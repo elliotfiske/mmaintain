@@ -43,7 +43,7 @@ type alias BackendModel =
     , relicDict : RelicDict RelicData
     , dirtDict : DirtDict DirtData
     , connectedClients : List ClientId
-    , clientIdToPersonId : Dict ClientId PersonId
+    , sessionIdToPersonId : Dict SessionId PersonId
     , biggestId : Int
     }
 

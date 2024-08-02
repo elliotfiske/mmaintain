@@ -35,7 +35,7 @@ subscriptions _ =
 init : ( Model, Cmd BackendMsg )
 init =
     ( { connectedClients = []
-      , clientIdToPersonId = Dict.empty
+      , sessionIdToPersonId = Dict.empty
       , personDict = PersonDict.empty
       , relicDict = RelicDict.empty
       , dirtDict = DirtDict.empty
@@ -54,12 +54,12 @@ update msg model =
         ClientConnected sessionId clientId ->
             let
                 ( newModel, cmd, personId ) =
-                    createPersonIfNeeded clientId model
+                    createPersonIfNeeded sessionId clientId model
             in
             ( newModel, cmd )
-                |> andThen (addClientToList clientId personId)
+                |> andThen (addClientToList clientId sessionId personId)
 
-        ClientDisconnected sessionId clientId ->
+        ClientDisconnected _ clientId ->
             ( { model | connectedClients = List.filter (\c -> c /= clientId) model.connectedClients }, Cmd.none )
 
 
@@ -72,8 +72,8 @@ andThen updateFunc ( model, cmd ) =
     ( newModel, Cmd.batch [ newCmd, cmd ] )
 
 
-addClientToList : ClientId -> PersonId -> Model -> ( Model, Cmd BackendMsg )
-addClientToList clientId personId model =
+addClientToList : ClientId -> SessionId -> PersonId -> Model -> ( Model, Cmd BackendMsg )
+addClientToList clientId sessionId personId model =
     let
         newState : FrontendPlayingState
         newState =
@@ -84,16 +84,16 @@ addClientToList clientId personId model =
             }
     in
     ( { model
-        | clientIdToPersonId = Dict.insert clientId personId model.clientIdToPersonId
+        | sessionIdToPersonId = Dict.insert sessionId personId model.sessionIdToPersonId
         , connectedClients = clientId :: model.connectedClients
       }
     , sendToFrontend clientId (UpdateFullState newState)
     )
 
 
-createPersonIfNeeded : ClientId -> Model -> ( Model, Cmd BackendMsg, PersonId )
-createPersonIfNeeded clientId model =
-    case Dict.get clientId model.clientIdToPersonId of
+createPersonIfNeeded : SessionId -> ClientId -> Model -> ( Model, Cmd BackendMsg, PersonId )
+createPersonIfNeeded sessionId clientId model =
+    case Dict.get sessionId model.sessionIdToPersonId of
         Just personId ->
             ( model, Cmd.none, personId )
 
@@ -135,7 +135,9 @@ updateModelFromGameState model gameState =
 
 
 updateFromFrontend : SessionId -> ClientId -> ToBackend -> Model -> ( Model, Cmd BackendMsg )
-updateFromFrontend sessionId clientId msg model =
+updateFromFrontend _ clientId msg model =
+    -- todo: currently we allow anybody to do anything. Need to check "legality" of action (a client could
+    -- currently move other characters, for instance)
     case msg of
         NoOpToBackend ->
             ( model, Cmd.none )

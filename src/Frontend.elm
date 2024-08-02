@@ -1,14 +1,16 @@
 module Frontend exposing (..)
 
 import Browser exposing (UrlRequest(..))
+import Browser.Events exposing (onKeyDown)
 import Browser.Navigation as Nav
-import Debug exposing (toString)
 import Dict
 import GameObject exposing (executeActionOnGameState)
-import GameObjectTypes exposing (ActionOnGamestate, PersonId)
+import GameObjectTypes exposing (ActionOnGamestate(..), Direction(..), PersonData, PersonId, personIdToInt)
 import Html
-import Html.Attributes as Attr
+import Html.Attributes as Attr exposing (..)
+import Json.Decode as Decode
 import Lamdera exposing (sendToBackend)
+import PersonDict
 import Types exposing (..)
 import Url
 
@@ -24,9 +26,48 @@ app =
         , onUrlChange = UrlChanged
         , update = update
         , updateFromBackend = updateFromBackend
-        , subscriptions = \m -> Sub.none
+        , subscriptions = subscriptions
         , view = view
         }
+
+
+subscriptions : Model -> Sub FrontendMsg
+subscriptions model =
+    Sub.batch
+        [ onKeyDown (keyDecoder model)
+        ]
+
+
+keyDecoder : Model -> Decode.Decoder FrontendMsg
+keyDecoder model =
+    Decode.map (toKey model) (Decode.field "key" Decode.string)
+
+
+toKey : Model -> String -> FrontendMsg
+toKey model str =
+    case model.state of
+        Loading ->
+            NoOpFrontendMsg
+
+        Error _ ->
+            NoOpFrontendMsg
+
+        Playing playingState ->
+            case str of
+                "ArrowUp" ->
+                    PerformAction (MovePerson playingState.myId Up)
+
+                "ArrowDown" ->
+                    PerformAction (MovePerson playingState.myId Down)
+
+                "ArrowLeft" ->
+                    PerformAction (MovePerson playingState.myId Left)
+
+                "ArrowRight" ->
+                    PerformAction (MovePerson playingState.myId Right)
+
+                _ ->
+                    NoOpFrontendMsg
 
 
 init : Url.Url -> Nav.Key -> ( Model, Cmd FrontendMsg )
@@ -117,12 +158,38 @@ view model =
     in
     { title = ""
     , body =
-        [ Html.div [ Attr.style "text-align" "center", Attr.style "padding-top" "40px" ]
-            [ Html.div
-                [ Attr.style "font-family" "sans-serif"
-                , Attr.style "padding-top" "40px"
-                ]
-                [ Html.text modelString ]
-            ]
+        [ Html.node "link" [ rel "stylesheet", href "/output.css" ] []
+        , renderModel model
+        , Html.text modelString
         ]
     }
+
+
+renderModel : Model -> Html.Html FrontendMsg
+renderModel model =
+    case model.state of
+        Loading ->
+            Html.text "Loading..."
+
+        Error string ->
+            Html.text ("Error: " ++ string)
+
+        Playing playingState ->
+            PersonDict.values playingState.personDict
+                |> List.map personView
+                |> Html.div [ class "game-container" ]
+
+
+personView : PersonData -> Html.Html FrontendMsg
+personView { id, name, x, y } =
+    let
+        offsetMultiplier =
+            10
+
+        offsetX =
+            x * offsetMultiplier
+
+        offsetY =
+            y * offsetMultiplier
+    in
+    Html.div [ class "absolute", style "left" (toString offsetX ++ "px"), style "top" (toString offsetY ++ "px") ] [ Html.text (String.fromInt (personIdToInt id)) ]
