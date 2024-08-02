@@ -187,9 +187,9 @@ personView { id, name, x, y } =
             10
 
         offsetX =
-            x * offsetMultiplier
+            String.fromInt (x * offsetMultiplier)
 
         offsetY =
-            y * offsetMultiplier
+            String.fromInt (y * offsetMultiplier)
     in
-    Html.div [ class "absolute", style "left" (toString offsetX ++ "px"), style "top" (toString offsetY ++ "px") ] [ Html.text (String.fromInt (personIdToInt id)) ]
+    Html.div [ class "absolute", style "left" (offsetX ++ "px"), style "top" (offsetY ++ "px") ] [ Html.text (String.fromInt (personIdToInt id)) ]
