@@ -4,6 +4,7 @@ import Browser exposing (UrlRequest(..))
 import Browser.Events exposing (onKeyDown)
 import Browser.Navigation as Nav
 import Dict
+import DirtDict
 import GameObject exposing (executeActionOnGameState)
 import GameObjectTypes exposing (ActionOnGamestate(..), Direction(..), PersonData, PersonId, personIdToInt)
 import Html
@@ -11,6 +12,7 @@ import Html.Attributes as Attr exposing (..)
 import Json.Decode as Decode
 import Lamdera exposing (sendToBackend)
 import PersonDict
+import RelicDict
 import Types exposing (..)
 import Url
 
@@ -154,7 +156,7 @@ view model =
                     "Error: " ++ string
 
                 Playing { personDict, relicDict, dirtDict, myId } ->
-                    "PersonDict: " ++ toString personDict ++ "\nRelicDict: " ++ toString relicDict ++ "\nDirtDict: " ++ toString dirtDict ++ "\nMyId: " ++ toString myId
+                    "PersonDict: " ++ String.fromInt (PersonDict.size personDict) ++ "\nRelicDict: " ++ String.fromInt (RelicDict.size relicDict) ++ "\nDirtDict: " ++ String.fromInt (DirtDict.size dirtDict) ++ "\nMyId: " ++ String.fromInt (personIdToInt myId)
     in
     { title = ""
     , body =
