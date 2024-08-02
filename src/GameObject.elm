@@ -10,10 +10,10 @@ movePerson : Direction -> PersonData -> PersonData
 movePerson direction person =
     case direction of
         Up ->
-            { person | y = person.y + 1 }
+            { person | y = person.y - 1 }
 
         Down ->
-            { person | y = person.y - 1 }
+            { person | y = person.y + 1 }
 
         Left ->
             { person | x = person.x - 1 }
