@@ -7,8 +7,9 @@ import Dict
 import DirtDict
 import GameObject exposing (executeActionOnGameState)
 import GameObjectTypes exposing (ActionOnGamestate(..), Direction(..), PersonData, PersonId, personIdToInt)
-import Html
-import Html.Attributes as Attr exposing (..)
+import Html exposing (..)
+import Html.Attributes exposing (..)
+import Html.Events exposing (onClick)
 import Json.Decode as Decode
 import Lamdera exposing (sendToBackend)
 import PersonDict
@@ -19,6 +20,29 @@ import Url
 
 type alias Model =
     FrontendModel
+
+
+type alias ValidFrontendModelData =
+    { me : PersonData }
+
+
+type AssembledFrontendModel
+    = ValidFrontendModel ValidFrontendModelData
+    | InvalidFrontendModel String
+
+
+assembleFrontendModel : FrontendPlayingState -> AssembledFrontendModel
+assembleFrontendModel state =
+    case PersonDict.get state.myId state.personDict of
+        Nothing ->
+            InvalidFrontendModel
+                ("You said my ID was "
+                    ++ GameObjectTypes.personIdToString state.myId
+                    ++ ", but that's not in the dict of persons."
+                )
+
+        Just myself ->
+            ValidFrontendModel { me = myself }
 
 
 app =
@@ -55,7 +79,7 @@ toKey model str =
             NoOpFrontendMsg
 
         Playing playingState ->
-            case str of
+            case Debug.log "str" str of
                 "ArrowUp" ->
                     PerformAction (MovePerson playingState.myId Up)
 
@@ -67,6 +91,9 @@ toKey model str =
 
                 "ArrowRight" ->
                     PerformAction (MovePerson playingState.myId Right)
+
+                " " ->
+                    PerformAction (tryCleaning playingState)
 
                 _ ->
                     NoOpFrontendMsg
@@ -100,6 +127,9 @@ update msg model =
 
         PerformAction action ->
             ( updateModelWithAction action model, sendToBackend (ClientPerformsAction action) )
+
+        ClickedPleaseMakeMeDirty ->
+            ( model, sendToBackend PleaseMakeMeDirty )
 
 
 updateModelWithAction : ActionOnGamestate -> Model -> Model
@@ -140,8 +170,21 @@ updateFromBackend msg model =
         UpdateFullState frontendState ->
             ( { model | state = Playing frontendState }, Cmd.none )
 
-        OtherClientPerformedAction action ->
+        OtherClientPerformedAction id action ->
             ( updateModelWithAction action model, Cmd.none )
+
+
+debugDirtDict : RealDirtDict -> Html.Html FrontendMsg
+debugDirtDict dict =
+    DirtDict.values dict
+        |> List.map debugDirt
+        |> List.map Html.text
+        |> Html.div []
+
+
+debugDirt : GameObjectTypes.DirtData -> String
+debugDirt dirt =
+    "x: " ++ String.fromInt dirt.x ++ ", y: " ++ String.fromInt dirt.y
 
 
 view : Model -> Browser.Document FrontendMsg
@@ -156,13 +199,14 @@ view model =
                     "Error: " ++ string
 
                 Playing { personDict, relicDict, dirtDict, myId } ->
-                    "PersonDict: " ++ String.fromInt (PersonDict.size personDict) ++ "\nRelicDict: " ++ String.fromInt (RelicDict.size relicDict) ++ "\nDirtDict: " ++ String.fromInt (DirtDict.size dirtDict) ++ "\nMyId: " ++ String.fromInt (personIdToInt myId)
+                    "PersonDict: " ++ String.fromInt (PersonDict.size personDict) ++ "\nRelicDict: " ++ String.fromInt (RelicDict.size relicDict) ++ "\nDirtDict: " ++ String.fromInt (DirtDict.size dirtDict) ++ "\nMyId: " ++ GameObjectTypes.personIdToString myId
     in
     { title = ""
     , body =
         [ Html.node "link" [ rel "stylesheet", href "/output.css" ] []
         , renderModel model
         , Html.text modelString
+        , Html.button [ Html.Events.onClick ClickedPleaseMakeMeDirty, class "btn btn-primary" ] [ text "Add Dirt" ]
         ]
     }
 
@@ -177,21 +221,81 @@ renderModel model =
             Html.text ("Error: " ++ string)
 
         Playing playingState ->
-            PersonDict.values playingState.personDict
-                |> List.map personView
-                |> Html.div [ class "game-container" ]
+            Html.div []
+                [ debugStuff playingState
+                , renderPlayingState playingState
+                ]
+
+
+debugStuff : FrontendPlayingState -> Html.Html FrontendMsg
+debugStuff state =
+    debugDirtDict state.dirtDict
+
+
+renderPlayingState : FrontendPlayingState -> Html.Html FrontendMsg
+renderPlayingState state =
+    renderPeople state
+        ++ renderDirt state
+        |> Html.div []
+
+
+renderDirt : FrontendPlayingState -> List (Html.Html FrontendMsg)
+renderDirt state =
+    DirtDict.values state.dirtDict
+        |> List.map dirtView
+
+
+renderPeople : FrontendPlayingState -> List (Html.Html FrontendMsg)
+renderPeople state =
+    PersonDict.values state.personDict
+        |> List.map personView
+
+
+renderOffsetMultiplier =
+    10
 
 
 personView : PersonData -> Html.Html FrontendMsg
 personView { id, name, x, y } =
     let
-        offsetMultiplier =
-            10
-
         offsetX =
-            String.fromInt (x * offsetMultiplier)
+            String.fromInt (x * renderOffsetMultiplier)
 
         offsetY =
-            String.fromInt (y * offsetMultiplier)
+            String.fromInt (y * renderOffsetMultiplier)
     in
-    Html.div [ class "absolute", style "left" (offsetX ++ "px"), style "top" (offsetY ++ "px") ] [ Html.text (String.fromInt (personIdToInt id)) ]
+    Html.div [ class "absolute", style "left" (offsetX ++ "px"), style "top" (offsetY ++ "px") ]
+        [ Html.text (String.fromInt (personIdToInt id)) ]
+
+
+dirtView : GameObjectTypes.DirtData -> Html.Html FrontendMsg
+dirtView { x, y, amount } =
+    let
+        offsetX =
+            String.fromInt (x * renderOffsetMultiplier)
+
+        offsetY =
+            String.fromInt (y * renderOffsetMultiplier)
+    in
+    Html.div [ class "absolute text-orange-500", style "left" (offsetX ++ "px"), style "top" (offsetY ++ "px") ]
+        [ Html.text (String.fromInt amount) ]
+
+
+me : FrontendPlayingState -> Maybe PersonData
+me state =
+    PersonDict.get state.myId state.personDict
+
+
+tryCleaning : FrontendPlayingState -> ActionOnGamestate
+tryCleaning state =
+    case me state of
+        Nothing ->
+            GameStateNoOp
+
+        Just myself ->
+            case GameObject.getDirtAtLocation myself.x myself.y state.dirtDict of
+                Nothing ->
+                    GameStateNoOp
+
+                Just dirt ->
+                    Clean dirt.id

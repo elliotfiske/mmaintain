@@ -10,6 +10,11 @@ personIdToInt (PersonId id) =
     id
 
 
+personIdToString : PersonId -> String
+personIdToString id =
+    String.fromInt (personIdToInt id)
+
+
 type DirtId
     = DirtId Int
 
@@ -71,4 +76,9 @@ type Direction
 type ActionOnGamestate
     = MovePerson PersonId Direction
     | Clean DirtId
+    | ChangeDirtAmount DirtId Int
+    | AddDirt DirtData
     | AddPerson PersonData
+    | PickUpRelic RelicId PersonId
+    | BatchAction (List ActionOnGamestate)
+    | GameStateNoOp

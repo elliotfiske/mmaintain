@@ -11,10 +11,26 @@ import RelicDict exposing (RelicDict)
 import Url exposing (Url)
 
 
+
+-- TODO: could probably generate this with everything else
+
+
+type alias RealPersonDict =
+    PersonDict PersonData
+
+
+type alias RealRelicDict =
+    RelicDict RelicData
+
+
+type alias RealDirtDict =
+    DirtDict DirtData
+
+
 type alias GameState =
     { personDict : PersonDict PersonData
     , relicDict : RelicDict RelicData
-    , dirtDict : DirtDict DirtData
+    , dirtDict : RealDirtDict
     }
 
 
@@ -53,11 +69,13 @@ type FrontendMsg
     | UrlChanged Url
     | NoOpFrontendMsg
     | PerformAction ActionOnGamestate
+    | ClickedPleaseMakeMeDirty
 
 
 type ToBackend
     = NoOpToBackend
     | ClientPerformsAction ActionOnGamestate
+    | PleaseMakeMeDirty
 
 
 type BackendMsg
@@ -68,5 +86,5 @@ type BackendMsg
 
 type ToFrontend
     = NoOpToFrontend
-    | OtherClientPerformedAction ActionOnGamestate
+    | OtherClientPerformedAction ClientId ActionOnGamestate
     | UpdateFullState FrontendPlayingState

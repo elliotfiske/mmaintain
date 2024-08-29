@@ -47,6 +47,35 @@ init =
 
 update : BackendMsg -> Model -> ( Model, Cmd BackendMsg )
 update msg model =
+    let
+        ( newModel, cmd ) =
+            maybeDoUpdate msg model
+    in
+    case assembleBackendModel newModel of
+        ValidBackendModel _ ->
+            ( newModel, cmd )
+
+        InvalidBackendModel _ ->
+            -- TODO: Attempted to get to an invalid state! Cancel the action. In the future it would be good to log this (to a Google Sheet maybe?)
+            ( model, Cmd.none )
+
+
+maybeDoUpdate : BackendMsg -> Model -> ( Model, Cmd BackendMsg )
+maybeDoUpdate msg model =
+    let
+        assembledModel =
+            assembleBackendModel model
+    in
+    case assembledModel of
+        ValidBackendModel validModel ->
+            actualUpdate msg model validModel
+
+        InvalidBackendModel _ ->
+            ( model, Cmd.none )
+
+
+actualUpdate : BackendMsg -> Model -> ValidBackendModelData -> ( Model, Cmd BackendMsg )
+actualUpdate msg model assembledModel =
     case msg of
         NoOpBackendMsg ->
             ( model, Cmd.none )
@@ -54,13 +83,62 @@ update msg model =
         ClientConnected sessionId clientId ->
             let
                 ( newModel, cmd, personId ) =
-                    createPersonIfNeeded sessionId clientId model
+                    createPersonIfNeeded sessionId clientId model assembledModel
             in
             ( newModel, cmd )
                 |> andThen (addClientToList clientId sessionId personId)
 
         ClientDisconnected _ clientId ->
             ( { model | connectedClients = List.filter (\c -> c /= clientId) model.connectedClients }, Cmd.none )
+
+
+type alias ValidBackendModelData =
+    { sessionIdToPersonData : Dict.Dict SessionId PersonData }
+
+
+type AssembledBackendModel
+    = ValidBackendModel ValidBackendModelData
+    | InvalidBackendModel String
+
+
+assembleBackendModel : Model -> AssembledBackendModel
+assembleBackendModel model =
+    case assembleSessionIdsToPersonData model of
+        Ok dict ->
+            ValidBackendModel
+                { sessionIdToPersonData = dict }
+
+        Err msg ->
+            InvalidBackendModel msg
+
+
+type alias AssembleStep =
+    Result String (Dict.Dict SessionId PersonData)
+
+
+assembleSessionIdsToPersonData : Model -> AssembleStep
+assembleSessionIdsToPersonData model =
+    Dict.foldl (convertPersonIdToPersonData model.personDict) (Ok Dict.empty) model.sessionIdToPersonId
+
+
+convertPersonIdToPersonData : RealPersonDict -> SessionId -> PersonId -> AssembleStep -> AssembleStep
+convertPersonIdToPersonData dict sessionId personId acc =
+    Result.andThen (addPersonDataToDict dict sessionId personId) acc
+
+
+addPersonDataToDict : RealPersonDict -> SessionId -> PersonId -> Dict.Dict SessionId PersonData -> AssembleStep
+addPersonDataToDict dict sessionId personId acc =
+    case PersonDict.get personId dict of
+        Nothing ->
+            Err
+                ("Could not find person with ID "
+                    ++ GameObjectTypes.personIdToString personId
+                    ++ " which was mapped from session ID "
+                    ++ sessionId
+                )
+
+        Just personData ->
+            Ok (Dict.insert sessionId personData acc)
 
 
 andThen : (Model -> ( Model, Cmd msg )) -> ( Model, Cmd msg ) -> ( Model, Cmd msg )
@@ -72,36 +150,36 @@ andThen updateFunc ( model, cmd ) =
     ( newModel, Cmd.batch [ newCmd, cmd ] )
 
 
-addClientToList : ClientId -> SessionId -> PersonId -> Model -> ( Model, Cmd BackendMsg )
-addClientToList clientId sessionId personId model =
+addClientToList : ClientId -> SessionId -> PersonData -> Model -> ( Model, Cmd BackendMsg )
+addClientToList clientId sessionId personData model =
     let
         newState : FrontendPlayingState
         newState =
             { personDict = model.personDict
             , relicDict = model.relicDict
             , dirtDict = model.dirtDict
-            , myId = personId
+            , myId = personData.id
             }
     in
     ( { model
-        | sessionIdToPersonId = Dict.insert sessionId personId model.sessionIdToPersonId
+        | sessionIdToPersonId = Dict.insert sessionId personData.id model.sessionIdToPersonId
         , connectedClients = clientId :: model.connectedClients
       }
     , sendToFrontend clientId (UpdateFullState newState)
     )
 
 
-createPersonIfNeeded : SessionId -> ClientId -> Model -> ( Model, Cmd BackendMsg, PersonId )
-createPersonIfNeeded sessionId clientId model =
-    case Dict.get sessionId model.sessionIdToPersonId of
-        Just personId ->
-            ( model, Cmd.none, personId )
+createPersonIfNeeded : SessionId -> ClientId -> Model -> ValidBackendModelData -> ( Model, Cmd BackendMsg, PersonData )
+createPersonIfNeeded sessionId clientId model assembledModel =
+    case Dict.get sessionId assembledModel.sessionIdToPersonData of
+        Just personData ->
+            ( model, Cmd.none, personData )
 
         Nothing ->
             createPerson clientId model
 
 
-createPerson : ClientId -> Model -> ( Model, Cmd BackendMsg, PersonId )
+createPerson : ClientId -> Model -> ( Model, Cmd BackendMsg, PersonData )
 createPerson clientId model =
     let
         newPerson : PersonData
@@ -110,11 +188,39 @@ createPerson clientId model =
 
         newPersonDict =
             PersonDict.insert newPerson.id newPerson model.personDict
+
+        incrementedModel =
+            incrementBiggestId model
     in
-    ( { model | biggestId = model.biggestId + 1, personDict = newPersonDict }
+    ( { incrementedModel | personDict = newPersonDict }
     , forwardToEveryoneButMe (AddPerson newPerson) clientId model
-    , newPerson.id
+    , newPerson
     )
+
+
+type alias CreateDirtArgs =
+    { x : Int, y : Int, amount : Int }
+
+
+createDirt : CreateDirtArgs -> Model -> ( Model, Cmd BackendMsg )
+createDirt args model =
+    let
+        newDirt : GameObjectTypes.DirtData
+        newDirt =
+            { x = args.x, y = args.y, amount = args.amount, id = GameObjectTypes.DirtId model.biggestId }
+
+        newDirtDict =
+            DirtDict.insert newDirt.id newDirt model.dirtDict
+
+        incrementedModel =
+            incrementBiggestId model
+    in
+    ( { incrementedModel | dirtDict = newDirtDict }, Lamdera.broadcast (OtherClientPerformedAction "big boss" (AddDirt newDirt)) )
+
+
+incrementBiggestId : Model -> Model
+incrementBiggestId model =
+    { model | biggestId = model.biggestId + 1 }
 
 
 constructGameState : Model -> GameState
@@ -143,14 +249,48 @@ updateFromFrontend _ clientId msg model =
             ( model, Cmd.none )
 
         ClientPerformsAction actionOnGamestate ->
-            ( updateModelFromGameState model (executeActionOnGameState actionOnGamestate (constructGameState model))
+            ( model
+                |> constructGameState
+                |> executeActionOnGameState actionOnGamestate
+                |> updateModelFromGameState model
             , forwardToEveryoneButMe actionOnGamestate clientId model
             )
+
+        PleaseMakeMeDirty ->
+            addSomeDirt model
+
+
+addSomeDirt : Model -> ( Model, Cmd BackendMsg )
+addSomeDirt model =
+    addDirtToSpot model 8 8
+
+
+addDirtToSpot : Model -> Int -> Int -> ( Model, Cmd BackendMsg )
+addDirtToSpot model x y =
+    let
+        existingDirt =
+            GameObject.getDirtAtLocation x y model.dirtDict
+    in
+    case existingDirt of
+        Nothing ->
+            createDirt { x = x, y = y, amount = 9 } model
+
+        Just dirt ->
+            changeDirtAmount dirt model 9
+
+
+changeDirtAmount : GameObjectTypes.DirtData -> Model -> Int -> ( Model, Cmd BackendMsg )
+changeDirtAmount dirt model amount =
+    let
+        newDirtDict =
+            DirtDict.insert dirt.id { dirt | amount = amount } model.dirtDict
+    in
+    ( { model | dirtDict = newDirtDict }, Lamdera.broadcast (OtherClientPerformedAction "da big one" (ChangeDirtAmount dirt.id amount)) )
 
 
 forwardToEveryoneButMe : ActionOnGamestate -> ClientId -> Model -> Cmd BackendMsg
 forwardToEveryoneButMe action myClientId model =
     model.connectedClients
         |> List.filter (\c -> c /= myClientId)
-        |> List.map (\id -> sendToFrontend id (OtherClientPerformedAction action))
+        |> List.map (\id -> sendToFrontend id (OtherClientPerformedAction id action))
         |> Cmd.batch
