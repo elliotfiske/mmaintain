@@ -15,6 +15,7 @@ import PersonDict
 import RelicDict
 import Types exposing (..)
 import Url
+import Util
 
 
 type alias Model =
@@ -22,7 +23,7 @@ type alias Model =
 
 
 type alias ValidFrontendModelData =
-    { me : PersonData, relicsByPerson : PersonDict.PersonDict Types.PersonWithRelics }
+    { me : Types.PersonWithRelics, relicsByPerson : PersonDict.PersonDict Types.PersonWithRelics }
 
 
 type AssembledFrontendModel
@@ -33,13 +34,16 @@ type AssembledFrontendModel
 assembleFrontendModel : FrontendPlayingState -> AssembledFrontendModel
 assembleFrontendModel state =
     let
+        relicsByPersonResult =
+            assembleRelicsByPerson state
+
         myselfResult =
             extractMyself state
 
-        relicsByPersonResult =
-            assembleRelicsByPerson state
+        myselfWithRelicsResult =
+            Util.andThen2 assembleMyself myselfResult relicsByPersonResult
     in
-    case Result.map2 createValidFrontendModel myselfResult relicsByPersonResult of
+    case Result.map2 createValidFrontendModel myselfWithRelicsResult relicsByPersonResult of
         Err message ->
             InvalidFrontendModel message
 
@@ -47,7 +51,17 @@ assembleFrontendModel state =
             ValidFrontendModel validFrontendModelData
 
 
-createValidFrontendModel : PersonData -> PersonDict.PersonDict PersonWithRelics -> ValidFrontendModelData
+assembleMyself : PersonData -> PersonDict.PersonDict PersonWithRelics -> Result String PersonWithRelics
+assembleMyself myself relicsByPerson =
+    case PersonDict.get myself.id relicsByPerson of
+        Nothing ->
+            Err ("Could not find myself in the 'relics by person' dict. My id: " ++ personIdToString myself.id)
+
+        Just myselfWithRelics ->
+            Ok myselfWithRelics
+
+
+createValidFrontendModel : Types.PersonWithRelics -> PersonDict.PersonDict PersonWithRelics -> ValidFrontendModelData
 createValidFrontendModel myself relicsByPerson =
     { me = myself, relicsByPerson = relicsByPerson }
 
@@ -74,7 +88,14 @@ assembleRelicsByPerson : FrontendPlayingState -> Result String (PersonDict.Perso
 assembleRelicsByPerson state =
     state.relicDict
         |> RelicDict.values
-        |> List.foldl (tryUpdatingRelicHolderDict state.personDict) (Ok PersonDict.empty)
+        |> List.foldl (tryUpdatingRelicHolderDict state.personDict) (Ok (emptyRelicsByPerson state))
+
+
+emptyRelicsByPerson : FrontendPlayingState -> PersonDict.PersonDict PersonWithRelics
+emptyRelicsByPerson state =
+    state.personDict
+        |> PersonDict.values
+        |> List.foldl (\p d -> PersonDict.insert p.id { person = p, heldRelics = [] } d) PersonDict.empty
 
 
 tryUpdatingRelicHolderDict : RealPersonDict -> GameObjectTypes.RelicData -> AssembleRelicsByPersonStep -> AssembleRelicsByPersonStep
@@ -302,11 +323,21 @@ renderModel model =
             Html.text ("Error: " ++ string)
 
         Playing playingState ->
+            renderPlayingState playingState
+
+
+renderPlayingState : FrontendPlayingState -> Html.Html FrontendMsg
+renderPlayingState state =
+    case assembleFrontendModel state of
+        ValidFrontendModel validFrontendModelData ->
             Html.div []
-                [ debugStuff playingState
-                , renderHeldRelics playingState
-                , renderPlayingState playingState
+                [ debugStuff state
+                , renderHeldRelics validFrontendModelData
+                , renderMap state
                 ]
+
+        InvalidFrontendModel errorMessage ->
+            Html.text ("Error assembling model: " ++ errorMessage)
 
 
 debugStuff : FrontendPlayingState -> Html.Html FrontendMsg
@@ -314,8 +345,8 @@ debugStuff state =
     debugDirtDict state.dirtDict
 
 
-renderPlayingState : FrontendPlayingState -> Html.Html FrontendMsg
-renderPlayingState state =
+renderMap : FrontendPlayingState -> Html.Html FrontendMsg
+renderMap state =
     renderPeople state
         ++ renderDirt state
         ++ renderFloorRelics state
@@ -328,10 +359,10 @@ renderDirt state =
         |> List.map dirtView
 
 
-renderHeldRelics : FrontendPlayingState -> Html.Html FrontendMsg
+renderHeldRelics : ValidFrontendModelData -> Html.Html FrontendMsg
 renderHeldRelics state =
-    RelicDict.values state.relicDict
-        |> List.map heldRelicView
+    state.me.heldRelics
+        |> List.map (heldRelicView state.me.person.id)
         |> Html.div []
 
 
@@ -394,20 +425,14 @@ floorRelicView { relicType, position } =
                 [ Html.text "!" ]
 
 
-heldRelicView : GameObjectTypes.RelicData -> Html.Html FrontendMsg
-heldRelicView { id, relicType, position } =
-    case position of
-        GameObjectTypes.OnFloor _ _ ->
-            text ""
-
-        GameObjectTypes.HeldBy personId ->
-            -- TODO: Only show relics held by meeee
-            Html.div []
-                [ Html.text (GameObject.relicName relicType)
-                , Html.button
-                    [ Html.Events.onClick (PerformAction (DropRelic id personId)), class "btn btn-primary" ]
-                    [ text "Drop" ]
-                ]
+heldRelicView : PersonId -> GameObjectTypes.RelicData -> Html.Html FrontendMsg
+heldRelicView myId { id, relicType } =
+    Html.div []
+        [ Html.text (GameObject.relicName relicType)
+        , Html.button
+            [ Html.Events.onClick (PerformAction (DropRelic id myId)), class "btn btn-primary" ]
+            [ text "Drop" ]
+        ]
 
 
 me : FrontendPlayingState -> Maybe PersonData

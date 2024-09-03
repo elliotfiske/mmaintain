@@ -1,4 +1,4 @@
-module Backend exposing (..)
+module Backend exposing (app)
 
 import Dict
 import DirtDict
