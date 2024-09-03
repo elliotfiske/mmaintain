@@ -27,6 +27,10 @@ type alias RealDirtDict =
     DirtDict DirtData
 
 
+type alias PersonWithRelics =
+    { person : PersonData, heldRelics : List RelicData }
+
+
 type alias GameState =
     { personDict : PersonDict PersonData
     , relicDict : RelicDict RelicData
@@ -70,12 +74,14 @@ type FrontendMsg
     | NoOpFrontendMsg
     | PerformAction ActionOnGamestate
     | ClickedPleaseMakeMeDirty
+    | DebugGenerateRelic
 
 
 type ToBackend
     = NoOpToBackend
     | ClientPerformsAction ActionOnGamestate
     | PleaseMakeMeDirty
+    | PleaseGenerateRelic
 
 
 type BackendMsg

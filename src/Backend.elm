@@ -223,6 +223,11 @@ incrementBiggestId model =
     { model | biggestId = model.biggestId + 1 }
 
 
+getAndIncrementBiggestId : Model -> ( Int, Model )
+getAndIncrementBiggestId model =
+    ( model.biggestId, incrementBiggestId model )
+
+
 constructGameState : Model -> GameState
 constructGameState model =
     { personDict = model.personDict
@@ -259,14 +264,43 @@ updateFromFrontend _ clientId msg model =
         PleaseMakeMeDirty ->
             addSomeDirt model
 
+        PleaseGenerateRelic ->
+            addRelic model
+
+
+addRelic : Model -> ( Model, Cmd BackendMsg )
+addRelic model =
+    let
+        ( newId, incModel ) =
+            getAndIncrementBiggestId model
+
+        newRelic : GameObjectTypes.RelicData
+        newRelic =
+            { id = GameObjectTypes.RelicId newId, relicType = GameObjectTypes.CleanFast, position = GameObjectTypes.OnFloor 10 10 }
+
+        newRelicDict =
+            RelicDict.insert newRelic.id newRelic model.relicDict
+    in
+    ( { incModel | relicDict = newRelicDict }, Lamdera.broadcast (OtherClientPerformedAction "big boss" (AddRelic newRelic)) )
+
 
 addSomeDirt : Model -> ( Model, Cmd BackendMsg )
 addSomeDirt model =
-    addDirtToSpot model 8 8
+    List.foldl andThenAddDirtToSpot ( model, Cmd.none ) [ 5, 7, 9 ]
 
 
-addDirtToSpot : Model -> Int -> Int -> ( Model, Cmd BackendMsg )
-addDirtToSpot model x y =
+
+-- List of numbers
+-- function that takes a number and outputs a ( model, Cmd)
+
+
+andThenAddDirtToSpot : Int -> ( Model, Cmd BackendMsg ) -> ( Model, Cmd BackendMsg )
+andThenAddDirtToSpot y ( model, msg ) =
+    andThen (addDirtToSpot 8 y) ( model, msg )
+
+
+addDirtToSpot : Int -> Int -> Model -> ( Model, Cmd BackendMsg )
+addDirtToSpot x y model =
     let
         existingDirt =
             GameObject.getDirtAtLocation x y model.dirtDict
