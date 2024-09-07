@@ -276,39 +276,12 @@ updateFromBackend msg model =
             ( updateModelWithAction action model, Cmd.none )
 
 
-debugDirtDict : RealDirtDict -> Html.Html FrontendMsg
-debugDirtDict dict =
-    DirtDict.values dict
-        |> List.map debugDirt
-        |> List.map Html.text
-        |> Html.div []
-
-
-debugDirt : GameObjectTypes.DirtData -> String
-debugDirt dirt =
-    "x: " ++ String.fromInt dirt.x ++ ", y: " ++ String.fromInt dirt.y
-
-
 view : Model -> Browser.Document FrontendMsg
 view model =
-    let
-        modelString =
-            case model.state of
-                Loading ->
-                    "Loading..."
-
-                Error string ->
-                    "Error: " ++ string
-
-                Playing { personDict, relicDict, dirtDict, myId } ->
-                    "PersonDict: " ++ String.fromInt (PersonDict.size personDict) ++ "\nRelicDict: " ++ String.fromInt (RelicDict.size relicDict) ++ "\nDirtDict: " ++ String.fromInt (DirtDict.size dirtDict) ++ "\nMyId: " ++ GameObjectTypes.personIdToString myId
-    in
     { title = ""
     , body =
         [ Html.node "link" [ rel "stylesheet", href "/output.css" ] []
         , renderModel model
-        , Html.text modelString
-        , Html.button [ Html.Events.onClick ClickedPleaseMakeMeDirty, class "btn btn-primary" ] [ text "Add Dirt" ]
         ]
     }
 
@@ -332,7 +305,7 @@ renderPlayingState state =
         ValidFrontendModel validFrontendModelData ->
             Html.div []
                 [ debugStuff state
-                , renderHeldRelics validFrontendModelData
+                , renderMyHUD validFrontendModelData
                 , renderMap state
                 ]
 
@@ -340,9 +313,25 @@ renderPlayingState state =
             Html.text ("Error assembling model: " ++ errorMessage)
 
 
+renderMyHUD : ValidFrontendModelData -> Html.Html FrontendMsg
+renderMyHUD state =
+    Html.div [ class "flex flex-col items-end" ]
+        [ renderXP state.me.person
+        , renderHeldRelics state
+        ]
+
+
 debugStuff : FrontendPlayingState -> Html.Html FrontendMsg
 debugStuff state =
-    debugDirtDict state.dirtDict
+    Html.div [ class "flex flex-col items-end" ]
+        [ debugDicts state
+        , Html.button [ Html.Events.onClick ClickedPleaseMakeMeDirty, class "btn btn-primary" ] [ text "Add Dirt" ]
+        ]
+
+
+debugDicts : FrontendPlayingState -> Html.Html FrontendMsg
+debugDicts { personDict, relicDict, dirtDict, myId } =
+    Html.text ("PersonDict: " ++ String.fromInt (PersonDict.size personDict) ++ "\nRelicDict: " ++ String.fromInt (RelicDict.size relicDict) ++ "\nDirtDict: " ++ String.fromInt (DirtDict.size dirtDict) ++ "\nMyId: " ++ GameObjectTypes.personIdToString myId)
 
 
 renderMap : FrontendPlayingState -> Html.Html FrontendMsg
@@ -359,11 +348,28 @@ renderDirt state =
         |> List.map dirtView
 
 
+renderXP : PersonData -> Html.Html FrontendMsg
+renderXP myself =
+    Html.div [ class "flex flex-col text-right" ]
+        [ Html.text ("XP: " ++ String.fromInt myself.experience)
+        , Html.br [] []
+        , Html.text
+            ("Level: " ++ String.fromInt (Util.levelForExp myself.experience))
+        ]
+
+
 renderHeldRelics : ValidFrontendModelData -> Html.Html FrontendMsg
 renderHeldRelics state =
-    state.me.heldRelics
-        |> List.map (heldRelicView state.me.person.id)
-        |> Html.div []
+    Html.div [ class "flex flex-col" ]
+        (Html.text
+            "My Relics:"
+            :: renderRelicList state.me.heldRelics state.me.person.id
+        )
+
+
+renderRelicList : List GameObjectTypes.RelicData -> PersonId -> List (Html.Html FrontendMsg)
+renderRelicList list myId =
+    List.map (heldRelicView myId) list
 
 
 renderFloorRelics state =
@@ -378,7 +384,7 @@ renderPeople state =
 
 
 renderOffsetMultiplier =
-    10
+    30
 
 
 personView : PersonData -> Html.Html FrontendMsg

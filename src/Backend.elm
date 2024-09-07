@@ -9,6 +9,7 @@ import List
 import PersonDict
 import RelicDict
 import Types exposing (..)
+import Util
 
 
 type alias Model =
@@ -286,7 +287,15 @@ addRelic model =
 
 addSomeDirt : Model -> ( Model, Cmd BackendMsg )
 addSomeDirt model =
-    List.foldl andThenAddDirtToSpot ( model, Cmd.none ) [ 5, 7, 9 ]
+    List.foldl andThenAddDirtToSpot
+        ( model, Cmd.none )
+        (Util.generateGridOfPoints
+            { minX = 5
+            , maxX = 10
+            , minY = 5
+            , maxY = 10
+            }
+        )
 
 
 
@@ -294,9 +303,9 @@ addSomeDirt model =
 -- function that takes a number and outputs a ( model, Cmd)
 
 
-andThenAddDirtToSpot : Int -> ( Model, Cmd BackendMsg ) -> ( Model, Cmd BackendMsg )
-andThenAddDirtToSpot y ( model, msg ) =
-    andThen (addDirtToSpot 8 y) ( model, msg )
+andThenAddDirtToSpot : Point -> ( Model, Cmd BackendMsg ) -> ( Model, Cmd BackendMsg )
+andThenAddDirtToSpot { x, y } ( model, msg ) =
+    andThen (addDirtToSpot x y) ( model, msg )
 
 
 addDirtToSpot : Int -> Int -> Model -> ( Model, Cmd BackendMsg )

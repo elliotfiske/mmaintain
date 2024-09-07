@@ -60,7 +60,25 @@ setDirtAmount amount dirt =
 
 makeDirtCleaner : DirtId -> DirtDict DirtData -> DirtDict DirtData
 makeDirtCleaner id dict =
-    DirtDict.update id (Maybe.map cleanDirt) dict
+    let
+        newDirt =
+            Maybe.map cleanDirt (DirtDict.get id dict)
+    in
+    case newDirt of
+        Nothing ->
+            dict
+
+        Just dirt ->
+            updateDirtOrRemoveEmpty dirt dict
+
+
+updateDirtOrRemoveEmpty : DirtData -> DirtDict DirtData -> DirtDict DirtData
+updateDirtOrRemoveEmpty dirt dict =
+    if dirt.amount <= 0 then
+        DirtDict.remove dirt.id dict
+
+    else
+        DirtDict.insert dirt.id dirt dict
 
 
 changeDirtAmount : DirtId -> Int -> RealDirtDict -> RealDirtDict

@@ -44,6 +44,10 @@ type alias FrontendModel =
     }
 
 
+type alias Point =
+    { x : Int, y : Int }
+
+
 type alias FrontendPlayingState =
     { personDict : PersonDict PersonData
     , relicDict : RelicDict RelicData
