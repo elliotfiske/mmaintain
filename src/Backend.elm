@@ -41,6 +41,7 @@ init =
       , relicDict = RelicDict.empty
       , dirtDict = DirtDict.empty
       , biggestId = 0
+      , bigRandom = 46296
       }
     , Cmd.none
     )
@@ -185,7 +186,7 @@ createPerson clientId model =
     let
         newPerson : PersonData
         newPerson =
-            { id = PersonId model.biggestId, name = "Person", experience = 0, x = 0, y = 0 }
+            GameObject.createPerson (PersonId model.biggestId) "Person"
 
         newPersonDict =
             PersonDict.insert newPerson.id newPerson model.personDict
@@ -229,6 +230,17 @@ getAndIncrementBiggestId model =
     ( model.biggestId, incrementBiggestId model )
 
 
+{-| Return a "random enough" number.
+-}
+getRandomValue : Model -> ( Int, Model )
+getRandomValue model =
+    let
+        nextRandom =
+            modBy 2301875097 (model.bigRandom * 348987 + 174039)
+    in
+    ( model.bigRandom, { model | bigRandom = nextRandom } )
+
+
 constructGameState : Model -> GameState
 constructGameState model =
     { personDict = model.personDict
@@ -258,6 +270,7 @@ updateFromFrontend _ clientId msg model =
             ( model
                 |> constructGameState
                 |> executeActionOnGameState actionOnGamestate
+                -- idea: have "backend action" generated from here that's ignored on the frontend but triggers stuff on the backend. Used for EXP granting and relic rolls.
                 |> updateModelFromGameState model
             , forwardToEveryoneButMe actionOnGamestate clientId model
             )
@@ -277,7 +290,7 @@ addRelic model =
 
         newRelic : GameObjectTypes.RelicData
         newRelic =
-            { id = GameObjectTypes.RelicId newId, relicType = GameObjectTypes.CleanFast, position = GameObjectTypes.OnFloor 10 10 }
+            { id = GameObjectTypes.RelicId newId, relicType = GameObjectTypes.CleanFast, position = GameObjectTypes.OnFloor 2 2 }
 
         newRelicDict =
             RelicDict.insert newRelic.id newRelic model.relicDict
@@ -291,35 +304,37 @@ addSomeDirt model =
         ( model, Cmd.none )
         (Util.generateGridOfPoints
             { minX = 5
-            , maxX = 10
+            , maxX = 20
             , minY = 5
-            , maxY = 10
+            , maxY = 20
             }
         )
 
 
-
--- List of numbers
--- function that takes a number and outputs a ( model, Cmd)
-
-
 andThenAddDirtToSpot : Point -> ( Model, Cmd BackendMsg ) -> ( Model, Cmd BackendMsg )
-andThenAddDirtToSpot { x, y } ( model, msg ) =
-    andThen (addDirtToSpot x y) ( model, msg )
+andThenAddDirtToSpot point ( model, msg ) =
+    let
+        ( randomValue, newModel ) =
+            getRandomValue model
+
+        dirtAmount =
+            modBy 50 randomValue + 50
+    in
+    andThen (addDirtToSpot point dirtAmount) ( newModel, msg )
 
 
-addDirtToSpot : Int -> Int -> Model -> ( Model, Cmd BackendMsg )
-addDirtToSpot x y model =
+addDirtToSpot : Types.Point -> Int -> Model -> ( Model, Cmd BackendMsg )
+addDirtToSpot { x, y } amount model =
     let
         existingDirt =
             GameObject.getDirtAtLocation x y model.dirtDict
     in
     case existingDirt of
         Nothing ->
-            createDirt { x = x, y = y, amount = 9 } model
+            createDirt { x = x, y = y, amount = amount } model
 
         Just dirt ->
-            changeDirtAmount dirt model 9
+            changeDirtAmount dirt model amount
 
 
 changeDirtAmount : GameObjectTypes.DirtData -> Model -> Int -> ( Model, Cmd BackendMsg )

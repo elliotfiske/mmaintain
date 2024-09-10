@@ -40,6 +40,10 @@ createPerson id name =
     , experience = 0
     , x = 0
     , y = 0
+    , stats =
+        { cleanCount = 0
+        , clearCount = 0
+        }
     }
 
 
@@ -48,9 +52,9 @@ movePersonWithId id direction dict =
     PersonDict.update id (Maybe.map (movePerson direction)) dict
 
 
-cleanDirt : DirtData -> DirtData
-cleanDirt dirt =
-    { dirt | amount = dirt.amount - 1 }
+cleanDirt : Int -> DirtData -> DirtData
+cleanDirt cleanStrength dirt =
+    { dirt | amount = dirt.amount - cleanStrength }
 
 
 setDirtAmount : Int -> DirtData -> DirtData
@@ -58,18 +62,48 @@ setDirtAmount amount dirt =
     { dirt | amount = amount }
 
 
-makeDirtCleaner : DirtId -> DirtDict DirtData -> DirtDict DirtData
-makeDirtCleaner id dict =
-    let
-        newDirt =
-            Maybe.map cleanDirt (DirtDict.get id dict)
-    in
-    case newDirt of
+makeDirtCleaner : Maybe DirtData -> DirtDict DirtData -> DirtDict DirtData
+makeDirtCleaner dirtData dict =
+    case dirtData of
         Nothing ->
             dict
 
         Just dirt ->
             updateDirtOrRemoveEmpty dirt dict
+
+
+incrementCleanCount : PersonId -> PersonDict PersonData -> PersonDict PersonData
+incrementCleanCount personId dict =
+    PersonDict.update personId (Maybe.map doIncrementCleanCount) dict
+
+
+doIncrementCleanCount : PersonData -> PersonData
+doIncrementCleanCount person =
+    let
+        stats =
+            person.stats
+
+        newStats =
+            { stats | cleanCount = stats.cleanCount + 1 }
+    in
+    { person | stats = newStats }
+
+
+incrementClearCount : PersonId -> PersonDict PersonData -> PersonDict PersonData
+incrementClearCount personId dict =
+    PersonDict.update personId (Maybe.map doIncrementClearCount) dict
+
+
+doIncrementClearCount : PersonData -> PersonData
+doIncrementClearCount person =
+    let
+        stats =
+            person.stats
+
+        newStats =
+            { stats | clearCount = stats.clearCount + 1 }
+    in
+    { person | stats = newStats }
 
 
 updateDirtOrRemoveEmpty : DirtData -> DirtDict DirtData -> DirtDict DirtData
@@ -129,27 +163,22 @@ relicHolder relic =
 
 relicModifiesAction : RelicData -> ActionOnGamestate -> ActionOnGamestate
 relicModifiesAction relic action =
-    case action of
-        BatchAction actions ->
-            BatchAction (List.map (relicModifiesAction relic) actions)
+    case relic.relicType of
+        CleanFast ->
+            case action of
+                Clean personId dirtId strength ->
+                    if Just personId == relicHolder relic then
+                        Clean personId dirtId (strength * 2)
 
-        _ ->
-            case relic.relicType of
-                CleanFast ->
-                    case action of
-                        Clean personId _ ->
-                            if Just personId == relicHolder relic then
-                                BatchAction [ action, action ]
+                    else
+                        action
 
-                            else
-                                action
-
-                        _ ->
-                            action
-
-                MoreXP ->
-                    -- unimplemented
+                _ ->
                     action
+
+        MoreXP ->
+            -- unimplemented
+            action
 
 
 relicName : RelicType -> String
@@ -168,20 +197,61 @@ updateWithRelics action state =
         |> List.foldl relicModifiesAction action
 
 
-internalExecuteActionOnGameState : ActionOnGamestate -> GameState -> GameState
+doClean : PersonId -> DirtId -> Int -> GameState -> ( GameState, ActionOnGamestate )
+doClean personId dirtId strength state =
+    case DirtDict.get dirtId state.dirtDict of
+        Nothing ->
+            -- TODO: Log error? Attempted to clean dirt not in dictionary.
+            ( state, GameStateNoOp )
+
+        Just dirtData ->
+            let
+                newDirt =
+                    cleanDirt strength dirtData
+
+                nextAction =
+                    if newDirt.amount <= 0 then
+                        ClearedPollution personId dirtData
+
+                    else
+                        GameStateNoOp
+            in
+            ( { state | dirtDict = DirtDict.insert dirtId newDirt state.dirtDict }
+            , nextAction
+            )
+
+
+addCleanStats : PersonId -> GameState -> GameState
+addCleanStats personId state =
+    { state | personDict = incrementCleanCount personId state.personDict }
+
+
+addClearStats : PersonId -> GameState -> GameState
+addClearStats personId state =
+    { state | personDict = incrementClearCount personId state.personDict }
+
+
+withNoOp : GameState -> ( GameState, ActionOnGamestate )
+withNoOp state =
+    ( state, GameStateNoOp )
+
+
+internalExecuteActionOnGameState : ActionOnGamestate -> GameState -> ( GameState, ActionOnGamestate )
 internalExecuteActionOnGameState action state =
     case action of
-        Clean _ dirtId ->
-            { state | dirtDict = makeDirtCleaner dirtId state.dirtDict }
+        Clean personId dirtId strength ->
+            state
+                |> addCleanStats personId
+                |> doClean personId dirtId strength
 
         MovePerson personId direction ->
-            { state | personDict = movePersonWithId personId direction state.personDict }
+            withNoOp { state | personDict = movePersonWithId personId direction state.personDict }
 
         AddPerson personData ->
-            { state | personDict = PersonDict.insert personData.id personData state.personDict }
+            withNoOp { state | personDict = PersonDict.insert personData.id personData state.personDict }
 
         PickUpRelic relicId personId ->
-            { state | relicDict = RelicDict.update relicId (Maybe.map (pickUpRelic personId)) state.relicDict }
+            withNoOp { state | relicDict = RelicDict.update relicId (Maybe.map (pickUpRelic personId)) state.relicDict }
 
         DropRelic relicId personId ->
             let
@@ -194,27 +264,41 @@ internalExecuteActionOnGameState action state =
             -- TODO: Cool helper function like "return state unchanged if either of these are Nothing, otherwise execute update". I think I may do this a lot.
             case ( maybeDropper, maybeRelic ) of
                 ( Just dropper, Just relic ) ->
-                    { state | relicDict = RelicDict.insert relicId (dropRelic dropper relic) state.relicDict }
+                    withNoOp { state | relicDict = RelicDict.insert relicId (dropRelic dropper relic) state.relicDict }
 
                 _ ->
-                    state
+                    withNoOp state
 
         ChangeDirtAmount dirtId int ->
-            { state | dirtDict = changeDirtAmount dirtId int state.dirtDict }
+            withNoOp { state | dirtDict = changeDirtAmount dirtId int state.dirtDict }
 
         AddDirt dirtData ->
-            { state | dirtDict = DirtDict.insert dirtData.id dirtData state.dirtDict }
+            withNoOp { state | dirtDict = DirtDict.insert dirtData.id dirtData state.dirtDict }
 
         AddRelic relicData ->
-            { state | relicDict = RelicDict.insert relicData.id relicData state.relicDict }
-
-        BatchAction actionList ->
-            List.foldl internalExecuteActionOnGameState state actionList
+            withNoOp { state | relicDict = RelicDict.insert relicData.id relicData state.relicDict }
 
         GameStateNoOp ->
-            state
+            withNoOp state
+
+        ClearedPollution personId dirtData ->
+            let
+                newRelic =
+                    { id = GameObjectTypes.RelicId (RelicDict.size state.relicDict * 11), relicType = GameObjectTypes.CleanFast, position = GameObjectTypes.OnFloor dirtData.x dirtData.y }
+
+                newDirtDict =
+                    DirtDict.remove dirtData.id state.dirtDict
+            in
+            ( addClearStats personId { state | dirtDict = newDirtDict }
+            , AddRelic newRelic
+            )
 
 
 executeActionOnGameState : ActionOnGamestate -> GameState -> GameState
 executeActionOnGameState actionOnGamestate state =
-    internalExecuteActionOnGameState (updateWithRelics actionOnGamestate state) state
+    case internalExecuteActionOnGameState (updateWithRelics actionOnGamestate state) state of
+        ( newState, GameStateNoOp ) ->
+            newState
+
+        ( newState, nextAction ) ->
+            executeActionOnGameState nextAction newState

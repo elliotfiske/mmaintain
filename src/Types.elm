@@ -69,6 +69,7 @@ type alias BackendModel =
     , connectedClients : List ClientId
     , sessionIdToPersonId : Dict SessionId PersonId
     , biggestId : Int
+    , bigRandom : Int
     }
 
 

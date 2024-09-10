@@ -44,12 +44,19 @@ type GameObject
     | Relic RelicData
 
 
+type alias PersonStats =
+    { cleanCount : Int
+    , clearCount : Int
+    }
+
+
 type alias PersonData =
     { id : PersonId
     , name : String
     , experience : Int
     , x : Int
     , y : Int
+    , stats : PersonStats
     }
 
 
@@ -80,12 +87,12 @@ type Direction
 
 type ActionOnGamestate
     = MovePerson PersonId Direction
-    | Clean PersonId DirtId
+    | Clean PersonId DirtId Int
+    | ClearedPollution PersonId DirtData
     | ChangeDirtAmount DirtId Int
     | AddDirt DirtData
     | AddRelic RelicData
     | AddPerson PersonData
     | PickUpRelic RelicId PersonId
     | DropRelic RelicId PersonId
-    | BatchAction (List ActionOnGamestate)
     | GameStateNoOp

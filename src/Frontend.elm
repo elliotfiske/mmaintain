@@ -4,13 +4,13 @@ import Browser exposing (UrlRequest(..))
 import Browser.Events exposing (onKeyDown)
 import Browser.Navigation as Nav
 import DirtDict
-import GameObject exposing (executeActionOnGameState, relicName)
+import GameObject
 import GameObjectTypes exposing (ActionOnGamestate(..), Direction(..), PersonData, PersonId, personIdToInt, personIdToString, relicIdToString)
 import Html exposing (..)
 import Html.Attributes exposing (..)
 import Html.Events
 import Json.Decode as Decode
-import Lamdera exposing (sendToBackend)
+import Lamdera
 import PersonDict
 import RelicDict
 import Types exposing (..)
@@ -175,27 +175,49 @@ toKey model str =
             NoOpFrontendMsg
 
         Playing playingState ->
-            case Debug.log "str" str of
+            handleKey playingState str
+
+
+handleKey : FrontendPlayingState -> String -> FrontendMsg
+handleKey state key =
+    case assembleFrontendModel state of
+        ValidFrontendModel assembledModel ->
+            case key of
+                "w" ->
+                    PerformAction (MovePerson state.myId Up)
+
+                "s" ->
+                    PerformAction (MovePerson state.myId Down)
+
+                "a" ->
+                    PerformAction (MovePerson state.myId Left)
+
+                "d" ->
+                    PerformAction (MovePerson state.myId Right)
+
                 "ArrowUp" ->
-                    PerformAction (MovePerson playingState.myId Up)
+                    PerformAction (MovePerson state.myId Up)
 
                 "ArrowDown" ->
-                    PerformAction (MovePerson playingState.myId Down)
+                    PerformAction (MovePerson state.myId Down)
 
                 "ArrowLeft" ->
-                    PerformAction (MovePerson playingState.myId Left)
+                    PerformAction (MovePerson state.myId Left)
 
                 "ArrowRight" ->
-                    PerformAction (MovePerson playingState.myId Right)
+                    PerformAction (MovePerson state.myId Right)
 
                 "r" ->
                     DebugGenerateRelic
 
                 " " ->
-                    PerformAction (tryCleaning playingState)
+                    PerformAction (tryCleaning state assembledModel)
 
                 _ ->
                     NoOpFrontendMsg
+
+        InvalidFrontendModel _ ->
+            NoOpFrontendMsg
 
 
 init : Url.Url -> Nav.Key -> ( Model, Cmd FrontendMsg )
@@ -225,13 +247,13 @@ update msg model =
             ( model, Cmd.none )
 
         PerformAction action ->
-            ( updateModelWithAction action model, sendToBackend (ClientPerformsAction action) )
+            ( updateModelWithAction action model, Lamdera.sendToBackend (ClientPerformsAction action) )
 
         ClickedPleaseMakeMeDirty ->
-            ( model, sendToBackend PleaseMakeMeDirty )
+            ( model, Lamdera.sendToBackend PleaseMakeMeDirty )
 
         DebugGenerateRelic ->
-            ( model, sendToBackend PleaseGenerateRelic )
+            ( model, Lamdera.sendToBackend PleaseGenerateRelic )
 
 
 updateModelWithAction : ActionOnGamestate -> Model -> Model
@@ -242,13 +264,13 @@ updateModelWithAction actionOnGamestate model =
                 gameState =
                     { personDict = personDict, dirtDict = dirtDict, relicDict = relicDict }
             in
-            { model | state = gameStateToFrontendState myId (executeActionOnGameState actionOnGamestate gameState) }
+            { model | state = gameStateToFrontendState myId (GameObject.executeActionOnGameState actionOnGamestate gameState) }
 
         Loading ->
             -- TODO: action came down when the app was still loading. handle this?
             model
 
-        Error string ->
+        Error _ ->
             -- TODO: action came down when the app was in an error state. handle this?
             model
 
@@ -305,7 +327,7 @@ renderPlayingState state =
         ValidFrontendModel validFrontendModelData ->
             Html.div []
                 [ debugStuff state
-                , renderMyHUD validFrontendModelData
+                , renderMyHUD state validFrontendModelData
                 , renderMap state
                 ]
 
@@ -313,11 +335,12 @@ renderPlayingState state =
             Html.text ("Error assembling model: " ++ errorMessage)
 
 
-renderMyHUD : ValidFrontendModelData -> Html.Html FrontendMsg
-renderMyHUD state =
+renderMyHUD : FrontendPlayingState -> ValidFrontendModelData -> Html.Html FrontendMsg
+renderMyHUD state assembledModel =
     Html.div [ class "flex flex-col items-end" ]
-        [ renderXP state.me.person
-        , renderHeldRelics state
+        [ renderXP assembledModel.me.person
+        , renderHeldRelics assembledModel
+        , maybeRenderGameOver state assembledModel
         ]
 
 
@@ -367,6 +390,15 @@ renderHeldRelics state =
         )
 
 
+maybeRenderGameOver : FrontendPlayingState -> ValidFrontendModelData -> Html.Html FrontendMsg
+maybeRenderGameOver state model =
+    if DirtDict.size state.dirtDict == 0 then
+        text ("Congratulations, the park is clean! You did this many clean actions: " ++ String.fromInt model.me.person.stats.cleanCount ++ " and you finished off this many pollution patches: " ++ String.fromInt model.me.person.stats.clearCount)
+
+    else
+        text ""
+
+
 renderRelicList : List GameObjectTypes.RelicData -> PersonId -> List (Html.Html FrontendMsg)
 renderRelicList list myId =
     List.map (heldRelicView myId) list
@@ -407,7 +439,7 @@ dirtView { x, y, amount } =
             String.fromInt (x * renderOffsetMultiplier)
 
         offsetY =
-            String.fromInt (y * renderOffsetMultiplier)
+            String.fromInt (y * renderOffsetMultiplier + 15)
     in
     Html.div [ class "absolute text-orange-500", style "left" (offsetX ++ "px"), style "top" (offsetY ++ "px") ]
         [ Html.text (String.fromInt amount) ]
@@ -425,7 +457,7 @@ floorRelicView { relicType, position } =
                     String.fromInt (x * renderOffsetMultiplier)
 
                 offsetY =
-                    String.fromInt (y * renderOffsetMultiplier)
+                    String.fromInt (y * renderOffsetMultiplier + 15)
             in
             Html.div [ class "absolute text-green-500", style "left" (offsetX ++ "px"), style "top" (offsetY ++ "px") ]
                 [ Html.text "!" ]
@@ -441,26 +473,20 @@ heldRelicView myId { id, relicType } =
         ]
 
 
-me : FrontendPlayingState -> Maybe PersonData
-me state =
-    PersonDict.get state.myId state.personDict
-
-
-tryCleaning : FrontendPlayingState -> ActionOnGamestate
-tryCleaning state =
-    case me state of
+tryCleaning : FrontendPlayingState -> ValidFrontendModelData -> ActionOnGamestate
+tryCleaning state assembledModel =
+    let
+        myself =
+            assembledModel.me.person
+    in
+    case GameObject.getDirtAtLocation myself.x myself.y state.dirtDict of
         Nothing ->
-            GameStateNoOp
-
-        Just myself ->
-            case GameObject.getDirtAtLocation myself.x myself.y state.dirtDict of
+            case GameObject.getRelicAtLocation myself.x myself.y state.relicDict of
                 Nothing ->
-                    case GameObject.getRelicAtLocation myself.x myself.y state.relicDict of
-                        Nothing ->
-                            GameStateNoOp
+                    GameStateNoOp
 
-                        Just relic ->
-                            PickUpRelic relic.id myself.id
+                Just relic ->
+                    PickUpRelic relic.id myself.id
 
-                Just dirt ->
-                    Clean myself.id dirt.id
+        Just dirt ->
+            Clean myself.id dirt.id 1
