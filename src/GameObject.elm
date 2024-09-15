@@ -4,7 +4,7 @@ import DirtDict exposing (DirtDict)
 import GameObjectTypes exposing (..)
 import PersonDict exposing (PersonDict)
 import RelicDict
-import Types exposing (GameState, RealDirtDict, RealRelicDict)
+import Types exposing (BackendTrigger(..), GameState, RealDirtDict, RealRelicDict)
 
 
 movePerson : Direction -> PersonData -> PersonData
@@ -161,6 +161,25 @@ relicHolder relic =
             Nothing
 
 
+cleanFastStrengthMultiplier : RelicRarity -> Int -> Float
+cleanFastStrengthMultiplier rarity xp =
+    case rarity of
+        Common ->
+            1.1
+
+        Uncommon ->
+            1.2
+
+        Rare ->
+            1.5
+
+        Epic ->
+            3
+
+        Legendary ->
+            5
+
+
 relicModifiesAction : RelicData -> ActionOnGamestate -> ActionOnGamestate
 relicModifiesAction relic action =
     case relic.relicType of
@@ -168,7 +187,7 @@ relicModifiesAction relic action =
             case action of
                 Clean personId dirtId strength ->
                     if Just personId == relicHolder relic then
-                        Clean personId dirtId (strength * 2)
+                        Clean personId dirtId (round (toFloat strength * cleanFastStrengthMultiplier relic.rarity relic.exp))
 
                     else
                         action
@@ -191,33 +210,78 @@ relicName relicType =
             "More XP!"
 
 
+relicColor : RelicRarity -> String
+relicColor rarity =
+    case rarity of
+        Common ->
+            "text-black"
+
+        Uncommon ->
+            "text-green-500"
+
+        Rare ->
+            "text-blue-500"
+
+        Epic ->
+            "text-purple-500"
+
+        Legendary ->
+            "text-red-500"
+
+
+relicRarityName : RelicRarity -> String
+relicRarityName rarity =
+    case rarity of
+        Common ->
+            "Common"
+
+        Uncommon ->
+            "Uncommon"
+
+        Rare ->
+            "Rare"
+
+        Epic ->
+            "Epic"
+
+        Legendary ->
+            "Legendary"
+
+
 updateWithRelics : ActionOnGamestate -> GameState -> ActionOnGamestate
 updateWithRelics action state =
     RelicDict.values state.relicDict
         |> List.foldl relicModifiesAction action
 
 
-doClean : PersonId -> DirtId -> Int -> GameState -> ( GameState, ActionOnGamestate )
+doClean : PersonId -> DirtId -> Int -> GameState -> ( GameState, Types.BackendTrigger )
 doClean personId dirtId strength state =
     case DirtDict.get dirtId state.dirtDict of
         Nothing ->
-            -- TODO: Log error? Attempted to clean dirt not in dictionary.
-            ( state, GameStateNoOp )
+            -- This might happen if the user is lagging and someone else cleared the dirt
+            ( state, NoOpBackendTrigger )
 
         Just dirtData ->
             let
                 newDirt =
                     cleanDirt strength dirtData
 
-                nextAction =
+                backendTrigger =
                     if newDirt.amount <= 0 then
                         ClearedPollution personId dirtData
 
                     else
-                        GameStateNoOp
+                        NoOpBackendTrigger
+
+                newDict =
+                    if newDirt.amount <= 0 then
+                        DirtDict.remove dirtId state.dirtDict
+
+                    else
+                        DirtDict.insert dirtId newDirt state.dirtDict
             in
-            ( { state | dirtDict = DirtDict.insert dirtId newDirt state.dirtDict }
-            , nextAction
+            ( { state | dirtDict = newDict }
+            , backendTrigger
             )
 
 
@@ -231,12 +295,12 @@ addClearStats personId state =
     { state | personDict = incrementClearCount personId state.personDict }
 
 
-withNoOp : GameState -> ( GameState, ActionOnGamestate )
+withNoOp : GameState -> ( GameState, Types.BackendTrigger )
 withNoOp state =
-    ( state, GameStateNoOp )
+    ( state, NoOpBackendTrigger )
 
 
-internalExecuteActionOnGameState : ActionOnGamestate -> GameState -> ( GameState, ActionOnGamestate )
+internalExecuteActionOnGameState : ActionOnGamestate -> GameState -> ( GameState, Types.BackendTrigger )
 internalExecuteActionOnGameState action state =
     case action of
         Clean personId dirtId strength ->
@@ -281,24 +345,12 @@ internalExecuteActionOnGameState action state =
         GameStateNoOp ->
             withNoOp state
 
-        ClearedPollution personId dirtData ->
-            let
-                newRelic =
-                    { id = GameObjectTypes.RelicId (RelicDict.size state.relicDict * 11), relicType = GameObjectTypes.CleanFast, position = GameObjectTypes.OnFloor dirtData.x dirtData.y }
 
-                newDirtDict =
-                    DirtDict.remove dirtData.id state.dirtDict
-            in
-            ( addClearStats personId { state | dirtDict = newDirtDict }
-            , AddRelic newRelic
-            )
-
-
-executeActionOnGameState : ActionOnGamestate -> GameState -> GameState
+executeActionOnGameState : ActionOnGamestate -> GameState -> ( GameState, Types.BackendTrigger )
 executeActionOnGameState actionOnGamestate state =
-    case internalExecuteActionOnGameState (updateWithRelics actionOnGamestate state) state of
-        ( newState, GameStateNoOp ) ->
-            newState
-
-        ( newState, nextAction ) ->
-            executeActionOnGameState nextAction newState
+    -- TODO: Currently no difference, can remove this function and rename
+    let
+        modifiedAction =
+            updateWithRelics actionOnGamestate state
+    in
+    internalExecuteActionOnGameState modifiedAction state

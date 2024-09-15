@@ -65,7 +65,7 @@ type alias DirtData =
 
 
 type alias RelicData =
-    { id : RelicId, relicType : RelicType, position : RelicPosition }
+    { id : RelicId, relicType : RelicType, position : RelicPosition, rarity : RelicRarity, exp : Int }
 
 
 type RelicPosition
@@ -78,6 +78,14 @@ type RelicType
     | MoreXP
 
 
+type RelicRarity
+    = Common
+    | Uncommon
+    | Rare
+    | Epic
+    | Legendary
+
+
 type Direction
     = Up
     | Down
@@ -88,7 +96,6 @@ type Direction
 type ActionOnGamestate
     = MovePerson PersonId Direction
     | Clean PersonId DirtId Int
-    | ClearedPollution PersonId DirtData
     | ChangeDirtAmount DirtId Int
     | AddDirt DirtData
     | AddRelic RelicData

@@ -217,7 +217,7 @@ createDirt args model =
         incrementedModel =
             incrementBiggestId model
     in
-    ( { incrementedModel | dirtDict = newDirtDict }, Lamdera.broadcast (OtherClientPerformedAction "big boss" (AddDirt newDirt)) )
+    ( { incrementedModel | dirtDict = newDirtDict }, Lamdera.broadcast (OtherClientPerformedAction Server (AddDirt newDirt)) )
 
 
 incrementBiggestId : Model -> Model
@@ -267,12 +267,24 @@ updateFromFrontend _ clientId msg model =
             ( model, Cmd.none )
 
         ClientPerformsAction actionOnGamestate ->
-            ( model
-                |> constructGameState
-                |> executeActionOnGameState actionOnGamestate
-                -- idea: have "backend action" generated from here that's ignored on the frontend but triggers stuff on the backend. Used for EXP granting and relic rolls.
-                |> updateModelFromGameState model
-            , forwardToEveryoneButMe actionOnGamestate clientId model
+            let
+                ( newGameState, trigger ) =
+                    model
+                        |> constructGameState
+                        |> executeActionOnGameState actionOnGamestate
+
+                newModel =
+                    updateModelFromGameState model newGameState
+
+                -- todo: handle `trigger` here. Will update model and potentially have a new action to send back to the client. This could include an action to the original client!
+                ( newerModel, actionsFromTrigger ) =
+                    executeBackendTrigger trigger newModel
+            in
+            ( newerModel
+            , Cmd.batch
+                [ forwardToEveryoneButMe actionOnGamestate clientId model
+                , Lamdera.broadcast (OtherClientPerformedAction Server actionsFromTrigger)
+                ]
             )
 
         PleaseMakeMeDirty ->
@@ -280,6 +292,68 @@ updateFromFrontend _ clientId msg model =
 
         PleaseGenerateRelic ->
             addRelic model
+
+
+executeBackendTrigger : BackendTrigger -> Model -> ( Model, ActionOnGamestate )
+executeBackendTrigger trigger model =
+    case trigger of
+        NoOpBackendTrigger ->
+            ( model, GameStateNoOp )
+
+        BatchTrigger backendTriggers ->
+            ( model, GameStateNoOp )
+
+        ClearedPollution personId dirtData ->
+            doRelicRoll personId dirtData model
+
+
+doRelicRoll : PersonId -> GameObjectTypes.DirtData -> Model -> ( Model, ActionOnGamestate )
+doRelicRoll who killedDirt model =
+    let
+        ( randomRarity, newModel ) =
+            getRandomValue model
+
+        rarity =
+            randomRarity
+                |> modBy 100
+                |> rarityRoll
+
+        ( newId, incModel ) =
+            getAndIncrementBiggestId newModel
+
+        newRelic =
+            { id = GameObjectTypes.RelicId newId
+            , relicType = GameObjectTypes.CleanFast
+            , position = GameObjectTypes.OnFloor killedDirt.x killedDirt.y
+            , rarity = rarity
+            , exp = 0
+            }
+
+        newRelicDict =
+            RelicDict.insert newRelic.id newRelic model.relicDict
+
+        finalModel =
+            { incModel | relicDict = newRelicDict }
+    in
+    ( finalModel, AddRelic newRelic )
+
+
+rarityRoll : Int -> GameObjectTypes.RelicRarity
+rarityRoll randomValue =
+    if randomValue < 1 then
+        GameObjectTypes.Legendary
+
+    else if randomValue < 10 then
+        GameObjectTypes.Epic
+
+    else if randomValue < 40 then
+        GameObjectTypes.Rare
+
+    else if randomValue < 80 then
+        GameObjectTypes.Uncommon
+
+    else
+        GameObjectTypes.Common
 
 
 addRelic : Model -> ( Model, Cmd BackendMsg )
@@ -290,12 +364,12 @@ addRelic model =
 
         newRelic : GameObjectTypes.RelicData
         newRelic =
-            { id = GameObjectTypes.RelicId newId, relicType = GameObjectTypes.CleanFast, position = GameObjectTypes.OnFloor 2 2 }
+            { id = GameObjectTypes.RelicId newId, relicType = GameObjectTypes.CleanFast, position = GameObjectTypes.OnFloor 2 2, rarity = GameObjectTypes.Legendary, exp = 0 }
 
         newRelicDict =
             RelicDict.insert newRelic.id newRelic model.relicDict
     in
-    ( { incModel | relicDict = newRelicDict }, Lamdera.broadcast (OtherClientPerformedAction "big boss" (AddRelic newRelic)) )
+    ( { incModel | relicDict = newRelicDict }, Lamdera.broadcast (OtherClientPerformedAction Server (AddRelic newRelic)) )
 
 
 addSomeDirt : Model -> ( Model, Cmd BackendMsg )
@@ -304,9 +378,9 @@ addSomeDirt model =
         ( model, Cmd.none )
         (Util.generateGridOfPoints
             { minX = 5
-            , maxX = 20
+            , maxX = 25
             , minY = 5
-            , maxY = 20
+            , maxY = 10
             }
         )
 
@@ -318,7 +392,7 @@ andThenAddDirtToSpot point ( model, msg ) =
             getRandomValue model
 
         dirtAmount =
-            modBy 50 randomValue + 50
+            modBy 800 randomValue + 300
     in
     andThen (addDirtToSpot point dirtAmount) ( newModel, msg )
 
@@ -343,12 +417,12 @@ changeDirtAmount dirt model amount =
         newDirtDict =
             DirtDict.insert dirt.id { dirt | amount = amount } model.dirtDict
     in
-    ( { model | dirtDict = newDirtDict }, Lamdera.broadcast (OtherClientPerformedAction "da big one" (ChangeDirtAmount dirt.id amount)) )
+    ( { model | dirtDict = newDirtDict }, Lamdera.broadcast (OtherClientPerformedAction Server (ChangeDirtAmount dirt.id amount)) )
 
 
 forwardToEveryoneButMe : ActionOnGamestate -> ClientId -> Model -> Cmd BackendMsg
 forwardToEveryoneButMe action myClientId model =
     model.connectedClients
         |> List.filter (\c -> c /= myClientId)
-        |> List.map (\id -> sendToFrontend id (OtherClientPerformedAction id action))
+        |> List.map (\id -> sendToFrontend id (OtherClientPerformedAction (Client id) action))
         |> Cmd.batch

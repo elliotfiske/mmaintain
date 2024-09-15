@@ -263,8 +263,11 @@ updateModelWithAction actionOnGamestate model =
             let
                 gameState =
                     { personDict = personDict, dirtDict = dirtDict, relicDict = relicDict }
+
+                ( newGameState, _ ) =
+                    GameObject.executeActionOnGameState actionOnGamestate gameState
             in
-            { model | state = gameStateToFrontendState myId (GameObject.executeActionOnGameState actionOnGamestate gameState) }
+            { model | state = gameStateToFrontendState myId newGameState }
 
         Loading ->
             -- TODO: action came down when the app was still loading. handle this?
@@ -339,6 +342,7 @@ renderMyHUD : FrontendPlayingState -> ValidFrontendModelData -> Html.Html Fronte
 renderMyHUD state assembledModel =
     Html.div [ class "flex flex-col items-end" ]
         [ renderXP assembledModel.me.person
+        , renderCleanStrength assembledModel
         , renderHeldRelics assembledModel
         , maybeRenderGameOver state assembledModel
         ]
@@ -390,6 +394,37 @@ renderHeldRelics state =
         )
 
 
+renderCleanStrength : ValidFrontendModelData -> Html.Html FrontendMsg
+renderCleanStrength state =
+    let
+        strength =
+            simulateClean state
+    in
+    Html.div [ class "flex flex-col" ]
+        [ Html.text
+            ("Clean Strength: "
+                ++ String.fromInt strength
+            )
+        ]
+
+
+simulateClean : ValidFrontendModelData -> Int
+simulateClean state =
+    let
+        action =
+            List.foldl
+                GameObject.relicModifiesAction
+                (Clean state.me.person.id (GameObjectTypes.DirtId 0) 10)
+                state.me.heldRelics
+    in
+    case action of
+        Clean _ _ strength ->
+            strength
+
+        _ ->
+            -1
+
+
 maybeRenderGameOver : FrontendPlayingState -> ValidFrontendModelData -> Html.Html FrontendMsg
 maybeRenderGameOver state model =
     if DirtDict.size state.dirtDict == 0 then
@@ -416,7 +451,7 @@ renderPeople state =
 
 
 renderOffsetMultiplier =
-    30
+    50
 
 
 personView : PersonData -> Html.Html FrontendMsg
@@ -446,7 +481,7 @@ dirtView { x, y, amount } =
 
 
 floorRelicView : GameObjectTypes.RelicData -> Html.Html FrontendMsg
-floorRelicView { relicType, position } =
+floorRelicView { relicType, rarity, position } =
     case position of
         GameObjectTypes.HeldBy _ ->
             text ""
@@ -459,14 +494,17 @@ floorRelicView { relicType, position } =
                 offsetY =
                     String.fromInt (y * renderOffsetMultiplier + 15)
             in
-            Html.div [ class "absolute text-green-500", style "left" (offsetX ++ "px"), style "top" (offsetY ++ "px") ]
+            Html.div [ class ("absolute " ++ GameObject.relicColor rarity), style "left" (offsetX ++ "px"), style "top" (offsetY ++ "px") ]
                 [ Html.text "!" ]
 
 
 heldRelicView : PersonId -> GameObjectTypes.RelicData -> Html.Html FrontendMsg
-heldRelicView myId { id, relicType } =
+heldRelicView myId { id, relicType, rarity } =
     Html.div []
         [ Html.text (GameObject.relicName relicType)
+        , Html.div
+            [ class (GameObject.relicColor rarity) ]
+            [ Html.text (GameObject.relicRarityName rarity) ]
         , Html.button
             [ Html.Events.onClick (PerformAction (DropRelic id myId)), class "btn btn-primary" ]
             [ text "Drop" ]
@@ -489,4 +527,4 @@ tryCleaning state assembledModel =
                     PickUpRelic relic.id myself.id
 
         Just dirt ->
-            Clean myself.id dirt.id 1
+            Clean myself.id dirt.id 10

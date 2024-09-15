@@ -73,6 +73,12 @@ type alias BackendModel =
     }
 
 
+type BackendTrigger
+    = NoOpBackendTrigger
+    | ClearedPollution PersonId DirtData
+    | BatchTrigger (List BackendTrigger)
+
+
 type FrontendMsg
     = UrlClicked UrlRequest
     | UrlChanged Url
@@ -95,7 +101,12 @@ type BackendMsg
     | ClientDisconnected SessionId ClientId
 
 
+type ActionPerformer
+    = Client ClientId
+    | Server
+
+
 type ToFrontend
     = NoOpToFrontend
-    | OtherClientPerformedAction ClientId ActionOnGamestate
+    | OtherClientPerformedAction ActionPerformer ActionOnGamestate
     | UpdateFullState FrontendPlayingState
