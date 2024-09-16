@@ -313,7 +313,7 @@ doRelicRoll who killedDirt model =
         ( randomRarity, newModel ) =
             getRandomValue model
 
-        rarity =
+        maybeRarity =
             randomRarity
                 |> modBy 100
                 |> rarityRoll
@@ -321,39 +321,59 @@ doRelicRoll who killedDirt model =
         ( newId, incModel ) =
             getAndIncrementBiggestId newModel
 
-        newRelic =
-            { id = GameObjectTypes.RelicId newId
-            , relicType = GameObjectTypes.CleanFast
-            , position = GameObjectTypes.OnFloor killedDirt.x killedDirt.y
-            , rarity = rarity
-            , exp = 0
-            }
+        maybeNewRelic =
+            Maybe.map
+                (\rarity ->
+                    { id = GameObjectTypes.RelicId newId
+                    , relicType = GameObjectTypes.CleanFast
+                    , position = GameObjectTypes.OnFloor killedDirt.x killedDirt.y
+                    , rarity = rarity
+                    , exp = 0
+                    }
+                )
+                maybeRarity
 
         newRelicDict =
-            RelicDict.insert newRelic.id newRelic model.relicDict
+            case maybeNewRelic of
+                Nothing ->
+                    model.relicDict
+
+                Just newRelic ->
+                    RelicDict.insert newRelic.id newRelic model.relicDict
 
         finalModel =
             { incModel | relicDict = newRelicDict }
+
+        action =
+            case maybeNewRelic of
+                Nothing ->
+                    GameStateNoOp
+
+                Just relic ->
+                    AddRelic relic
     in
-    ( finalModel, AddRelic newRelic )
+    ( finalModel, action )
 
 
-rarityRoll : Int -> GameObjectTypes.RelicRarity
+rarityRoll : Int -> Maybe GameObjectTypes.RelicRarity
 rarityRoll randomValue =
     if randomValue < 1 then
-        GameObjectTypes.Legendary
+        Just GameObjectTypes.Legendary
 
     else if randomValue < 10 then
-        GameObjectTypes.Epic
+        Just GameObjectTypes.Epic
 
-    else if randomValue < 40 then
-        GameObjectTypes.Rare
+    else if randomValue < 30 then
+        Just GameObjectTypes.Rare
 
-    else if randomValue < 80 then
-        GameObjectTypes.Uncommon
+    else if randomValue < 50 then
+        Just GameObjectTypes.Uncommon
+
+    else if randomValue < 70 then
+        Just GameObjectTypes.Common
 
     else
-        GameObjectTypes.Common
+        Nothing
 
 
 addRelic : Model -> ( Model, Cmd BackendMsg )

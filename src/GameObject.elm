@@ -214,7 +214,7 @@ relicColor : RelicRarity -> String
 relicColor rarity =
     case rarity of
         Common ->
-            "text-black"
+            ""
 
         Uncommon ->
             "text-green-500"

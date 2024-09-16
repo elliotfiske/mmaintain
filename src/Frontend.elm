@@ -500,14 +500,24 @@ floorRelicView { relicType, rarity, position } =
 
 heldRelicView : PersonId -> GameObjectTypes.RelicData -> Html.Html FrontendMsg
 heldRelicView myId { id, relicType, rarity } =
-    Html.div []
-        [ Html.text (GameObject.relicName relicType)
-        , Html.div
+    card (GameObject.relicName relicType)
+        [ Html.div
             [ class (GameObject.relicColor rarity) ]
             [ Html.text (GameObject.relicRarityName rarity) ]
         , Html.button
             [ Html.Events.onClick (PerformAction (DropRelic id myId)), class "btn btn-primary" ]
             [ text "Drop" ]
+        ]
+
+
+card : String -> List (Html.Html FrontendMsg) -> Html.Html FrontendMsg
+card title content =
+    Html.div [ class "card card-compact bg-base-200 shadow-xl" ]
+        [ Html.div
+            [ class "card-body" ]
+            ([ Html.h2 [ class "card-title" ] [ Html.text title ] ]
+                ++ content
+            )
         ]
 
 
