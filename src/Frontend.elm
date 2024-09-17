@@ -303,7 +303,7 @@ updateFromBackend msg model =
 
 view : Model -> Browser.Document FrontendMsg
 view model =
-    { title = ""
+    { title = "mmaintain"
     , body =
         [ Html.node "link" [ rel "stylesheet", href "/output.css" ] []
         , renderModel model
@@ -526,6 +526,9 @@ tryCleaning state assembledModel =
     let
         myself =
             assembledModel.me.person
+
+        myRelicCount =
+            List.length assembledModel.me.heldRelics
     in
     case GameObject.getDirtAtLocation myself.x myself.y state.dirtDict of
         Nothing ->
@@ -534,7 +537,11 @@ tryCleaning state assembledModel =
                     GameStateNoOp
 
                 Just relic ->
-                    PickUpRelic relic.id myself.id
+                    if myRelicCount < 4 then
+                        PickUpRelic relic.id myself.id
+
+                    else
+                        GameStateNoOp
 
         Just dirt ->
             Clean myself.id dirt.id 10

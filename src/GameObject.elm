@@ -148,7 +148,27 @@ getRelicAtLocation x y dict =
     dict
         |> RelicDict.values
         |> List.filter (relicIsAtLocation x y)
+        |> List.sortBy byRelicRarity
         |> List.head
+
+
+byRelicRarity : RelicData -> Int
+byRelicRarity relic =
+    case relic.rarity of
+        Common ->
+            0
+
+        Uncommon ->
+            -1
+
+        Rare ->
+            -2
+
+        Epic ->
+            -3
+
+        Legendary ->
+            -4
 
 
 relicHolder : RelicData -> Maybe PersonId
@@ -290,9 +310,14 @@ addCleanStats personId state =
     { state | personDict = incrementCleanCount personId state.personDict }
 
 
-addClearStats : PersonId -> GameState -> GameState
-addClearStats personId state =
-    { state | personDict = incrementClearCount personId state.personDict }
+addClearStats : PersonId -> ( GameState, Types.BackendTrigger ) -> ( GameState, Types.BackendTrigger )
+addClearStats personId ( state, trigger ) =
+    case trigger of
+        ClearedPollution _ _ ->
+            ( { state | personDict = incrementClearCount personId state.personDict }, trigger )
+
+        _ ->
+            ( state, trigger )
 
 
 withNoOp : GameState -> ( GameState, Types.BackendTrigger )
@@ -307,6 +332,7 @@ internalExecuteActionOnGameState action state =
             state
                 |> addCleanStats personId
                 |> doClean personId dirtId strength
+                |> addClearStats personId
 
         MovePerson personId direction ->
             withNoOp { state | personDict = movePersonWithId personId direction state.personDict }

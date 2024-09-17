@@ -357,13 +357,13 @@ doRelicRoll who killedDirt model =
 
 rarityRoll : Int -> Maybe GameObjectTypes.RelicRarity
 rarityRoll randomValue =
-    if randomValue < 1 then
+    if randomValue < 2 then
         Just GameObjectTypes.Legendary
 
     else if randomValue < 10 then
         Just GameObjectTypes.Epic
 
-    else if randomValue < 30 then
+    else if randomValue < 20 then
         Just GameObjectTypes.Rare
 
     else if randomValue < 50 then

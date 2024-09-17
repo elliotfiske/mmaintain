@@ -1455,21 +1455,12 @@ html {
   display: flex;
 }
 
-.w-96 {
-  width: 24rem;
-}
-
 .flex-col {
   flex-direction: column;
 }
 
 .items-end {
   align-items: flex-end;
-}
-
-.bg-base-100 {
-  --tw-bg-opacity: 1;
-  background-color: hsl(var(--b1) / var(--tw-bg-opacity));
 }
 
 .bg-base-200 {
@@ -1479,11 +1470,6 @@ html {
 
 .text-right {
   text-align: right;
-}
-
-.text-black {
-  --tw-text-opacity: 1;
-  color: rgb(0 0 0 / var(--tw-text-opacity));
 }
 
 .text-blue-500 {
@@ -1509,11 +1495,6 @@ html {
 .text-red-500 {
   --tw-text-opacity: 1;
   color: rgb(239 68 68 / var(--tw-text-opacity));
-}
-
-.text-base-200 {
-  --tw-text-opacity: 1;
-  color: hsl(var(--b2) / var(--tw-text-opacity));
 }
 
 .shadow-xl {
