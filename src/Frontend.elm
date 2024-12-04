@@ -5,7 +5,7 @@ import Browser.Events exposing (onKeyDown)
 import Browser.Navigation as Nav
 import DirtDict
 import GameObject
-import GameObjectTypes exposing (ActionOnGamestate(..), Direction(..), PersonData, PersonId, personIdToInt, personIdToString, relicIdToString)
+import GameObjectTypes exposing (ActionOnGamestate(..), Direction(..), PersonData, PersonId, relicIdToString)
 import Html exposing (..)
 import Html.Attributes exposing (..)
 import Html.Events
@@ -55,7 +55,7 @@ assembleMyself : PersonData -> PersonDict.PersonDict PersonWithRelics -> Result 
 assembleMyself myself relicsByPerson =
     case PersonDict.get myself.id relicsByPerson of
         Nothing ->
-            Err ("Could not find myself in the 'relics by person' dict. My id: " ++ personIdToString myself.id)
+            Err ("Could not find myself in the 'relics by person' dict. My id: " ++ GameObjectTypes.personIdToString myself.id)
 
         Just myselfWithRelics ->
             Ok myselfWithRelics
@@ -113,7 +113,13 @@ tryGetRelicHolder people relicData =
         GameObjectTypes.HeldBy personId ->
             case PersonDict.get personId people of
                 Nothing ->
-                    Err ("Relic with ID " ++ relicIdToString relicData.id ++ " thinks it is held by person with ID " ++ personIdToString personId ++ ", but no such person was found in the PersonDict.")
+                    Err
+                        ("Relic with ID "
+                            ++ relicIdToString relicData.id
+                            ++ " thinks it is held by person with ID "
+                            ++ GameObjectTypes.personIdToString personId
+                            ++ ", but no such person was found in the PersonDict."
+                        )
 
                 Just holder ->
                     Ok (Just holder)
@@ -122,7 +128,11 @@ tryGetRelicHolder people relicData =
             Ok Nothing
 
 
-addRelicToHolderDict : GameObjectTypes.RelicData -> Maybe PersonData -> PersonDict.PersonDict PersonWithRelics -> PersonDict.PersonDict PersonWithRelics
+addRelicToHolderDict :
+    GameObjectTypes.RelicData
+    -> Maybe PersonData
+    -> PersonDict.PersonDict PersonWithRelics
+    -> PersonDict.PersonDict PersonWithRelics
 addRelicToHolderDict relicData maybeHolder dictSoFar =
     case maybeHolder of
         Nothing ->
@@ -328,7 +338,7 @@ renderPlayingState : FrontendPlayingState -> Html.Html FrontendMsg
 renderPlayingState state =
     case assembleFrontendModel state of
         ValidFrontendModel validFrontendModelData ->
-            Html.div []
+            Html.div [ class "flex flex-col flex-grow-0 justify-end h-full overflow-y-auto" ]
                 [ debugStuff state
                 , renderMyHUD state validFrontendModelData
                 , renderMap state
@@ -340,7 +350,7 @@ renderPlayingState state =
 
 renderMyHUD : FrontendPlayingState -> ValidFrontendModelData -> Html.Html FrontendMsg
 renderMyHUD state assembledModel =
-    Html.div [ class "flex flex-col items-end" ]
+    Html.div [ class "flex flex-col items-end h-full" ]
         [ renderXP assembledModel.me.person
         , renderCleanStrength assembledModel
         , renderHeldRelics assembledModel
@@ -358,7 +368,16 @@ debugStuff state =
 
 debugDicts : FrontendPlayingState -> Html.Html FrontendMsg
 debugDicts { personDict, relicDict, dirtDict, myId } =
-    Html.text ("PersonDict: " ++ String.fromInt (PersonDict.size personDict) ++ "\nRelicDict: " ++ String.fromInt (RelicDict.size relicDict) ++ "\nDirtDict: " ++ String.fromInt (DirtDict.size dirtDict) ++ "\nMyId: " ++ GameObjectTypes.personIdToString myId)
+    Html.text
+        ("PersonDict: "
+            ++ String.fromInt (PersonDict.size personDict)
+            ++ "\nRelicDict: "
+            ++ String.fromInt (RelicDict.size relicDict)
+            ++ "\nDirtDict: "
+            ++ String.fromInt (DirtDict.size dirtDict)
+            ++ "\nMyId: "
+            ++ GameObjectTypes.personIdToString myId
+        )
 
 
 renderMap : FrontendPlayingState -> Html.Html FrontendMsg
@@ -378,20 +397,38 @@ renderDirt state =
 renderXP : PersonData -> Html.Html FrontendMsg
 renderXP myself =
     Html.div [ class "flex flex-col text-right" ]
-        [ Html.text ("XP: " ++ String.fromInt myself.experience)
+        [ levelProgressBar myself
         , Html.br [] []
         , Html.text
             ("Level: " ++ String.fromInt (Util.levelForExp myself.experience))
+        , Html.text
+            ("Exp: " ++ String.fromInt myself.experience)
+        ]
+
+
+levelProgressBar : PersonData -> Html.Html FrontendMsg
+levelProgressBar person =
+    Html.div [ class "bg-cyan-600 h-4 w-64 rounded" ]
+        [ Html.div
+            [ class "bg-cyan-100 h-4 rounded"
+            , style "width" (String.fromInt (round (Util.levelProgress person.experience)) ++ "%")
+            ]
+            []
         ]
 
 
 renderHeldRelics : ValidFrontendModelData -> Html.Html FrontendMsg
 renderHeldRelics state =
-    Html.div [ class "flex flex-col" ]
-        (Html.text
+    Html.div [ class "flex flex-col gap-2 h-full" ]
+        [ Html.text
             "My Relics:"
-            :: renderRelicList state.me.heldRelics state.me.person.id
-        )
+        , Html.div [ class "flex flex-col flex-wrap gap-2 overflow-y-scroll" ]
+            (renderRelicList
+                state.me.heldRelics
+                state.me.person.id
+                ++ renderRelicSlots state.me
+            )
+        ]
 
 
 renderCleanStrength : ValidFrontendModelData -> Html.Html FrontendMsg
@@ -414,7 +451,7 @@ simulateClean state =
         action =
             List.foldl
                 GameObject.relicModifiesAction
-                (Clean state.me.person.id (GameObjectTypes.DirtId 0) 10)
+                (Clean state.me.person.id (GameObjectTypes.DirtId 0) (10 + Util.levelForExp state.me.person.experience))
                 state.me.heldRelics
     in
     case action of
@@ -428,7 +465,12 @@ simulateClean state =
 maybeRenderGameOver : FrontendPlayingState -> ValidFrontendModelData -> Html.Html FrontendMsg
 maybeRenderGameOver state model =
     if DirtDict.size state.dirtDict == 0 then
-        text ("Congratulations, the park is clean! You did this many clean actions: " ++ String.fromInt model.me.person.stats.cleanCount ++ " and you finished off this many pollution patches: " ++ String.fromInt model.me.person.stats.clearCount)
+        text
+            ("Congratulations, the park is clean! You did this many clean actions: "
+                ++ String.fromInt model.me.person.stats.cleanCount
+                ++ " and you finished off this many pollution patches: "
+                ++ String.fromInt model.me.person.stats.clearCount
+            )
 
     else
         text ""
@@ -437,6 +479,42 @@ maybeRenderGameOver state model =
 renderRelicList : List GameObjectTypes.RelicData -> PersonId -> List (Html.Html FrontendMsg)
 renderRelicList list myId =
     List.map (heldRelicView myId) list
+
+
+renderRelicSlots : PersonWithRelics -> List (Html.Html FrontendMsg)
+renderRelicSlots person =
+    let
+        myLevel =
+            Util.levelForExp person.person.experience
+
+        totalUnlockedSlots =
+            GameObject.relicSlotsForLevel myLevel
+
+        numAvailableSlots =
+            totalUnlockedSlots - List.length person.heldRelics
+
+        lockedSlots =
+            GameObject.lockedRelicSlots myLevel
+    in
+    List.repeat numAvailableSlots availableRelicView ++ List.map lockedSlotView lockedSlots
+
+
+availableRelicView : Html.Html FrontendMsg
+availableRelicView =
+    card "Free Slot"
+        [ Html.div
+            [ class "" ]
+            [ Html.text "Pick something up why doncha" ]
+        ]
+
+
+lockedSlotView : Int -> Html.Html FrontendMsg
+lockedSlotView lockedUntil =
+    card "Locked"
+        [ Html.div
+            [ class "" ]
+            [ Html.text ("Until level " ++ String.fromInt lockedUntil) ]
+        ]
 
 
 renderFloorRelics state =
@@ -464,7 +542,7 @@ personView { id, name, x, y } =
             String.fromInt (y * renderOffsetMultiplier)
     in
     Html.div [ class "absolute", style "left" (offsetX ++ "px"), style "top" (offsetY ++ "px") ]
-        [ Html.text (String.fromInt (personIdToInt id)) ]
+        [ Html.text (String.fromInt (GameObjectTypes.personIdToInt id)) ]
 
 
 dirtView : GameObjectTypes.DirtData -> Html.Html FrontendMsg
@@ -537,11 +615,11 @@ tryCleaning state assembledModel =
                     GameStateNoOp
 
                 Just relic ->
-                    if myRelicCount < 4 then
+                    if myRelicCount < GameObject.relicSlotsForLevel (Util.levelForExp myself.experience) then
                         PickUpRelic relic.id myself.id
 
                     else
                         GameStateNoOp
 
         Just dirt ->
-            Clean myself.id dirt.id 10
+            Clean myself.id dirt.id (10 + Util.levelForExp myself.experience)

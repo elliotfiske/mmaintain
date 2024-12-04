@@ -274,6 +274,28 @@ updateWithRelics action state =
         |> List.foldl relicModifiesAction action
 
 
+relicSlotThreshholds : List Int
+relicSlotThreshholds =
+    [ 3, 5, 10 ]
+
+
+relicSlotsForLevel : Int -> Int
+relicSlotsForLevel level =
+    3
+        + (relicSlotThreshholds
+            |> List.filter (\x -> level >= x)
+            |> List.length
+          )
+
+
+{-| Given a level, return a list where each member is a level at which you'll unlock a new relic slot
+-}
+lockedRelicSlots : Int -> List Int
+lockedRelicSlots level =
+    relicSlotThreshholds
+        |> List.filter (\x -> level < x)
+
+
 doClean : PersonId -> DirtId -> Int -> GameState -> ( GameState, Types.BackendTrigger )
 doClean personId dirtId strength state =
     case DirtDict.get dirtId state.dirtDict of
@@ -320,6 +342,35 @@ addClearStats personId ( state, trigger ) =
             ( state, trigger )
 
 
+earnExperienceFromClean : PersonId -> ( GameState, Types.BackendTrigger ) -> ( GameState, Types.BackendTrigger )
+earnExperienceFromClean personId ( state, trigger ) =
+    let
+        person =
+            PersonDict.get personId state.personDict
+
+        xpEarned =
+            case trigger of
+                ClearedPollution _ _ ->
+                    10
+
+                _ ->
+                    1
+    in
+    case person of
+        Nothing ->
+            ( state, NoOpBackendTrigger )
+
+        Just fella ->
+            let
+                newPerson =
+                    { fella | experience = fella.experience + xpEarned }
+
+                newPersonDict =
+                    PersonDict.insert personId newPerson state.personDict
+            in
+            ( { state | personDict = newPersonDict }, trigger )
+
+
 withNoOp : GameState -> ( GameState, Types.BackendTrigger )
 withNoOp state =
     ( state, NoOpBackendTrigger )
@@ -333,6 +384,7 @@ internalExecuteActionOnGameState action state =
                 |> addCleanStats personId
                 |> doClean personId dirtId strength
                 |> addClearStats personId
+                |> earnExperienceFromClean personId
 
         MovePerson personId direction ->
             withNoOp { state | personDict = movePersonWithId personId direction state.personDict }

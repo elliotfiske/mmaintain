@@ -1,5 +1,6 @@
 module Util exposing (..)
 
+import Dict
 import Types
 
 
@@ -23,9 +24,66 @@ yMax =
     1
 
 
+expForLevel : Int -> Int
+expForLevel level =
+    case Dict.get level levelTable of
+        Nothing ->
+            4000
+
+        Just exp ->
+            exp
+
+
 levelForExp : Int -> Int
 levelForExp xp =
-    xp // 5
+    List.foldl
+        (\( level, exp ) acc ->
+            if xp >= exp then
+                level
+
+            else
+                acc
+        )
+        0
+        levelList
+
+
+levelList : List ( Int, Int )
+levelList =
+    [ ( 0, 0 )
+    , ( 1, 20 )
+    , ( 2, 50 )
+    , ( 3, 100 )
+    , ( 4, 180 )
+    , ( 5, 300 )
+    , ( 6, 450 )
+    , ( 7, 650 )
+    , ( 8, 900 )
+    , ( 9, 1200 )
+    , ( 10, 1550 )
+    , ( 11, 2000 )
+    , ( 12, 2500 )
+    , ( 13, 3000 )
+    , ( 14, 3500 )
+    , ( 15, 4000 )
+    ]
+
+
+levelTable : Dict.Dict Int Int
+levelTable =
+    Dict.fromList levelList
+
+
+levelProgress : Int -> Float
+levelProgress xp =
+    let
+        lowerBound =
+            expForLevel (levelForExp xp)
+
+        upperBound =
+            expForLevel (1 + levelForExp xp)
+    in
+    toFloat (xp - lowerBound) / toFloat (Debug.log "upper" upperBound - Debug.log "lower" lowerBound) * 100
 
 
 {-| Take 2 "input results", and a function that can fail that takes 2 arguments.
