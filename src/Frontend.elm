@@ -440,10 +440,10 @@ renderCleanStrength state =
 
 renderHeldRelics : ValidFrontendModelData -> Html.Html FrontendMsg
 renderHeldRelics state =
-    Html.div [ class "w-full" ]
+    Html.div [ class "w-full flex flex-col flex-gro" ]
         [ Html.h2 [ class "text-center prose" ]
             [ Html.text "My Relics:" ]
-        , Html.div [ class "flex flex-col gap-2 overflow-y-auto", id "relic-list" ]
+        , Html.div [ class "flex flex-col gap-2 overflow-y-auto flex-grow", id "relic-list" ]
             (renderRelicList
                 state.me.heldRelics
                 state.me.person.id

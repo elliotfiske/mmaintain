@@ -398,9 +398,9 @@ addSomeDirt model =
         ( model, Cmd.none )
         (Util.generateGridOfPoints
             { minX = 5
-            , maxX = 25
+            , maxX = 20
             , minY = 5
-            , maxY = 10
+            , maxY = 15
             }
         )
 
