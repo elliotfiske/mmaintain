@@ -7,3 +7,22 @@ body, html {
     margin: 0;
     padding: 0;
 }
+
+.sprite {
+    width: 50px;  /* Width of one frame */
+    height: 50px; /* Height of one frame */
+    animation: play 300ms steps(3) infinite;
+    background-position: 0 0;
+
+    image-rendering: pixelated;  /* Modern browsers */
+    image-rendering: crisp-edges;  /* Firefox */
+}
+
+.person {
+    background-image: url('/public/sprites/dude.png');
+}
+
+@keyframes play {
+    from { background-position: 0px; }
+    to { background-position: 150px; }  /* Total width of spritesheet */
+}

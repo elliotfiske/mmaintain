@@ -83,7 +83,7 @@ levelProgress xp =
         upperBound =
             expForLevel (1 + levelForExp xp)
     in
-    toFloat (xp - lowerBound) / toFloat (Debug.log "upper" upperBound - Debug.log "lower" lowerBound) * 100
+    toFloat (xp - lowerBound) / toFloat (upperBound - lowerBound) * 100
 
 
 {-| Take 2 "input results", and a function that can fail that takes 2 arguments.

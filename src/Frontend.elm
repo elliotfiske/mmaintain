@@ -1,6 +1,7 @@
 module Frontend exposing (..)
 
 import Browser exposing (UrlRequest(..))
+import Browser.Dom
 import Browser.Events exposing (onKeyDown)
 import Browser.Navigation as Nav
 import DirtDict
@@ -11,8 +12,11 @@ import Html.Attributes exposing (..)
 import Html.Events
 import Json.Decode as Decode
 import Lamdera
+import Material.Icons.Outlined as Outlined
+import Material.Icons.Types as Coloring
 import PersonDict
 import RelicDict
+import Task
 import Types exposing (..)
 import Url
 import Util
@@ -257,7 +261,11 @@ update msg model =
             ( model, Cmd.none )
 
         PerformAction action ->
-            ( updateModelWithAction action model, Lamdera.sendToBackend (ClientPerformsAction action) )
+            let
+                refocus =
+                    Task.attempt (\_ -> NoOpFrontendMsg) (Browser.Dom.focus "main-map")
+            in
+            ( updateModelWithAction action model, Cmd.batch [ Lamdera.sendToBackend (ClientPerformsAction action), refocus ] )
 
         ClickedPleaseMakeMeDirty ->
             ( model, Lamdera.sendToBackend PleaseMakeMeDirty )
@@ -338,10 +346,12 @@ renderPlayingState : FrontendPlayingState -> Html.Html FrontendMsg
 renderPlayingState state =
     case assembleFrontendModel state of
         ValidFrontendModel validFrontendModelData ->
-            Html.div [ class "flex flex-col flex-grow-0 justify-end h-full overflow-y-auto" ]
+            Html.div [ class "h-full" ]
                 [ debugStuff state
-                , renderMyHUD state validFrontendModelData
-                , renderMap state
+                , Html.div [ class "flex justify-end h-full" ]
+                    [ renderMap state
+                    , renderMyHUD state validFrontendModelData
+                    ]
                 ]
 
         InvalidFrontendModel errorMessage ->
@@ -350,7 +360,7 @@ renderPlayingState state =
 
 renderMyHUD : FrontendPlayingState -> ValidFrontendModelData -> Html.Html FrontendMsg
 renderMyHUD state assembledModel =
-    Html.div [ class "flex flex-col items-end h-full" ]
+    Html.div [ class "flex flex-col items-end h-full bg-base-100 mx-3" ]
         [ renderXP assembledModel.me.person
         , renderCleanStrength assembledModel
         , renderHeldRelics assembledModel
@@ -360,7 +370,7 @@ renderMyHUD state assembledModel =
 
 debugStuff : FrontendPlayingState -> Html.Html FrontendMsg
 debugStuff state =
-    Html.div [ class "flex flex-col items-end" ]
+    Html.div [ class "flex flex-col absolute" ]
         [ debugDicts state
         , Html.button [ Html.Events.onClick ClickedPleaseMakeMeDirty, class "btn btn-primary" ] [ text "Add Dirt" ]
         ]
@@ -385,7 +395,7 @@ renderMap state =
     renderPeople state
         ++ renderDirt state
         ++ renderFloorRelics state
-        |> Html.div []
+        |> Html.div [ class "bg-green-800 flex-grow", id "main-map", tabindex 0 ]
 
 
 renderDirt : FrontendPlayingState -> List (Html.Html FrontendMsg)
@@ -396,13 +406,12 @@ renderDirt state =
 
 renderXP : PersonData -> Html.Html FrontendMsg
 renderXP myself =
-    Html.div [ class "flex flex-col text-right" ]
-        [ levelProgressBar myself
-        , Html.br [] []
-        , Html.text
-            ("Level: " ++ String.fromInt (Util.levelForExp myself.experience))
-        , Html.text
-            ("Exp: " ++ String.fromInt myself.experience)
+    Html.div [ class "prose" ]
+        [ Html.h2 [ class "text-center" ]
+            [ Html.text
+                ("Level " ++ String.fromInt (Util.levelForExp myself.experience))
+            ]
+        , levelProgressBar myself
         ]
 
 
@@ -417,30 +426,28 @@ levelProgressBar person =
         ]
 
 
-renderHeldRelics : ValidFrontendModelData -> Html.Html FrontendMsg
-renderHeldRelics state =
-    Html.div [ class "flex flex-col gap-2 h-full" ]
-        [ Html.text
-            "My Relics:"
-        , Html.div [ class "flex flex-col flex-wrap gap-2 overflow-y-scroll" ]
-            (renderRelicList
-                state.me.heldRelics
-                state.me.person.id
-                ++ renderRelicSlots state.me
-            )
-        ]
-
-
 renderCleanStrength : ValidFrontendModelData -> Html.Html FrontendMsg
 renderCleanStrength state =
     let
         strength =
             simulateClean state
     in
-    Html.div [ class "flex flex-col" ]
-        [ Html.text
-            ("Clean Strength: "
-                ++ String.fromInt strength
+    Html.div [ class "w-full prose" ]
+        [ Html.h3 [ class "text-center" ]
+            [ Html.text ("Clean Strength: " ++ String.fromInt strength) ]
+        ]
+
+
+renderHeldRelics : ValidFrontendModelData -> Html.Html FrontendMsg
+renderHeldRelics state =
+    Html.div [ class "w-full" ]
+        [ Html.h2 [ class "text-center prose" ]
+            [ Html.text "My Relics:" ]
+        , Html.div [ class "flex flex-col gap-2 overflow-y-auto", id "relic-list" ]
+            (renderRelicList
+                state.me.heldRelics
+                state.me.person.id
+                ++ renderRelicSlots state.me
             )
         ]
 
@@ -501,7 +508,7 @@ renderRelicSlots person =
 
 availableRelicView : Html.Html FrontendMsg
 availableRelicView =
-    card "Free Slot"
+    card [ Html.text "Free Slot" ]
         [ Html.div
             [ class "" ]
             [ Html.text "Pick something up why doncha" ]
@@ -510,7 +517,7 @@ availableRelicView =
 
 lockedSlotView : Int -> Html.Html FrontendMsg
 lockedSlotView lockedUntil =
-    card "Locked"
+    card [ Html.text "Locked" ]
         [ Html.div
             [ class "" ]
             [ Html.text ("Until level " ++ String.fromInt lockedUntil) ]
@@ -541,8 +548,8 @@ personView { id, name, x, y } =
         offsetY =
             String.fromInt (y * renderOffsetMultiplier)
     in
-    Html.div [ class "absolute", style "left" (offsetX ++ "px"), style "top" (offsetY ++ "px") ]
-        [ Html.text (String.fromInt (GameObjectTypes.personIdToInt id)) ]
+    Html.div [ class "absolute sprite person", style "left" (offsetX ++ "px"), style "top" (offsetY ++ "px") ]
+        []
 
 
 dirtView : GameObjectTypes.DirtData -> Html.Html FrontendMsg
@@ -572,28 +579,44 @@ floorRelicView { relicType, rarity, position } =
                 offsetY =
                     String.fromInt (y * renderOffsetMultiplier + 15)
             in
-            Html.div [ class ("absolute " ++ GameObject.relicColor rarity), style "left" (offsetX ++ "px"), style "top" (offsetY ++ "px") ]
+            Html.div [ class ("absolute " ++ GameObject.relicTextColor rarity), style "left" (offsetX ++ "px"), style "top" (offsetY ++ "px") ]
                 [ Html.text "!" ]
 
 
 heldRelicView : PersonId -> GameObjectTypes.RelicData -> Html.Html FrontendMsg
-heldRelicView myId { id, relicType, rarity } =
-    card (GameObject.relicName relicType)
+heldRelicView myId relicData =
+    let
+        cardTitle =
+            [ Html.div [ class "flex justify-between w-full" ]
+                [ Html.text (GameObject.relicName relicData.relicType), dropButton relicData.id myId ]
+            ]
+    in
+    card cardTitle
         [ Html.div
-            [ class (GameObject.relicColor rarity) ]
-            [ Html.text (GameObject.relicRarityName rarity) ]
-        , Html.button
-            [ Html.Events.onClick (PerformAction (DropRelic id myId)), class "btn btn-primary" ]
-            [ text "Drop" ]
+            [ class ("badge " ++ GameObject.relicBgColor relicData.rarity) ]
+            [ Html.text (GameObject.relicRarityName relicData.rarity) ]
+        , Html.div
+            [ class "flex justify-between" ]
+            [ Html.text (GameObject.relicDescription relicData) ]
         ]
 
 
-card : String -> List (Html.Html FrontendMsg) -> Html.Html FrontendMsg
+dropButton : GameObjectTypes.RelicId -> PersonId -> Html FrontendMsg
+dropButton relicId myId =
+    Html.button
+        [ Html.Events.onClick (PerformAction (DropRelic relicId myId))
+        , class "btn btn-sm btn-outline btn-square"
+        , id "drop-button"
+        ]
+        [ Outlined.file_download 18 Coloring.Inherit ]
+
+
+card : List (Html.Html FrontendMsg) -> List (Html.Html FrontendMsg) -> Html.Html FrontendMsg
 card title content =
-    Html.div [ class "card card-compact bg-base-200 shadow-xl" ]
+    Html.div [ class "card card-compact bg-base-300 shadow-xl" ]
         [ Html.div
             [ class "card-body" ]
-            ([ Html.h2 [ class "card-title" ] [ Html.text title ] ]
+            ([ Html.h2 [ class "card-title" ] title ]
                 ++ content
             )
         ]

@@ -38,8 +38,8 @@ createPerson id name =
     { id = id
     , name = name
     , experience = 0
-    , x = 0
-    , y = 0
+    , x = 3
+    , y = 3
     , stats =
         { cleanCount = 0
         , clearCount = 0
@@ -230,8 +230,8 @@ relicName relicType =
             "More XP!"
 
 
-relicColor : RelicRarity -> String
-relicColor rarity =
+relicTextColor : RelicRarity -> String
+relicTextColor rarity =
     case rarity of
         Common ->
             ""
@@ -247,6 +247,25 @@ relicColor rarity =
 
         Legendary ->
             "text-red-500"
+
+
+relicBgColor : RelicRarity -> String
+relicBgColor rarity =
+    case rarity of
+        Common ->
+            "bg-gray-300"
+
+        Uncommon ->
+            "bg-green-300"
+
+        Rare ->
+            "bg-blue-300"
+
+        Epic ->
+            "bg-purple-300"
+
+        Legendary ->
+            "bg-red-300"
 
 
 relicRarityName : RelicRarity -> String
@@ -266,6 +285,16 @@ relicRarityName rarity =
 
         Legendary ->
             "Legendary"
+
+
+relicDescription : RelicData -> String
+relicDescription relic =
+    case relic.relicType of
+        CleanFast ->
+            "x" ++ String.fromFloat (cleanFastStrengthMultiplier relic.rarity relic.exp) ++ " to Cleaning Strength"
+
+        MoreXP ->
+            "This relic gives you more experience for cleaning up pollution!"
 
 
 updateWithRelics : ActionOnGamestate -> GameState -> ActionOnGamestate
@@ -426,7 +455,6 @@ internalExecuteActionOnGameState action state =
 
 executeActionOnGameState : ActionOnGamestate -> GameState -> ( GameState, Types.BackendTrigger )
 executeActionOnGameState actionOnGamestate state =
-    -- TODO: Currently no difference, can remove this function and rename
     let
         modifiedAction =
             updateWithRelics actionOnGamestate state
