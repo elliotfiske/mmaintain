@@ -19,7 +19,7 @@ body, html {
 }
 
 .person {
-    background-image: url('/public/sprites/dude.png');
+    background-image: url('/sprites/dude.png');
 }
 
 @keyframes play {
