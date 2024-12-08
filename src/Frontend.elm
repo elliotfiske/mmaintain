@@ -342,12 +342,75 @@ renderModel model =
             renderPlayingState playingState
 
 
+renderModals : FrontendPlayingState -> ValidFrontendModelData -> Html.Html FrontendMsg
+renderModals state model =
+    if DirtDict.size state.dirtDict == 0 then
+        node "dialog"
+            [ id "my_modal_1"
+            , class "modal"
+            , attribute "open" "true"
+            ]
+            [ div
+                [ class "modal-box"
+                ]
+                [ h3
+                    [ class "text-lg font-bold"
+                    ]
+                    [ text "THE PARK IS CLEAN!!!" ]
+                , iframe
+                    [ src "https://giphy.com/embed/PFs9HklIZefehcOphI/video"
+                    , width 480
+                    , height 202
+                    , attribute "frameborder" "0"
+                    , class "giphy-embed"
+                    , attribute "allowfullscreen" ""
+                    ]
+                    []
+                , p []
+                    [ a
+                        [ href "https://giphy.com/clips/hamlet-yes-will-ferrell-hell-yeah-PFs9HklIZefehcOphI"
+                        ]
+                        [ text "via GIPHY" ]
+                    ]
+                , p
+                    [ class "py-4"
+                    ]
+                    [ text
+                        ("Congratulations, the park is clean! You did this many clean actions: "
+                            ++ String.fromInt model.me.person.stats.cleanCount
+                            ++ " and you finished off this many pollution patches: "
+                            ++ String.fromInt model.me.person.stats.clearCount
+                        )
+                    ]
+                , div
+                    [ class "modal-action"
+                    ]
+                    [ Html.form
+                        [ method "dialog"
+                        ]
+                        [ {- if there is a button in form, it will close the modal -}
+                          button
+                            [ class "btn"
+                            , Html.Events.onClick
+                                ClickedPleaseMakeMeDirty
+                            ]
+                            [ text "I'M NOT DONE, ADD MORE DIRT!" ]
+                        ]
+                    ]
+                ]
+            ]
+
+    else
+        text ""
+
+
 renderPlayingState : FrontendPlayingState -> Html.Html FrontendMsg
 renderPlayingState state =
     case assembleFrontendModel state of
         ValidFrontendModel validFrontendModelData ->
             Html.div [ class "h-full" ]
                 [ debugStuff state
+                , renderModals state validFrontendModelData
                 , Html.div [ class "flex justify-end h-full" ]
                     [ renderMap state
                     , renderMyHUD state validFrontendModelData
@@ -360,11 +423,10 @@ renderPlayingState state =
 
 renderMyHUD : FrontendPlayingState -> ValidFrontendModelData -> Html.Html FrontendMsg
 renderMyHUD state assembledModel =
-    Html.div [ class "flex flex-col items-end h-full bg-base-100 mx-3" ]
+    Html.div [ class "flex flex-col items-center h-full bg-base-100 mx-3" ]
         [ renderXP assembledModel.me.person
         , renderCleanStrength assembledModel
         , renderHeldRelics assembledModel
-        , maybeRenderGameOver state assembledModel
         ]
 
 
@@ -441,9 +503,11 @@ renderCleanStrength state =
 renderHeldRelics : ValidFrontendModelData -> Html.Html FrontendMsg
 renderHeldRelics state =
     Html.div [ class "w-full flex flex-col flex-gro" ]
-        [ Html.h2 [ class "text-center prose" ]
-            [ Html.text "My Relics:" ]
-        , Html.div [ class "flex flex-col gap-2 overflow-y-auto flex-grow", id "relic-list" ]
+        [ Html.div [ class "prose mt-8" ]
+            [ Html.h2 [ class "text-center" ]
+                [ Html.text "My Relics:" ]
+            ]
+        , Html.div [ class "flex flex-col gap-2 flex-grow flex-wrap h-[420px] p-2", id "relic-list" ]
             (renderRelicList
                 state.me.heldRelics
                 state.me.person.id
@@ -467,20 +531,6 @@ simulateClean state =
 
         _ ->
             -1
-
-
-maybeRenderGameOver : FrontendPlayingState -> ValidFrontendModelData -> Html.Html FrontendMsg
-maybeRenderGameOver state model =
-    if DirtDict.size state.dirtDict == 0 then
-        text
-            ("Congratulations, the park is clean! You did this many clean actions: "
-                ++ String.fromInt model.me.person.stats.cleanCount
-                ++ " and you finished off this many pollution patches: "
-                ++ String.fromInt model.me.person.stats.clearCount
-            )
-
-    else
-        text ""
 
 
 renderRelicList : List GameObjectTypes.RelicData -> PersonId -> List (Html.Html FrontendMsg)
@@ -508,16 +558,13 @@ renderRelicSlots person =
 
 availableRelicView : Html.Html FrontendMsg
 availableRelicView =
-    card [ Html.text "Free Slot" ]
-        [ Html.div
-            [ class "" ]
-            [ Html.text "Pick something up why doncha" ]
-        ]
+    card [ Html.div [ class "text-center" ] [ Html.text "Free Slot" ] ]
+        []
 
 
 lockedSlotView : Int -> Html.Html FrontendMsg
 lockedSlotView lockedUntil =
-    card [ Html.text "Locked" ]
+    card [ Outlined.lock 16 Coloring.Inherit, Html.text "Locked" ]
         [ Html.div
             [ class "" ]
             [ Html.text ("Until level " ++ String.fromInt lockedUntil) ]
@@ -613,7 +660,7 @@ dropButton relicId myId =
 
 card : List (Html.Html FrontendMsg) -> List (Html.Html FrontendMsg) -> Html.Html FrontendMsg
 card title content =
-    Html.div [ class "card card-compact bg-base-300 shadow-xl" ]
+    Html.div [ class "card card-compact bg-base-300 shadow-xl w-52" ]
         [ Html.div
             [ class "card-body" ]
             ([ Html.h2 [ class "card-title" ] title ]

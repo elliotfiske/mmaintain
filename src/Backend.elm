@@ -412,7 +412,11 @@ andThenAddDirtToSpot point ( model, msg ) =
             getRandomValue model
 
         dirtAmount =
-            modBy 800 randomValue + 300
+            if modBy 4 randomValue == 0 then
+                modBy 10000 randomValue + 1000
+
+            else
+                modBy 800 randomValue + 300
     in
     andThen (addDirtToSpot point dirtAmount) ( newModel, msg )
 
