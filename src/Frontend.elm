@@ -15,6 +15,7 @@ import Lamdera
 import Material.Icons.Outlined as Outlined
 import Material.Icons.Types as Coloring
 import PersonDict
+import Relic
 import RelicDict
 import Task
 import Types exposing (..)
@@ -366,12 +367,6 @@ renderModals state model =
                     , attribute "allowfullscreen" ""
                     ]
                     []
-                , p []
-                    [ a
-                        [ href "https://giphy.com/clips/hamlet-yes-will-ferrell-hell-yeah-PFs9HklIZefehcOphI"
-                        ]
-                        [ text "via GIPHY" ]
-                    ]
                 , p
                     [ class "py-4"
                     ]
@@ -390,7 +385,7 @@ renderModals state model =
                         ]
                         [ {- if there is a button in form, it will close the modal -}
                           button
-                            [ class "btn"
+                            [ class "btn btn-primary"
                             , Html.Events.onClick
                                 ClickedPleaseMakeMeDirty
                             ]
@@ -507,7 +502,7 @@ renderHeldRelics state =
             [ Html.h2 [ class "text-center" ]
                 [ Html.text "My Relics:" ]
             ]
-        , Html.div [ class "flex flex-col gap-2 flex-grow flex-wrap h-[420px] p-2", id "relic-list" ]
+        , Html.div [ class "flex flex-col gap-2 flex-grow flex-wrap h-[620px] p-2", id "relic-list" ]
             (renderRelicList
                 state.me.heldRelics
                 state.me.person.id
@@ -521,7 +516,7 @@ simulateClean state =
     let
         action =
             List.foldl
-                GameObject.relicModifiesAction
+                Relic.relicModifiesAction
                 (Clean state.me.person.id (GameObjectTypes.DirtId 0) (10 + Util.levelForExp state.me.person.experience))
                 state.me.heldRelics
     in
@@ -626,7 +621,7 @@ floorRelicView { relicType, rarity, position } =
                 offsetY =
                     String.fromInt (y * renderOffsetMultiplier + 15)
             in
-            Html.div [ class ("absolute " ++ GameObject.relicTextColor rarity), style "left" (offsetX ++ "px"), style "top" (offsetY ++ "px") ]
+            Html.div [ class ("absolute " ++ Relic.relicTextColor rarity), style "left" (offsetX ++ "px"), style "top" (offsetY ++ "px") ]
                 [ Html.text "!" ]
 
 
@@ -635,16 +630,16 @@ heldRelicView myId relicData =
     let
         cardTitle =
             [ Html.div [ class "flex justify-between w-full" ]
-                [ Html.text (GameObject.relicName relicData.relicType), dropButton relicData.id myId ]
+                [ Html.text (Relic.relicName relicData.relicType), dropButton relicData.id myId ]
             ]
     in
     card cardTitle
         [ Html.div
-            [ class ("badge " ++ GameObject.relicBgColor relicData.rarity) ]
-            [ Html.text (GameObject.relicRarityName relicData.rarity) ]
+            [ class ("badge dark:text-black " ++ Relic.relicBgColor relicData.rarity) ]
+            [ Html.text (Relic.relicRarityName relicData.rarity) ]
         , Html.div
             [ class "flex justify-between" ]
-            [ Html.text (GameObject.relicDescription relicData) ]
+            [ Html.text (Relic.relicDescription relicData) ]
         ]
 
 
@@ -660,7 +655,7 @@ dropButton relicId myId =
 
 card : List (Html.Html FrontendMsg) -> List (Html.Html FrontendMsg) -> Html.Html FrontendMsg
 card title content =
-    Html.div [ class "card card-compact bg-base-300 shadow-xl w-52" ]
+    Html.div [ class "card card-compact bg-base-300 shadow-xl w-52 h-48" ]
         [ Html.div
             [ class "card-body" ]
             ([ Html.h2 [ class "card-title" ] title ]

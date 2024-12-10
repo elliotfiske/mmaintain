@@ -3,6 +3,7 @@ module GameObject exposing (..)
 import DirtDict exposing (DirtDict)
 import GameObjectTypes exposing (..)
 import PersonDict exposing (PersonDict)
+import Relic exposing (..)
 import RelicDict
 import Types exposing (BackendTrigger(..), GameState, RealDirtDict, RealRelicDict)
 
@@ -62,16 +63,6 @@ setDirtAmount amount dirt =
     { dirt | amount = amount }
 
 
-makeDirtCleaner : Maybe DirtData -> DirtDict DirtData -> DirtDict DirtData
-makeDirtCleaner dirtData dict =
-    case dirtData of
-        Nothing ->
-            dict
-
-        Just dirt ->
-            updateDirtOrRemoveEmpty dirt dict
-
-
 incrementCleanCount : PersonId -> PersonDict PersonData -> PersonDict PersonData
 incrementCleanCount personId dict =
     PersonDict.update personId (Maybe.map doIncrementCleanCount) dict
@@ -104,15 +95,6 @@ doIncrementClearCount person =
             { stats | clearCount = stats.clearCount + 1 }
     in
     { person | stats = newStats }
-
-
-updateDirtOrRemoveEmpty : DirtData -> DirtDict DirtData -> DirtDict DirtData
-updateDirtOrRemoveEmpty dirt dict =
-    if dirt.amount <= 0 then
-        DirtDict.remove dirt.id dict
-
-    else
-        DirtDict.insert dirt.id dirt dict
 
 
 changeDirtAmount : DirtId -> Int -> RealDirtDict -> RealDirtDict
@@ -171,136 +153,10 @@ byRelicRarity relic =
             -4
 
 
-relicHolder : RelicData -> Maybe PersonId
-relicHolder relic =
-    case relic.position of
-        HeldBy personId ->
-            Just personId
-
-        OnFloor _ _ ->
-            Nothing
-
-
-cleanFastStrengthMultiplier : RelicRarity -> Int -> Float
-cleanFastStrengthMultiplier rarity xp =
-    case rarity of
-        Common ->
-            1.1
-
-        Uncommon ->
-            1.2
-
-        Rare ->
-            1.5
-
-        Epic ->
-            3
-
-        Legendary ->
-            5
-
-
-relicModifiesAction : RelicData -> ActionOnGamestate -> ActionOnGamestate
-relicModifiesAction relic action =
-    case relic.relicType of
-        CleanFast ->
-            case action of
-                Clean personId dirtId strength ->
-                    if Just personId == relicHolder relic then
-                        Clean personId dirtId (round (toFloat strength * cleanFastStrengthMultiplier relic.rarity relic.exp))
-
-                    else
-                        action
-
-                _ ->
-                    action
-
-        MoreXP ->
-            -- unimplemented
-            action
-
-
-relicName : RelicType -> String
-relicName relicType =
-    case relicType of
-        CleanFast ->
-            "Clean Fast!"
-
-        MoreXP ->
-            "More XP!"
-
-
-relicTextColor : RelicRarity -> String
-relicTextColor rarity =
-    case rarity of
-        Common ->
-            ""
-
-        Uncommon ->
-            "text-green-500"
-
-        Rare ->
-            "text-blue-500"
-
-        Epic ->
-            "text-purple-500"
-
-        Legendary ->
-            "text-red-500"
-
-
-relicBgColor : RelicRarity -> String
-relicBgColor rarity =
-    case rarity of
-        Common ->
-            "bg-gray-300"
-
-        Uncommon ->
-            "bg-green-300"
-
-        Rare ->
-            "bg-blue-300"
-
-        Epic ->
-            "bg-purple-300"
-
-        Legendary ->
-            "bg-red-300"
-
-
-relicRarityName : RelicRarity -> String
-relicRarityName rarity =
-    case rarity of
-        Common ->
-            "Common"
-
-        Uncommon ->
-            "Uncommon"
-
-        Rare ->
-            "Rare"
-
-        Epic ->
-            "Epic"
-
-        Legendary ->
-            "Legendary"
-
-
-relicDescription : RelicData -> String
-relicDescription relic =
-    case relic.relicType of
-        CleanFast ->
-            "x" ++ String.fromFloat (cleanFastStrengthMultiplier relic.rarity relic.exp) ++ " to Cleaning Strength"
-
-        MoreXP ->
-            "This relic gives you more experience for cleaning up pollution!"
-
-
 updateWithRelics : ActionOnGamestate -> GameState -> ActionOnGamestate
 updateWithRelics action state =
     RelicDict.values state.relicDict
-        |> List.foldl relicModifiesAction action
+        |> List.foldl Relic.relicModifiesAction action
 
 
 relicSlotThreshholds : List Int
@@ -371,13 +227,33 @@ addClearStats personId ( state, trigger ) =
             ( state, trigger )
 
 
+xpMultiplierForPlayer : GameState -> PersonData -> Float
+xpMultiplierForPlayer state person =
+    let
+        heldRelics =
+            RelicDict.values state.relicDict
+                |> List.filter (\relic -> relicHolder relic == Just person.id)
+    in
+    heldRelics
+        |> List.foldl
+            (\relic acc ->
+                case relic.relicType of
+                    MoreXP ->
+                        acc * xpMultiplier relic.rarity person.experience
+
+                    _ ->
+                        acc
+            )
+            1
+
+
 earnExperienceFromClean : PersonId -> ( GameState, Types.BackendTrigger ) -> ( GameState, Types.BackendTrigger )
 earnExperienceFromClean personId ( state, trigger ) =
     let
         person =
             PersonDict.get personId state.personDict
 
-        xpEarned =
+        baseXpEarned =
             case trigger of
                 ClearedPollution _ _ ->
                     10
@@ -391,6 +267,11 @@ earnExperienceFromClean personId ( state, trigger ) =
 
         Just fella ->
             let
+                xpEarned =
+                    baseXpEarned
+                        * xpMultiplierForPlayer state fella
+                        |> round
+
                 newPerson =
                     { fella | experience = fella.experience + xpEarned }
 
@@ -432,7 +313,6 @@ internalExecuteActionOnGameState action state =
                 maybeRelic =
                     RelicDict.get relicId state.relicDict
             in
-            -- TODO: Cool helper function like "return state unchanged if either of these are Nothing, otherwise execute update". I think I may do this a lot.
             case ( maybeDropper, maybeRelic ) of
                 ( Just dropper, Just relic ) ->
                     withNoOp { state | relicDict = RelicDict.insert relicId (dropRelic dropper relic) state.relicDict }

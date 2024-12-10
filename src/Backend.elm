@@ -313,19 +313,25 @@ doRelicRoll who killedDirt model =
         ( randomRarity, newModel ) =
             getRandomValue model
 
+        ( randomTypeIndex, newModel2 ) =
+            getRandomValue newModel
+
+        randomType =
+            relicTypeRoll randomTypeIndex
+
         maybeRarity =
             randomRarity
                 |> modBy 100
                 |> rarityRoll
 
         ( newId, incModel ) =
-            getAndIncrementBiggestId newModel
+            getAndIncrementBiggestId newModel2
 
         maybeNewRelic =
             Maybe.map
                 (\rarity ->
                     { id = GameObjectTypes.RelicId newId
-                    , relicType = GameObjectTypes.CleanFast
+                    , relicType = randomType
                     , position = GameObjectTypes.OnFloor killedDirt.x killedDirt.y
                     , rarity = rarity
                     , exp = 0
@@ -374,6 +380,19 @@ rarityRoll randomValue =
 
     else
         Nothing
+
+
+relicTypeRoll : Int -> GameObjectTypes.RelicType
+relicTypeRoll rawRandomValue =
+    let
+        randomValue =
+            modBy 100 rawRandomValue
+    in
+    if randomValue < 66 then
+        GameObjectTypes.CleanFast
+
+    else
+        GameObjectTypes.MoreXP
 
 
 addRelic : Model -> ( Model, Cmd BackendMsg )

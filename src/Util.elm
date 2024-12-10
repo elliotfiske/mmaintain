@@ -117,3 +117,9 @@ type alias GenerateGridOfPointsArgs =
 generateGridOfPoints : GenerateGridOfPointsArgs -> List Types.Point
 generateGridOfPoints { minX, maxX, minY, maxY } =
     List.concatMap (\x -> List.map (\y -> { x = x, y = y }) (List.range minY maxY)) (List.range minX maxX)
+
+
+nthItem : Int -> List a -> Maybe a
+nthItem n list =
+    List.drop n list
+        |> List.head

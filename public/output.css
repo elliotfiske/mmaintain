@@ -2426,6 +2426,18 @@ html {
   height: 420px;
 }
 
+.h-48 {
+  height: 12rem;
+}
+
+.h-\[580px\] {
+  height: 580px;
+}
+
+.h-\[620px\] {
+  height: 620px;
+}
+
 .max-h-screen {
   max-height: 100vh;
 }
@@ -2671,4 +2683,16 @@ body, html {
   }
 
   /* Total width of spritesheet */
+}
+
+@media (prefers-color-scheme: dark) {
+  .dark\:text-black {
+    --tw-text-opacity: 1;
+    color: rgb(0 0 0 / var(--tw-text-opacity));
+  }
+
+  .dark\:text-slate-100 {
+    --tw-text-opacity: 1;
+    color: rgb(241 245 249 / var(--tw-text-opacity));
+  }
 }
