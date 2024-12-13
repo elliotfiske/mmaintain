@@ -263,10 +263,15 @@ update msg model =
 
         PerformAction action ->
             let
+                -- Necessary otherwise the next "space" keypress will activate buttons unexpectedly
                 refocus =
                     Task.attempt (\_ -> NoOpFrontendMsg) (Browser.Dom.focus "main-map")
             in
             ( updateModelWithAction action model, Cmd.batch [ Lamdera.sendToBackend (ClientPerformsAction action), refocus ] )
+
+        ActivatedRelic myId relicId ->
+            -- todo: set "loading" state, since this is a backend-authoritative action and it could take time
+            ( model, Lamdera.sendToBackend (PleaseActivateRelic myId relicId) )
 
         ClickedPleaseMakeMeDirty ->
             ( model, Lamdera.sendToBackend PleaseMakeMeDirty )
@@ -513,19 +518,8 @@ renderHeldRelics state =
 
 simulateClean : ValidFrontendModelData -> Int
 simulateClean state =
-    let
-        action =
-            List.foldl
-                Relic.relicModifiesAction
-                (Clean state.me.person.id (GameObjectTypes.DirtId 0) (10 + Util.levelForExp state.me.person.experience))
-                state.me.heldRelics
-    in
-    case action of
-        Clean _ _ strength ->
-            strength
-
-        _ ->
-            -1
+    -- TODO: Fix this up (I've decided that clean strength is a property of the player, not modified per action)
+    1
 
 
 renderRelicList : List GameObjectTypes.RelicData -> PersonId -> List (Html.Html FrontendMsg)
@@ -639,7 +633,7 @@ heldRelicView myId relicData =
             [ Html.text (Relic.relicRarityName relicData.rarity) ]
         , Html.div
             [ class "flex justify-between" ]
-            [ Html.text (Relic.relicDescription relicData) ]
+            (Relic.relicBody myId relicData)
         ]
 
 
@@ -658,8 +652,8 @@ card title content =
     Html.div [ class "card card-compact bg-base-300 shadow-xl w-52 h-48" ]
         [ Html.div
             [ class "card-body" ]
-            ([ Html.h2 [ class "card-title" ] title ]
-                ++ content
+            (Html.h2 [ class "card-title" ] title
+                :: content
             )
         ]
 

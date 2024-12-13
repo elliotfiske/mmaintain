@@ -1,6 +1,12 @@
 module Relic exposing (..)
 
 import GameObjectTypes exposing (..)
+import Html
+import Html.Events
+import List.Extra
+import PersonDict
+import RelicDict
+import Types exposing (..)
 
 
 relicName : RelicType -> String
@@ -11,6 +17,9 @@ relicName relicType =
 
         MoreXP ->
             "More XP!"
+
+        DropAndDouble _ ->
+            "Generosity Trap"
 
 
 relicTextColor : RelicRarity -> String
@@ -70,14 +79,31 @@ relicRarityName rarity =
             "Legendary"
 
 
-relicDescription : RelicData -> String
-relicDescription relic =
+simpleRelicBody : String -> List (Html.Html FrontendMsg)
+simpleRelicBody text =
+    [ Html.text text ]
+
+
+relicBody : PersonId -> RelicData -> List (Html.Html FrontendMsg)
+relicBody myId relic =
     case relic.relicType of
         CleanFast ->
-            "x" ++ String.fromFloat (cleanFastStrengthMultiplier relic.rarity relic.exp) ++ " to Cleaning Strength."
+            simpleRelicBody ("x" ++ String.fromFloat (cleanFastStrengthMultiplier relic.rarity relic.exp) ++ " to Cleaning Strength.")
 
         MoreXP ->
-            "x" ++ String.fromFloat (xpMultiplier relic.rarity relic.exp) ++ " to all XP earned from cleaning."
+            simpleRelicBody ("x" ++ String.fromFloat (xpMultiplier relic.rarity relic.exp) ++ " to all XP earned from cleaning.")
+
+        DropAndDouble people ->
+            [ Html.text ("Gain " ++ String.fromInt (dropDoubleCurrentExperience relic.rarity (List.length people)) ++ "xp now, or drop this and double it for somebody else. current folk: " ++ personDictToString people)
+            , Html.button [ Html.Events.onClick (ActivatedRelic myId relic.id) ] [ Html.text "Claim XP" ]
+            ]
+
+
+personDictToString : List PersonId -> String
+personDictToString personDict =
+    personDict
+        |> List.map (\personId -> "Person " ++ GameObjectTypes.personIdToString personId)
+        |> String.join ", "
 
 
 cleanFastStrengthMultiplier : RelicRarity -> Int -> Float
@@ -118,6 +144,30 @@ xpMultiplier rarity xp =
             15
 
 
+dropDoubleBaseExperience : RelicRarity -> Int
+dropDoubleBaseExperience rarity =
+    case rarity of
+        Common ->
+            100
+
+        Uncommon ->
+            200
+
+        Rare ->
+            300
+
+        Epic ->
+            400
+
+        Legendary ->
+            500
+
+
+dropDoubleCurrentExperience : RelicRarity -> Int -> Int
+dropDoubleCurrentExperience rarity droppedPeople =
+    dropDoubleBaseExperience rarity * 2 ^ droppedPeople
+
+
 relicHolder : RelicData -> Maybe PersonId
 relicHolder relic =
     case relic.position of
@@ -128,21 +178,92 @@ relicHolder relic =
             Nothing
 
 
-relicModifiesAction : RelicData -> ActionOnGamestate -> ActionOnGamestate
-relicModifiesAction relic action =
+relicModifiesState : ActionOnGamestate -> RelicData -> GameState -> GameState
+relicModifiesState action relic state =
     case relic.relicType of
         CleanFast ->
-            case action of
-                Clean personId dirtId strength ->
-                    if Just personId == relicHolder relic then
-                        Clean personId dirtId (round (toFloat strength * cleanFastStrengthMultiplier relic.rarity relic.exp))
-
-                    else
-                        action
-
-                _ ->
-                    action
+            state
 
         MoreXP ->
             -- Handled in earnExperienceFromClean
-            action
+            state
+
+        DropAndDouble people ->
+            case action of
+                DropRelic relicId personId ->
+                    handleDroppingDoubler relicId relic personId people state
+
+                _ ->
+                    state
+
+
+handleDroppingDoubler : RelicId -> RelicData -> PersonId -> List PersonId -> GameState -> GameState
+handleDroppingDoubler relicId relic personId people state =
+    if relicId == relic.id then
+        let
+            newPersonList =
+                personId :: List.Extra.uniqueBy personIdToString people
+
+            newRelic =
+                { relic | relicType = DropAndDouble newPersonList }
+
+            newRelicDict =
+                RelicDict.insert relic.id newRelic state.relicDict
+        in
+        { state | relicDict = newRelicDict }
+
+    else
+        state
+
+
+createActionOnGameStateFromRelicActivation : PersonId -> RelicId -> GameState -> ActionOnGamestate
+createActionOnGameStateFromRelicActivation activatorId relicId state =
+    let
+        maybeRelic =
+            RelicDict.get relicId state.relicDict
+
+        maybePerson =
+            PersonDict.get activatorId state.personDict
+    in
+    case ( maybeRelic, maybePerson ) of
+        ( Just relic, Just person ) ->
+            case relic.relicType of
+                DropAndDouble people ->
+                    ActivateGenerosityTrap activatorId relicId (List.length people)
+
+                _ ->
+                    GameStateNoOp
+
+        _ ->
+            GameStateNoOp
+
+
+maybeActivateRelic : PersonId -> RelicId -> GameState -> ( GameState, Types.BackendTrigger )
+maybeActivateRelic activatorId relicId state =
+    let
+        maybeRelic =
+            RelicDict.get relicId state.relicDict
+
+        maybePerson =
+            PersonDict.get activatorId state.personDict
+    in
+    case ( maybeRelic, maybePerson ) of
+        ( Just relic, Just person ) ->
+            activateRelicWithPersonData state person relic
+
+        _ ->
+            ( state, NoOpBackendTrigger )
+
+
+activateRelicWithPersonData : GameState -> PersonData -> RelicData -> ( GameState, Types.BackendTrigger )
+activateRelicWithPersonData state person relic =
+    case relic.relicType of
+        DropAndDouble people ->
+            let
+                newPersonState =
+                    { person | experience = person.experience + dropDoubleCurrentExperience relic.rarity (List.length people) }
+            in
+            ( { state | personDict = PersonDict.insert person.id newPersonState state.personDict }, NoOpBackendTrigger )
+
+        _ ->
+            ( state, NoOpBackendTrigger )

@@ -76,6 +76,7 @@ type RelicPosition
 type RelicType
     = CleanFast
     | MoreXP
+    | DropAndDouble (List PersonId)
 
 
 type RelicRarity
@@ -102,4 +103,6 @@ type ActionOnGamestate
     | AddPerson PersonData
     | PickUpRelic RelicId PersonId
     | DropRelic RelicId PersonId
+      -- todo: now that I decided to have this be backend-authoritative, this can be PersonData and RelicData for convenience
+    | ActivateGenerosityTrap PersonId RelicId Int
     | GameStateNoOp

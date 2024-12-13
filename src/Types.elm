@@ -82,10 +82,11 @@ type BackendTrigger
 type FrontendMsg
     = UrlClicked UrlRequest
     | UrlChanged Url
-    | NoOpFrontendMsg
     | PerformAction ActionOnGamestate
     | ClickedPleaseMakeMeDirty
     | DebugGenerateRelic
+    | ActivatedRelic PersonId RelicId
+    | NoOpFrontendMsg
 
 
 type ToBackend
@@ -93,6 +94,7 @@ type ToBackend
     | ClientPerformsAction ActionOnGamestate
     | PleaseMakeMeDirty
     | PleaseGenerateRelic
+    | PleaseActivateRelic PersonId RelicId
 
 
 type BackendMsg

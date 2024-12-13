@@ -7,6 +7,7 @@ import GameObjectTypes exposing (ActionOnGamestate(..), PersonData, PersonId(..)
 import Lamdera exposing (ClientId, SessionId, sendToFrontend)
 import List
 import PersonDict
+import Relic
 import RelicDict
 import Types exposing (..)
 import Util
@@ -231,6 +232,7 @@ getAndIncrementBiggestId model =
 
 
 {-| Return a "random enough" number.
+todo: use the actual random Generator instead
 -}
 getRandomValue : Model -> ( Int, Model )
 getRandomValue model =
@@ -292,6 +294,25 @@ updateFromFrontend _ clientId msg model =
 
         PleaseGenerateRelic ->
             addRelic model
+
+        PleaseActivateRelic personId relicId ->
+            let
+                actionsFromActivation =
+                    model
+                        |> constructGameState
+                        |> Relic.createActionOnGameStateFromRelicActivation personId relicId
+
+                ( newGameState, backendTriggers ) =
+                    model
+                        |> constructGameState
+                        |> executeActionOnGameState actionsFromActivation
+
+                newModel =
+                    updateModelFromGameState model newGameState
+            in
+            ( newModel
+            , Lamdera.broadcast (OtherClientPerformedAction Server actionsFromActivation)
+            )
 
 
 executeBackendTrigger : BackendTrigger -> Model -> ( Model, ActionOnGamestate )
@@ -403,7 +424,7 @@ addRelic model =
 
         newRelic : GameObjectTypes.RelicData
         newRelic =
-            { id = GameObjectTypes.RelicId newId, relicType = GameObjectTypes.CleanFast, position = GameObjectTypes.OnFloor 2 2, rarity = GameObjectTypes.Legendary, exp = 0 }
+            { id = GameObjectTypes.RelicId newId, relicType = GameObjectTypes.DropAndDouble [], position = GameObjectTypes.OnFloor 2 2, rarity = GameObjectTypes.Legendary, exp = 0 }
 
         newRelicDict =
             RelicDict.insert newRelic.id newRelic model.relicDict

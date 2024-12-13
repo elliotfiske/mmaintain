@@ -153,10 +153,11 @@ byRelicRarity relic =
             -4
 
 
-updateWithRelics : ActionOnGamestate -> GameState -> ActionOnGamestate
+updateWithRelics : ActionOnGamestate -> GameState -> GameState
 updateWithRelics action state =
     RelicDict.values state.relicDict
-        |> List.foldl Relic.relicModifiesAction action
+        -- todo: only have held relics modify state
+        |> List.foldl (Relic.relicModifiesState action) state
 
 
 relicSlotThreshholds : List Int
@@ -332,11 +333,44 @@ internalExecuteActionOnGameState action state =
         GameStateNoOp ->
             withNoOp state
 
+        ActivateGenerosityTrap personId relicId numDoubles ->
+            let
+                maybeRelic =
+                    RelicDict.get relicId state.relicDict
+
+                maybeFella =
+                    PersonDict.get personId state.personDict
+            in
+            case ( maybeRelic, maybeFella ) of
+                ( Just relicData, Just fella ) ->
+                    withNoOp (activateGenerosityTrap relicData fella numDoubles state)
+
+                _ ->
+                    withNoOp state
+
+
+activateGenerosityTrap : RelicData -> PersonData -> Int -> GameState -> GameState
+activateGenerosityTrap relicData personData numDoubles state =
+    let
+        newRelicDict =
+            RelicDict.remove relicData.id state.relicDict
+
+        xpEarned =
+            Relic.dropDoubleCurrentExperience relicData.rarity numDoubles
+
+        newPerson =
+            { personData | experience = personData.experience + xpEarned }
+
+        newPersonDict =
+            PersonDict.insert personData.id newPerson state.personDict
+    in
+    { state | relicDict = newRelicDict, personDict = newPersonDict }
+
 
 executeActionOnGameState : ActionOnGamestate -> GameState -> ( GameState, Types.BackendTrigger )
 executeActionOnGameState actionOnGamestate state =
     let
-        modifiedAction =
+        modifiedState =
             updateWithRelics actionOnGamestate state
     in
-    internalExecuteActionOnGameState modifiedAction state
+    internalExecuteActionOnGameState actionOnGamestate modifiedState
