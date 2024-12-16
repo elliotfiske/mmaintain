@@ -425,7 +425,8 @@ renderMyHUD : FrontendPlayingState -> ValidFrontendModelData -> Html.Html Fronte
 renderMyHUD state assembledModel =
     Html.div [ class "flex flex-col items-center h-full bg-base-100 mx-3" ]
         [ renderXP assembledModel.me.person
-        , renderCleanStrength assembledModel
+        , renderCleanStrength state assembledModel
+        , renderXPMultiplier state assembledModel
         , renderHeldRelics assembledModel
         ]
 
@@ -488,16 +489,32 @@ levelProgressBar person =
         ]
 
 
-renderCleanStrength : ValidFrontendModelData -> Html.Html FrontendMsg
-renderCleanStrength state =
+renderCleanStrength : FrontendPlayingState -> ValidFrontendModelData -> Html.Html FrontendMsg
+renderCleanStrength state modelData =
     let
         strength =
-            simulateClean state
+            GameObject.cleanStrengthForPlayer state.relicDict modelData.me.person
     in
     Html.div [ class "w-full prose" ]
         [ Html.h3 [ class "text-center" ]
             [ Html.text ("Clean Strength: " ++ String.fromInt strength) ]
         ]
+
+
+renderXPMultiplier : FrontendPlayingState -> ValidFrontendModelData -> Html.Html FrontendMsg
+renderXPMultiplier state modelData =
+    let
+        xpMultiplier =
+            GameObject.xpMultiplierForPlayer state.relicDict modelData.me.person
+    in
+    if xpMultiplier == 1 then
+        Html.text ""
+
+    else
+        Html.div [ class "w-full prose" ]
+            [ Html.h3 [ class "text-center" ]
+                [ Html.text ("XP Multiplier: " ++ String.fromFloat xpMultiplier) ]
+            ]
 
 
 renderHeldRelics : ValidFrontendModelData -> Html.Html FrontendMsg
@@ -507,19 +524,13 @@ renderHeldRelics state =
             [ Html.h2 [ class "text-center" ]
                 [ Html.text "My Relics:" ]
             ]
-        , Html.div [ class "flex flex-col gap-2 flex-grow flex-wrap h-[620px] p-2", id "relic-list" ]
+        , Html.div [ class "flex flex-col gap-2 flex-grow flex-wrap h-[660px] p-2", id "relic-list" ]
             (renderRelicList
                 state.me.heldRelics
                 state.me.person.id
                 ++ renderRelicSlots state.me
             )
         ]
-
-
-simulateClean : ValidFrontendModelData -> Int
-simulateClean state =
-    -- TODO: Fix this up (I've decided that clean strength is a property of the player, not modified per action)
-    1
 
 
 renderRelicList : List GameObjectTypes.RelicData -> PersonId -> List (Html.Html FrontendMsg)
@@ -632,7 +643,7 @@ heldRelicView myId relicData =
             [ class ("badge dark:text-black " ++ Relic.relicBgColor relicData.rarity) ]
             [ Html.text (Relic.relicRarityName relicData.rarity) ]
         , Html.div
-            [ class "flex justify-between" ]
+            [ class "flex flex-col justify-between" ]
             (Relic.relicBody myId relicData)
         ]
 
@@ -649,7 +660,7 @@ dropButton relicId myId =
 
 card : List (Html.Html FrontendMsg) -> List (Html.Html FrontendMsg) -> Html.Html FrontendMsg
 card title content =
-    Html.div [ class "card card-compact bg-base-300 shadow-xl w-52 h-48" ]
+    Html.div [ class "card card-compact bg-base-300 shadow-xl w-52 h-52" ]
         [ Html.div
             [ class "card-body" ]
             (Html.h2 [ class "card-title" ] title
@@ -681,4 +692,4 @@ tryCleaning state assembledModel =
                         GameStateNoOp
 
         Just dirt ->
-            Clean myself.id dirt.id (10 + Util.levelForExp myself.experience)
+            Clean myself.id dirt.id

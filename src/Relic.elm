@@ -2,8 +2,10 @@ module Relic exposing (..)
 
 import GameObjectTypes exposing (..)
 import Html
+import Html.Attributes
 import Html.Events
 import List.Extra
+import Markdown
 import PersonDict
 import RelicDict
 import Types exposing (..)
@@ -91,12 +93,39 @@ relicBody myId relic =
             simpleRelicBody ("x" ++ String.fromFloat (cleanFastStrengthMultiplier relic.rarity relic.exp) ++ " to Cleaning Strength.")
 
         MoreXP ->
-            simpleRelicBody ("x" ++ String.fromFloat (xpMultiplier relic.rarity relic.exp) ++ " to all XP earned from cleaning.")
+            simpleRelicBody ("x" ++ String.fromFloat (xpMultiplier relic.rarity relic.exp) ++ " to all XP earned.")
 
         DropAndDouble people ->
-            [ Html.text ("Gain " ++ String.fromInt (dropDoubleCurrentExperience relic.rarity (List.length people)) ++ "xp now, or drop this and double it for somebody else. current folk: " ++ personDictToString people)
-            , Html.button [ Html.Events.onClick (ActivatedRelic myId relic.id) ] [ Html.text "Claim XP" ]
+            let
+                alreadyDropped =
+                    List.member myId people
+            in
+            Markdown.toHtml Nothing
+                ("Gain **"
+                    ++ String.fromInt (dropDoubleCurrentExperience relic.rarity (List.length people))
+                    ++ "xp** now, or drop this and double it for somebody else."
+                    ++ (if alreadyDropped then
+                            " <br><br> You've already dropped this. Give it to somebody else!"
+
+                        else
+                            ""
+                       )
+                )
+                ++ [ dropAndDoubleActivationButton myId people relic.id
+                   ]
+
+
+dropAndDoubleActivationButton : PersonId -> List PersonId -> RelicId -> Html.Html FrontendMsg
+dropAndDoubleActivationButton myId droppers relicId =
+    if List.member myId droppers then
+        Html.text ""
+
+    else
+        Html.button
+            [ Html.Attributes.class "btn btn-sm btn-primary"
+            , Html.Events.onClick (ActivatedRelic myId relicId)
             ]
+            [ Html.text "Claim XP" ]
 
 
 personDictToString : List PersonId -> String
@@ -202,7 +231,7 @@ handleDroppingDoubler relicId relic personId people state =
     if relicId == relic.id then
         let
             newPersonList =
-                personId :: List.Extra.uniqueBy personIdToString people
+                List.Extra.uniqueBy personIdToString (personId :: people)
 
             newRelic =
                 { relic | relicType = DropAndDouble newPersonList }

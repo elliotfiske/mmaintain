@@ -6,6 +6,7 @@ import PersonDict exposing (PersonDict)
 import Relic exposing (..)
 import RelicDict
 import Types exposing (BackendTrigger(..), GameState, RealDirtDict, RealRelicDict)
+import Util
 
 
 movePerson : Direction -> PersonData -> PersonData
@@ -228,11 +229,11 @@ addClearStats personId ( state, trigger ) =
             ( state, trigger )
 
 
-xpMultiplierForPlayer : GameState -> PersonData -> Float
-xpMultiplierForPlayer state person =
+xpMultiplierForPlayer : RealRelicDict -> PersonData -> Float
+xpMultiplierForPlayer relics person =
     let
         heldRelics =
-            RelicDict.values state.relicDict
+            RelicDict.values relics
                 |> List.filter (\relic -> relicHolder relic == Just person.id)
     in
     heldRelics
@@ -246,6 +247,30 @@ xpMultiplierForPlayer state person =
                         acc
             )
             1
+
+
+cleanStrengthForPlayer : RealRelicDict -> PersonData -> Int
+cleanStrengthForPlayer relics person =
+    let
+        heldRelics =
+            RelicDict.values relics
+                |> List.filter (\relic -> relicHolder relic == Just person.id)
+
+        baseXP =
+            toFloat (10 + Util.levelForExp person.experience)
+    in
+    heldRelics
+        |> List.foldl
+            (\relic acc ->
+                case relic.relicType of
+                    CleanFast ->
+                        acc * cleanFastStrengthMultiplier relic.rarity -37
+
+                    _ ->
+                        acc
+            )
+            baseXP
+        |> round
 
 
 earnExperienceFromClean : PersonId -> ( GameState, Types.BackendTrigger ) -> ( GameState, Types.BackendTrigger )
@@ -270,7 +295,7 @@ earnExperienceFromClean personId ( state, trigger ) =
             let
                 xpEarned =
                     baseXpEarned
-                        * xpMultiplierForPlayer state fella
+                        * xpMultiplierForPlayer state.relicDict fella
                         |> round
 
                 newPerson =
@@ -290,7 +315,19 @@ withNoOp state =
 internalExecuteActionOnGameState : ActionOnGamestate -> GameState -> ( GameState, Types.BackendTrigger )
 internalExecuteActionOnGameState action state =
     case action of
-        Clean personId dirtId strength ->
+        Clean personId dirtId ->
+            let
+                maybePlayer =
+                    PersonDict.get personId state.personDict
+
+                strength =
+                    case maybePlayer of
+                        Nothing ->
+                            1
+
+                        Just player ->
+                            cleanStrengthForPlayer state.relicDict player
+            in
             state
                 |> addCleanStats personId
                 |> doClean personId dirtId strength
