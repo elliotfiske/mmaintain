@@ -158,7 +158,7 @@ updateWithRelics : ActionOnGamestate -> GameState -> GameState
 updateWithRelics action state =
     RelicDict.values state.relicDict
         -- todo: only have held relics modify state
-        |> List.foldl (Relic.relicModifiesState action) state
+        |> List.foldl (Relic.relicMiddleware action) state
 
 
 relicSlotThreshholds : List Int
@@ -407,7 +407,7 @@ activateGenerosityTrap relicData personData numDoubles state =
 executeActionOnGameState : ActionOnGamestate -> GameState -> ( GameState, Types.BackendTrigger )
 executeActionOnGameState actionOnGamestate state =
     let
-        modifiedState =
+        stateAfterRelicMiddleware =
             updateWithRelics actionOnGamestate state
     in
-    internalExecuteActionOnGameState actionOnGamestate modifiedState
+    internalExecuteActionOnGameState actionOnGamestate stateAfterRelicMiddleware

@@ -21,7 +21,7 @@ relicName relicType =
             "More XP!"
 
         DropAndDouble _ ->
-            "Generosity Trap"
+            "Generosity"
 
 
 relicTextColor : RelicRarity -> String
@@ -207,8 +207,8 @@ relicHolder relic =
             Nothing
 
 
-relicModifiesState : ActionOnGamestate -> RelicData -> GameState -> GameState
-relicModifiesState action relic state =
+relicMiddleware : ActionOnGamestate -> RelicData -> GameState -> GameState
+relicMiddleware action relic state =
     case relic.relicType of
         CleanFast ->
             state

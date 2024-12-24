@@ -12,6 +12,7 @@ import Html.Attributes exposing (..)
 import Html.Events
 import Json.Decode as Decode
 import Lamdera
+import List.Extra
 import Material.Icons.Outlined as Outlined
 import Material.Icons.Types as Coloring
 import PersonDict
@@ -294,7 +295,9 @@ updateModelWithAction actionOnGamestate model =
             { model | state = gameStateToFrontendState myId newGameState }
 
         Loading ->
-            -- TODO: action came down when the app was still loading. handle this?
+            -- TODO: action came down when the app was still loading. We assume this can't happen – it
+            --   would mean that the state will be desynced which is bad. Need to add an "error report"
+            --   for this that will alert me if this happens on a client.
             model
 
         Error _ ->
@@ -458,6 +461,7 @@ renderMap state =
     renderPeople state
         ++ renderDirt state
         ++ renderFloorRelics state
+        ++ renderTooltipLayer state
         |> Html.div [ class "bg-green-800 flex-grow", id "main-map", tabindex 0 ]
 
 
@@ -571,9 +575,73 @@ lockedSlotView lockedUntil =
         ]
 
 
+renderFloorRelics : FrontendPlayingState -> List (Html FrontendMsg)
 renderFloorRelics state =
     RelicDict.values state.relicDict
-        |> List.map floorRelicView
+        |> List.map (floorRelicView state.myId)
+
+
+renderTooltipLayer : FrontendPlayingState -> List (Html.Html FrontendMsg)
+renderTooltipLayer state =
+    -- Group relics by location
+    RelicDict.values state.relicDict
+        |> List.filterMap
+            (\relic ->
+                case relic.position of
+                    GameObjectTypes.OnFloor x y ->
+                        Just relic
+
+                    GameObjectTypes.HeldBy _ ->
+                        Nothing
+            )
+        |> Util.groupWhile relicsAreSameLocation
+        |> List.map (renderTooltip state)
+
+
+relicsAreSameLocation : GameObjectTypes.RelicData -> GameObjectTypes.RelicData -> Bool
+relicsAreSameLocation relic1 relic2 =
+    case ( relic1.position, relic2.position ) of
+        ( GameObjectTypes.OnFloor x1 y1, GameObjectTypes.OnFloor x2 y2 ) ->
+            x1 == x2 && y1 == y2
+
+        _ ->
+            False
+
+
+renderTooltip : FrontendPlayingState -> List GameObjectTypes.RelicData -> Html.Html FrontendMsg
+renderTooltip state relics =
+    --let
+    --    offsetX =
+    --        String.fromInt (List.head relics |> Maybe.withDefault { x = 0, y = 0 } |> .x * renderOffsetMultiplier)
+    --
+    --    offsetY =
+    --        String.fromInt (List.head relics |> Maybe.withDefault { x = 0, y = 0 } |> .y * renderOffsetMultiplier + 15)
+    --in
+    Html.div [ class "absolute invisible z-50 group-hover:visible opacity-0 group-hover:opacity-100 transition", style "left" "0px", style "top" "10px" ]
+        (List.map (renderRelicTooltipBody state.myId) relics)
+
+
+renderRelicTooltipBody : PersonId -> GameObjectTypes.RelicData -> Html.Html FrontendMsg
+renderRelicTooltipBody myId relicData =
+    let
+        cardTitle =
+            [ Html.div [ class "flex justify-between w-full" ]
+                [ Html.text (Relic.relicName relicData.relicType) ]
+            ]
+    in
+    card cardTitle
+        [ relicRarityBadge relicData.rarity
+        , Html.div
+            [ class "flex flex-col justify-between" ]
+            (Relic.relicBody myId relicData)
+        ]
+
+
+relicRarityBadge : GameObjectTypes.RelicRarity -> Html msg
+relicRarityBadge rarity =
+    Html.div
+        [ class ("badge dark:text-black " ++ Relic.relicBgColor rarity) ]
+        [ Html.text (Relic.relicRarityName rarity) ]
 
 
 renderPeople : FrontendPlayingState -> List (Html.Html FrontendMsg)
@@ -612,9 +680,9 @@ dirtView { x, y, amount } =
         [ Html.text (String.fromInt amount) ]
 
 
-floorRelicView : GameObjectTypes.RelicData -> Html.Html FrontendMsg
-floorRelicView { relicType, rarity, position } =
-    case position of
+floorRelicView : PersonId -> GameObjectTypes.RelicData -> Html.Html FrontendMsg
+floorRelicView myId relicData =
+    case relicData.position of
         GameObjectTypes.HeldBy _ ->
             text ""
 
@@ -626,8 +694,19 @@ floorRelicView { relicType, rarity, position } =
                 offsetY =
                     String.fromInt (y * renderOffsetMultiplier + 15)
             in
-            Html.div [ class ("absolute " ++ Relic.relicTextColor rarity), style "left" (offsetX ++ "px"), style "top" (offsetY ++ "px") ]
-                [ Html.text "!" ]
+            Html.div [ class "relative group" ]
+                [ Html.div [ class ("absolute " ++ Relic.relicTextColor relicData.rarity), style "left" (offsetX ++ "px"), style "top" (offsetY ++ "px") ]
+                    [ Html.text "aaaaa" ]
+                , span
+                    [ class "absolute invisible group-hover:visible opacity-0 group-hover:opacity-100 transition bg-gray-800 text-white text-xs rounded py-1 px-2 top-0"
+                    , style "left" (offsetX ++ "px")
+                    , style "top" (offsetY ++ "px")
+                    ]
+                    [ heldRelicView
+                        myId
+                        relicData
+                    ]
+                ]
 
 
 heldRelicView : PersonId -> GameObjectTypes.RelicData -> Html.Html FrontendMsg

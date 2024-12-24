@@ -1,6 +1,7 @@
 module Util exposing (..)
 
 import Dict
+import List.Extra
 import Types
 
 
@@ -123,3 +124,9 @@ nthItem : Int -> List a -> Maybe a
 nthItem n list =
     List.drop n list
         |> List.head
+
+
+groupWhile : (a -> a -> Bool) -> List a -> List (List a)
+groupWhile predicate list =
+    List.Extra.groupWhile predicate list
+        |> List.map (\( a, rest ) -> a :: rest)
