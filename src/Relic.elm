@@ -86,8 +86,8 @@ simpleRelicBody text =
     [ Html.text text ]
 
 
-relicBody : PersonId -> RelicData -> List (Html.Html FrontendMsg)
-relicBody myId relic =
+relicBody : FrontendPlayingState -> RelicData -> List (Html.Html FrontendMsg)
+relicBody state relic =
     case relic.relicType of
         CleanFast ->
             simpleRelicBody ("x" ++ String.fromFloat (cleanFastStrengthMultiplier relic.rarity relic.exp) ++ " to Cleaning Strength.")
@@ -98,11 +98,25 @@ relicBody myId relic =
         DropAndDouble people ->
             let
                 alreadyDropped =
-                    List.member myId people
+                    List.member state.myId people
+
+                baseExp =
+                    dropDoubleCurrentExperience relic.rarity (List.length people)
+
+                me =
+                    PersonDict.get state.myId state.personDict
+
+                playerXpMultiplier =
+                    Maybe.map (xpMultiplierForPlayer state.relicDict) me
+                        |> Maybe.withDefault 1
+                        |> round
+
+                finalExp =
+                    baseExp * playerXpMultiplier
             in
             Markdown.toHtml Nothing
                 ("Gain **"
-                    ++ String.fromInt (dropDoubleCurrentExperience relic.rarity (List.length people))
+                    ++ String.fromInt finalExp
                     ++ "xp** now, or drop this and double it for somebody else."
                     ++ (if alreadyDropped then
                             " <br><br> You've already dropped this. Give it to somebody else!"
@@ -111,7 +125,7 @@ relicBody myId relic =
                             ""
                        )
                 )
-                ++ [ dropAndDoubleActivationButton myId people relic.id
+                ++ [ dropAndDoubleActivationButton state.myId people relic.id
                    ]
 
 
@@ -139,13 +153,13 @@ cleanFastStrengthMultiplier : RelicRarity -> Int -> Float
 cleanFastStrengthMultiplier rarity xp =
     case rarity of
         Common ->
-            1.1
+            1.3
 
         Uncommon ->
-            1.2
+            1.8
 
         Rare ->
-            1.5
+            2.2
 
         Epic ->
             3
@@ -205,6 +219,26 @@ relicHolder relic =
 
         OnFloor _ _ ->
             Nothing
+
+
+xpMultiplierForPlayer : RealRelicDict -> PersonData -> Float
+xpMultiplierForPlayer relics person =
+    let
+        heldRelics =
+            RelicDict.values relics
+                |> List.filter (\relic -> relicHolder relic == Just person.id)
+    in
+    heldRelics
+        |> List.foldl
+            (\relic acc ->
+                case relic.relicType of
+                    MoreXP ->
+                        acc * xpMultiplier relic.rarity person.experience
+
+                    _ ->
+                        acc
+            )
+            1
 
 
 relicMiddleware : ActionOnGamestate -> RelicData -> GameState -> GameState

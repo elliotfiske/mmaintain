@@ -2682,6 +2682,18 @@ html {
   height: 100%;
 }
 
+.h-32 {
+  height: 8rem;
+}
+
+.h-8 {
+  height: 2rem;
+}
+
+.h-auto {
+  height: auto;
+}
+
 .w-52 {
   width: 13rem;
 }
@@ -2692,6 +2704,14 @@ html {
 
 .w-full {
   width: 100%;
+}
+
+.w-32 {
+  width: 8rem;
+}
+
+.w-8 {
+  width: 2rem;
 }
 
 .flex-grow {

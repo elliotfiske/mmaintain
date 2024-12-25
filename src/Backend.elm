@@ -293,7 +293,7 @@ updateFromFrontend _ clientId msg model =
             addSomeDirt model
 
         PleaseGenerateRelic ->
-            addRelic model
+            debugAddRelic model
 
         PleaseActivateRelic personId relicId ->
             let
@@ -403,28 +403,50 @@ rarityRoll randomValue =
         Nothing
 
 
+relicWeights : List ( Int, GameObjectTypes.RelicType )
+relicWeights =
+    [ ( 60, GameObjectTypes.CleanFast )
+    , ( 5, GameObjectTypes.DropAndDouble [] )
+    , ( 30, GameObjectTypes.MoreXP )
+    ]
+
+
 relicTypeRoll : Int -> GameObjectTypes.RelicType
 relicTypeRoll rawRandomValue =
     let
+        totalWeights =
+            List.sum (List.map Tuple.first relicWeights)
+
         randomValue =
-            modBy 100 rawRandomValue
+            modBy totalWeights rawRandomValue
     in
-    if randomValue < 66 then
-        GameObjectTypes.CleanFast
+    List.foldl
+        (\( weight, relicType ) ( acc, chosenRelicType ) ->
+            if acc < randomValue then
+                ( acc + weight, relicType )
 
-    else
-        GameObjectTypes.MoreXP
+            else
+                ( acc, chosenRelicType )
+        )
+        ( 0, GameObjectTypes.CleanFast )
+        relicWeights
+        |> Tuple.second
 
 
-addRelic : Model -> ( Model, Cmd BackendMsg )
-addRelic model =
+debugAddRelic : Model -> ( Model, Cmd BackendMsg )
+debugAddRelic model =
     let
         ( newId, incModel ) =
             getAndIncrementBiggestId model
 
         newRelic : GameObjectTypes.RelicData
         newRelic =
-            { id = GameObjectTypes.RelicId newId, relicType = GameObjectTypes.DropAndDouble [], position = GameObjectTypes.OnFloor 2 2, rarity = GameObjectTypes.Legendary, exp = 0 }
+            { id = GameObjectTypes.RelicId newId
+            , relicType = GameObjectTypes.DropAndDouble []
+            , position = GameObjectTypes.OnFloor 2 2
+            , rarity = GameObjectTypes.Legendary
+            , exp = 0
+            }
 
         newRelicDict =
             RelicDict.insert newRelic.id newRelic model.relicDict

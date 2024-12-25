@@ -5,6 +5,7 @@ import GameObjectTypes exposing (..)
 import PersonDict exposing (PersonDict)
 import Relic exposing (..)
 import RelicDict
+import String exposing (toInt)
 import Types exposing (BackendTrigger(..), GameState, RealDirtDict, RealRelicDict)
 import Util
 
@@ -229,26 +230,6 @@ addClearStats personId ( state, trigger ) =
             ( state, trigger )
 
 
-xpMultiplierForPlayer : RealRelicDict -> PersonData -> Float
-xpMultiplierForPlayer relics person =
-    let
-        heldRelics =
-            RelicDict.values relics
-                |> List.filter (\relic -> relicHolder relic == Just person.id)
-    in
-    heldRelics
-        |> List.foldl
-            (\relic acc ->
-                case relic.relicType of
-                    MoreXP ->
-                        acc * xpMultiplier relic.rarity person.experience
-
-                    _ ->
-                        acc
-            )
-            1
-
-
 cleanStrengthForPlayer : RealRelicDict -> PersonData -> Int
 cleanStrengthForPlayer relics person =
     let
@@ -276,9 +257,6 @@ cleanStrengthForPlayer relics person =
 earnExperienceFromClean : PersonId -> ( GameState, Types.BackendTrigger ) -> ( GameState, Types.BackendTrigger )
 earnExperienceFromClean personId ( state, trigger ) =
     let
-        person =
-            PersonDict.get personId state.personDict
-
         baseXpEarned =
             case trigger of
                 ClearedPollution _ _ ->
@@ -287,24 +265,29 @@ earnExperienceFromClean personId ( state, trigger ) =
                 _ ->
                     1
     in
-    case person of
-        Nothing ->
-            ( state, NoOpBackendTrigger )
+    ( playerEarnsExperience personId baseXpEarned state, trigger )
 
-        Just fella ->
+
+playerEarnsExperience : PersonId -> Int -> GameState -> GameState
+playerEarnsExperience personId xpEarned state =
+    case PersonDict.get personId state.personDict of
+        Nothing ->
+            state
+
+        Just player ->
             let
-                xpEarned =
-                    baseXpEarned
-                        * xpMultiplierForPlayer state.relicDict fella
+                xpAfterMultiplier =
+                    toFloat xpEarned
+                        * Relic.xpMultiplierForPlayer state.relicDict player
                         |> round
 
-                newPerson =
-                    { fella | experience = fella.experience + xpEarned }
+                newPlayer =
+                    { player | experience = player.experience + xpAfterMultiplier }
 
                 newPersonDict =
-                    PersonDict.insert personId newPerson state.personDict
+                    PersonDict.insert personId newPlayer state.personDict
             in
-            ( { state | personDict = newPersonDict }, trigger )
+            { state | personDict = newPersonDict }
 
 
 withNoOp : GameState -> ( GameState, Types.BackendTrigger )
@@ -395,13 +378,10 @@ activateGenerosityTrap relicData personData numDoubles state =
         xpEarned =
             Relic.dropDoubleCurrentExperience relicData.rarity numDoubles
 
-        newPerson =
-            { personData | experience = personData.experience + xpEarned }
-
-        newPersonDict =
-            PersonDict.insert personData.id newPerson state.personDict
+        newState =
+            playerEarnsExperience personData.id xpEarned state
     in
-    { state | relicDict = newRelicDict, personDict = newPersonDict }
+    { newState | relicDict = newRelicDict }
 
 
 executeActionOnGameState : ActionOnGamestate -> GameState -> ( GameState, Types.BackendTrigger )

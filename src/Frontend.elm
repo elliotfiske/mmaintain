@@ -366,15 +366,7 @@ renderModals state model =
                     [ class "text-lg font-bold"
                     ]
                     [ text "THE PARK IS CLEAN!!!" ]
-                , iframe
-                    [ src "https://giphy.com/embed/PFs9HklIZefehcOphI/video"
-                    , width 480
-                    , height 202
-                    , attribute "frameborder" "0"
-                    , class "giphy-embed"
-                    , attribute "allowfullscreen" ""
-                    ]
-                    []
+                , img [ src "yeah.gif", class "w-full" ] []
                 , p
                     [ class "py-4"
                     ]
@@ -430,7 +422,7 @@ renderMyHUD state assembledModel =
         [ renderXP assembledModel.me.person
         , renderCleanStrength state assembledModel
         , renderXPMultiplier state assembledModel
-        , renderHeldRelics assembledModel
+        , renderHeldRelics state assembledModel
         ]
 
 
@@ -509,7 +501,7 @@ renderXPMultiplier : FrontendPlayingState -> ValidFrontendModelData -> Html.Html
 renderXPMultiplier state modelData =
     let
         xpMultiplier =
-            GameObject.xpMultiplierForPlayer state.relicDict modelData.me.person
+            Relic.xpMultiplierForPlayer state.relicDict modelData.me.person
     in
     if xpMultiplier == 1 then
         Html.text ""
@@ -521,8 +513,8 @@ renderXPMultiplier state modelData =
             ]
 
 
-renderHeldRelics : ValidFrontendModelData -> Html.Html FrontendMsg
-renderHeldRelics state =
+renderHeldRelics : FrontendPlayingState -> ValidFrontendModelData -> Html.Html FrontendMsg
+renderHeldRelics state model =
     Html.div [ class "w-full flex flex-col flex-gro" ]
         [ Html.div [ class "prose mt-8" ]
             [ Html.h2 [ class "text-center" ]
@@ -530,16 +522,16 @@ renderHeldRelics state =
             ]
         , Html.div [ class "flex flex-col gap-2 flex-grow flex-wrap h-[660px] p-2", id "relic-list" ]
             (renderRelicList
-                state.me.heldRelics
-                state.me.person.id
-                ++ renderRelicSlots state.me
+                model.me.heldRelics
+                state
+                ++ renderRelicSlots model.me
             )
         ]
 
 
-renderRelicList : List GameObjectTypes.RelicData -> PersonId -> List (Html.Html FrontendMsg)
-renderRelicList list myId =
-    List.map (heldRelicView myId) list
+renderRelicList : List GameObjectTypes.RelicData -> FrontendPlayingState -> List (Html.Html FrontendMsg)
+renderRelicList list state =
+    List.map (heldRelicView state) list
 
 
 renderRelicSlots : PersonWithRelics -> List (Html.Html FrontendMsg)
@@ -562,13 +554,15 @@ renderRelicSlots person =
 
 availableRelicView : Html.Html FrontendMsg
 availableRelicView =
-    card [ Html.div [ class "text-center" ] [ Html.text "Free Slot" ] ]
+    card "h-52"
+        [ Html.div [ class "text-center" ] [ Html.text "Free Slot" ] ]
         []
 
 
 lockedSlotView : Int -> Html.Html FrontendMsg
 lockedSlotView lockedUntil =
-    card [ Outlined.lock 16 Coloring.Inherit, Html.text "Locked" ]
+    card "h-52"
+        [ Outlined.lock 16 Coloring.Inherit, Html.text "Locked" ]
         [ Html.div
             [ class "" ]
             [ Html.text ("Until level " ++ String.fromInt lockedUntil) ]
@@ -578,24 +572,24 @@ lockedSlotView lockedUntil =
 renderFloorRelics : FrontendPlayingState -> List (Html FrontendMsg)
 renderFloorRelics state =
     RelicDict.values state.relicDict
-        |> List.map (floorRelicView state.myId)
+        |> List.map floorRelicView
 
 
 renderTooltipLayer : FrontendPlayingState -> List (Html.Html FrontendMsg)
 renderTooltipLayer state =
     -- Group relics by location
     RelicDict.values state.relicDict
-        |> List.filterMap
+        |> List.filter
             (\relic ->
                 case relic.position of
                     GameObjectTypes.OnFloor x y ->
-                        Just relic
+                        True
 
                     GameObjectTypes.HeldBy _ ->
-                        Nothing
+                        False
             )
-        |> Util.groupWhile relicsAreSameLocation
-        |> List.map (renderTooltip state)
+        |> List.Extra.groupWhile relicsAreSameLocation
+        |> List.map (renderRelicTooltip state)
 
 
 relicsAreSameLocation : GameObjectTypes.RelicData -> GameObjectTypes.RelicData -> Bool
@@ -608,32 +602,60 @@ relicsAreSameLocation relic1 relic2 =
             False
 
 
-renderTooltip : FrontendPlayingState -> List GameObjectTypes.RelicData -> Html.Html FrontendMsg
-renderTooltip state relics =
-    --let
-    --    offsetX =
-    --        String.fromInt (List.head relics |> Maybe.withDefault { x = 0, y = 0 } |> .x * renderOffsetMultiplier)
-    --
-    --    offsetY =
-    --        String.fromInt (List.head relics |> Maybe.withDefault { x = 0, y = 0 } |> .y * renderOffsetMultiplier + 15)
-    --in
-    Html.div [ class "absolute invisible z-50 group-hover:visible opacity-0 group-hover:opacity-100 transition", style "left" "0px", style "top" "10px" ]
-        (List.map (renderRelicTooltipBody state.myId) relics)
+tooltipClasses =
+    "absolute invisible z-50 group-hover:visible opacity-0 group-hover:opacity-100 transition"
 
 
-renderRelicTooltipBody : PersonId -> GameObjectTypes.RelicData -> Html.Html FrontendMsg
-renderRelicTooltipBody myId relicData =
+renderRelicTooltip : FrontendPlayingState -> ( GameObjectTypes.RelicData, List GameObjectTypes.RelicData ) -> Html.Html FrontendMsg
+renderRelicTooltip state ( firstRelic, restOfRelics ) =
+    let
+        ( x, y ) =
+            case firstRelic.position of
+                GameObjectTypes.OnFloor rx ry ->
+                    ( rx, ry )
+
+                GameObjectTypes.HeldBy _ ->
+                    ( 0, 0 )
+
+        offsetX =
+            String.fromInt (x * renderOffsetMultiplier)
+
+        offsetY =
+            String.fromInt (y * renderOffsetMultiplier + 15)
+    in
+    Html.div [ class "absolute", style "left" (offsetX ++ "px"), style "top" (offsetY ++ "px") ]
+        [ Html.div [ class "relative group" ]
+            [ -- Empty space 32px by 32px for mouse event
+              Html.div
+                [ class "absolute w-8 h-8"
+                , style "left" "0px"
+                , style "top" "0px"
+                ]
+                []
+            , Html.div
+                [ class (tooltipClasses ++ " flex flex-col")
+                , style "left" "50px"
+                , style "top" "0px"
+                ]
+                (List.map (renderRelicTooltipBody state) (firstRelic :: Debug.log "hihi" restOfRelics))
+            ]
+        ]
+
+
+renderRelicTooltipBody : FrontendPlayingState -> GameObjectTypes.RelicData -> Html.Html FrontendMsg
+renderRelicTooltipBody state relicData =
     let
         cardTitle =
             [ Html.div [ class "flex justify-between w-full" ]
                 [ Html.text (Relic.relicName relicData.relicType) ]
             ]
     in
-    card cardTitle
+    card "h-auto"
+        cardTitle
         [ relicRarityBadge relicData.rarity
         , Html.div
             [ class "flex flex-col justify-between" ]
-            (Relic.relicBody myId relicData)
+            (Relic.relicBody state relicData)
         ]
 
 
@@ -680,8 +702,8 @@ dirtView { x, y, amount } =
         [ Html.text (String.fromInt amount) ]
 
 
-floorRelicView : PersonId -> GameObjectTypes.RelicData -> Html.Html FrontendMsg
-floorRelicView myId relicData =
+floorRelicView : GameObjectTypes.RelicData -> Html.Html FrontendMsg
+floorRelicView relicData =
     case relicData.position of
         GameObjectTypes.HeldBy _ ->
             text ""
@@ -694,36 +716,26 @@ floorRelicView myId relicData =
                 offsetY =
                     String.fromInt (y * renderOffsetMultiplier + 15)
             in
-            Html.div [ class "relative group" ]
-                [ Html.div [ class ("absolute " ++ Relic.relicTextColor relicData.rarity), style "left" (offsetX ++ "px"), style "top" (offsetY ++ "px") ]
-                    [ Html.text "aaaaa" ]
-                , span
-                    [ class "absolute invisible group-hover:visible opacity-0 group-hover:opacity-100 transition bg-gray-800 text-white text-xs rounded py-1 px-2 top-0"
-                    , style "left" (offsetX ++ "px")
-                    , style "top" (offsetY ++ "px")
-                    ]
-                    [ heldRelicView
-                        myId
-                        relicData
-                    ]
-                ]
+            Html.div [ class ("absolute " ++ Relic.relicTextColor relicData.rarity), style "left" (offsetX ++ "px"), style "top" (offsetY ++ "px") ]
+                [ Html.text "o" ]
 
 
-heldRelicView : PersonId -> GameObjectTypes.RelicData -> Html.Html FrontendMsg
-heldRelicView myId relicData =
+heldRelicView : FrontendPlayingState -> GameObjectTypes.RelicData -> Html.Html FrontendMsg
+heldRelicView state relicData =
     let
         cardTitle =
             [ Html.div [ class "flex justify-between w-full" ]
-                [ Html.text (Relic.relicName relicData.relicType), dropButton relicData.id myId ]
+                [ Html.text (Relic.relicName relicData.relicType), dropButton relicData.id state.myId ]
             ]
     in
-    card cardTitle
+    card "h-52"
+        cardTitle
         [ Html.div
             [ class ("badge dark:text-black " ++ Relic.relicBgColor relicData.rarity) ]
             [ Html.text (Relic.relicRarityName relicData.rarity) ]
         , Html.div
             [ class "flex flex-col justify-between" ]
-            (Relic.relicBody myId relicData)
+            (Relic.relicBody state relicData)
         ]
 
 
@@ -737,9 +749,9 @@ dropButton relicId myId =
         [ Outlined.file_download 18 Coloring.Inherit ]
 
 
-card : List (Html.Html FrontendMsg) -> List (Html.Html FrontendMsg) -> Html.Html FrontendMsg
-card title content =
-    Html.div [ class "card card-compact bg-base-300 shadow-xl w-52 h-52" ]
+card : String -> List (Html.Html FrontendMsg) -> List (Html.Html FrontendMsg) -> Html.Html FrontendMsg
+card extraClasses title content =
+    Html.div [ class ("card card-compact bg-base-300 shadow-xl w-52 " ++ extraClasses) ]
         [ Html.div
             [ class "card-body" ]
             (Html.h2 [ class "card-title" ] title
