@@ -420,6 +420,7 @@ renderMyHUD : FrontendPlayingState -> ValidFrontendModelData -> Html.Html Fronte
 renderMyHUD state assembledModel =
     Html.div [ class "flex flex-col items-center h-full bg-base-100 mx-3" ]
         [ renderXP assembledModel.me.person
+        , renderExpProgress assembledModel
         , renderCleanStrength state assembledModel
         , renderXPMultiplier state assembledModel
         , renderHeldRelics state assembledModel
@@ -495,6 +496,23 @@ renderCleanStrength state modelData =
         [ Html.h3 [ class "text-center" ]
             [ Html.text ("Clean Strength: " ++ String.fromInt strength) ]
         ]
+
+
+renderExpProgress : ValidFrontendModelData -> Html.Html FrontendMsg
+renderExpProgress model =
+    let
+        myLevel =
+            Util.levelForExp model.me.person.experience
+
+        myExp =
+            model.me.person.experience
+
+        myNextLevelExp : Int
+        myNextLevelExp =
+            Util.expForLevel (myLevel + 1)
+    in
+    Html.h3 [ class "text-center" ]
+        [ Html.text (String.fromInt myExp ++ "/" ++ String.fromInt myNextLevelExp ++ " xp") ]
 
 
 renderXPMultiplier : FrontendPlayingState -> ValidFrontendModelData -> Html.Html FrontendMsg
