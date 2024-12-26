@@ -6,7 +6,7 @@ import PersonDict exposing (PersonDict)
 import Relic exposing (..)
 import RelicDict
 import String exposing (toInt)
-import Types exposing (BackendTrigger(..), GameState, RealDirtDict, RealRelicDict)
+import Types exposing (BackendTrigger(..), GameState, Point, RealDirtDict, RealRelicDict)
 import Util
 
 
@@ -24,6 +24,82 @@ movePerson direction person =
 
         Right ->
             { person | x = person.x + 1 }
+
+        UpLeft ->
+            { person | x = person.x - 1, y = person.y - 1 }
+
+        UpRight ->
+            { person | x = person.x + 1, y = person.y - 1 }
+
+        DownLeft ->
+            { person | x = person.x - 1, y = person.y + 1 }
+
+        DownRight ->
+            { person | x = person.x + 1, y = person.y + 1 }
+
+
+type DirectionDifferenceVertical
+    = Above
+    | Below
+    | SameY
+
+
+type DirectionDifferenceHorizontal
+    = LeftOf
+    | RightOf
+    | SameX
+
+
+directionToMoveFrom : Point -> Point -> Maybe Direction
+directionToMoveFrom from to =
+    let
+        yDiff =
+            if from.y > to.y then
+                Above
+
+            else if from.y < to.y then
+                Below
+
+            else
+                SameY
+
+        xDiff =
+            if from.x > to.x then
+                LeftOf
+
+            else if from.x < to.x then
+                RightOf
+
+            else
+                SameX
+    in
+    case ( xDiff, yDiff ) of
+        ( LeftOf, SameY ) ->
+            Just Left
+
+        ( RightOf, SameY ) ->
+            Just Right
+
+        ( SameX, Above ) ->
+            Just Up
+
+        ( SameX, Below ) ->
+            Just Down
+
+        ( LeftOf, Above ) ->
+            Just UpLeft
+
+        ( RightOf, Above ) ->
+            Just UpRight
+
+        ( LeftOf, Below ) ->
+            Just DownLeft
+
+        ( RightOf, Below ) ->
+            Just DownRight
+
+        ( SameX, SameY ) ->
+            Nothing
 
 
 pickUpRelic : PersonId -> RelicData -> RelicData

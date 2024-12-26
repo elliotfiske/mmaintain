@@ -8,6 +8,7 @@ import GameObjectTypes exposing (..)
 import Lamdera exposing (ClientId, SessionId)
 import PersonDict exposing (PersonDict)
 import RelicDict exposing (RelicDict)
+import Time exposing (Posix)
 import Url exposing (Url)
 
 
@@ -53,6 +54,7 @@ type alias FrontendPlayingState =
     , relicDict : RelicDict RelicData
     , dirtDict : DirtDict DirtData
     , myId : PersonId
+    , targetPosition : Maybe Point
     }
 
 
@@ -86,6 +88,8 @@ type FrontendMsg
     | ClickedPleaseMakeMeDirty
     | DebugGenerateRelic
     | ActivatedRelic PersonId RelicId
+    | ClickTarget Point
+    | Tick Posix
     | NoOpFrontendMsg
 
 

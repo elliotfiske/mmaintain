@@ -162,6 +162,7 @@ addClientToList clientId sessionId personData model =
             , relicDict = model.relicDict
             , dirtDict = model.dirtDict
             , myId = personData.id
+            , targetPosition = Nothing
             }
     in
     ( { model

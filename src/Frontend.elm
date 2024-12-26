@@ -4,6 +4,8 @@ import Browser exposing (UrlRequest(..))
 import Browser.Dom
 import Browser.Events exposing (onKeyDown)
 import Browser.Navigation as Nav
+import Dict
+import Dict.Extra
 import DirtDict
 import GameObject
 import GameObjectTypes exposing (ActionOnGamestate(..), Direction(..), PersonData, PersonId, relicIdToString)
@@ -12,13 +14,13 @@ import Html.Attributes exposing (..)
 import Html.Events
 import Json.Decode as Decode
 import Lamdera
-import List.Extra
 import Material.Icons.Outlined as Outlined
 import Material.Icons.Types as Coloring
 import PersonDict
 import Relic
 import RelicDict
 import Task
+import Time
 import Types exposing (..)
 import Url
 import Util
@@ -173,6 +175,7 @@ subscriptions : Model -> Sub FrontendMsg
 subscriptions model =
     Sub.batch
         [ onKeyDown (keyDecoder model)
+        , Time.every 50 Tick
         ]
 
 
@@ -252,14 +255,11 @@ update msg model =
             ( model, Cmd.none )
 
         UrlClicked urlRequest ->
-            case urlRequest of
-                Internal url ->
-                    ( model, Nav.pushUrl model.key (Url.toString url) )
-
-                External url ->
-                    ( model, Nav.load url )
+            -- unhandled for now (may eventually use for stuff like "join my park" links, or logging in)
+            ( model, Cmd.none )
 
         UrlChanged url ->
+            -- also unhandled
             ( model, Cmd.none )
 
         PerformAction action ->
@@ -267,8 +267,11 @@ update msg model =
                 -- Necessary otherwise the next "space" keypress will activate buttons unexpectedly
                 refocus =
                     Task.attempt (\_ -> NoOpFrontendMsg) (Browser.Dom.focus "main-map")
+
+                newModel =
+                    modelResettingTarget model
             in
-            ( updateModelWithAction action model, Cmd.batch [ Lamdera.sendToBackend (ClientPerformsAction action), refocus ] )
+            ( updateModelWithAction action newModel, Cmd.batch [ Lamdera.sendToBackend (ClientPerformsAction action), refocus ] )
 
         ActivatedRelic myId relicId ->
             -- todo: set "loading" state, since this is a backend-authoritative action and it could take time
@@ -280,19 +283,77 @@ update msg model =
         DebugGenerateRelic ->
             ( model, Lamdera.sendToBackend PleaseGenerateRelic )
 
+        Tick posix ->
+            moveMeTowardsMyTargetIfAny model
+
+        ClickTarget point ->
+            case model.state of
+                Playing state ->
+                    ( { model | state = Playing { state | targetPosition = Just point } }, Cmd.none )
+
+                _ ->
+                    ( model, Cmd.none )
+
+
+modelResettingTarget : Model -> Model
+modelResettingTarget model =
+    case model.state of
+        Playing state ->
+            { model | state = Playing { state | targetPosition = Nothing } }
+
+        _ ->
+            model
+
+
+moveMeTowardsMyTargetIfAny : Model -> ( Model, Cmd FrontendMsg )
+moveMeTowardsMyTargetIfAny model =
+    case model.state of
+        Playing state ->
+            case state.targetPosition of
+                Nothing ->
+                    ( model, Cmd.none )
+
+                Just _ ->
+                    let
+                        ( newState, cmd ) =
+                            moveMeTowardsTargetPoint state
+                    in
+                    ( { model | state = Playing newState }, cmd )
+
+        _ ->
+            ( model, Cmd.none )
+
+
+moveMeTowardsTargetPoint : FrontendPlayingState -> ( FrontendPlayingState, Cmd FrontendMsg )
+moveMeTowardsTargetPoint state =
+    case ( state.targetPosition, PersonDict.get state.myId state.personDict ) of
+        ( Just target, Just me ) ->
+            let
+                direction =
+                    GameObject.directionToMoveFrom { x = me.x, y = me.y } { x = target.x, y = target.y }
+
+                maybeAction =
+                    Maybe.map (MovePerson state.myId) direction
+
+                ( newState, action ) =
+                    case maybeAction of
+                        Just a ->
+                            ( updateStateWithAction a state, Lamdera.sendToBackend (ClientPerformsAction a) )
+
+                        Nothing ->
+                            ( state, Cmd.none )
+            in
+            ( newState, action )
+
+        _ ->
+            ( state, Cmd.none )
+
 
 updateModelWithAction : ActionOnGamestate -> Model -> Model
 updateModelWithAction actionOnGamestate model =
     case model.state of
-        Playing { personDict, dirtDict, relicDict, myId } ->
-            let
-                gameState =
-                    { personDict = personDict, dirtDict = dirtDict, relicDict = relicDict }
-
-                ( newGameState, _ ) =
-                    GameObject.executeActionOnGameState actionOnGamestate gameState
-            in
-            { model | state = gameStateToFrontendState myId newGameState }
+        Playing playState ->
+            { model | state = Playing (updateStateWithAction actionOnGamestate playState) }
 
         Loading ->
             -- TODO: action came down when the app was still loading. We assume this can't happen – it
@@ -305,6 +366,23 @@ updateModelWithAction actionOnGamestate model =
             model
 
 
+updateStateWithAction : ActionOnGamestate -> FrontendPlayingState -> FrontendPlayingState
+updateStateWithAction action { personDict, dirtDict, relicDict, myId, targetPosition } =
+    let
+        gameState =
+            { personDict = personDict, dirtDict = dirtDict, relicDict = relicDict }
+
+        ( newState, _ ) =
+            GameObject.executeActionOnGameState action gameState
+    in
+    { personDict = newState.personDict
+    , dirtDict = newState.dirtDict
+    , relicDict = newState.relicDict
+    , myId = myId
+    , targetPosition = targetPosition
+    }
+
+
 gameStateToFrontendState : PersonId -> GameState -> FrontendState
 gameStateToFrontendState myId gameState =
     Playing
@@ -312,6 +390,7 @@ gameStateToFrontendState myId gameState =
         , relicDict = gameState.relicDict
         , dirtDict = gameState.dirtDict
         , myId = myId
+        , targetPosition = Nothing
         }
 
 
@@ -597,44 +676,26 @@ renderTooltipLayer : FrontendPlayingState -> List (Html.Html FrontendMsg)
 renderTooltipLayer state =
     -- Group relics by location
     RelicDict.values state.relicDict
-        |> List.filter
-            (\relic ->
-                case relic.position of
+        |> Dict.Extra.filterGroupBy
+            (\relicData ->
+                case relicData.position of
                     GameObjectTypes.OnFloor x y ->
-                        True
+                        Just ( x, y )
 
                     GameObjectTypes.HeldBy _ ->
-                        False
+                        Nothing
             )
-        |> List.Extra.groupWhile relicsAreSameLocation
+        |> Dict.toList
         |> List.map (renderRelicTooltip state)
-
-
-relicsAreSameLocation : GameObjectTypes.RelicData -> GameObjectTypes.RelicData -> Bool
-relicsAreSameLocation relic1 relic2 =
-    case ( relic1.position, relic2.position ) of
-        ( GameObjectTypes.OnFloor x1 y1, GameObjectTypes.OnFloor x2 y2 ) ->
-            x1 == x2 && y1 == y2
-
-        _ ->
-            False
 
 
 tooltipClasses =
     "absolute invisible z-50 group-hover:visible opacity-0 group-hover:opacity-100 transition"
 
 
-renderRelicTooltip : FrontendPlayingState -> ( GameObjectTypes.RelicData, List GameObjectTypes.RelicData ) -> Html.Html FrontendMsg
-renderRelicTooltip state ( firstRelic, restOfRelics ) =
+renderRelicTooltip : FrontendPlayingState -> ( ( Int, Int ), List GameObjectTypes.RelicData ) -> Html.Html FrontendMsg
+renderRelicTooltip state ( ( x, y ), relics ) =
     let
-        ( x, y ) =
-            case firstRelic.position of
-                GameObjectTypes.OnFloor rx ry ->
-                    ( rx, ry )
-
-                GameObjectTypes.HeldBy _ ->
-                    ( 0, 0 )
-
         offsetX =
             String.fromInt (x * renderOffsetMultiplier)
 
@@ -648,6 +709,7 @@ renderRelicTooltip state ( firstRelic, restOfRelics ) =
                 [ class "absolute w-8 h-8"
                 , style "left" "0px"
                 , style "top" "0px"
+                , Html.Events.onClick (ClickTarget { x = x, y = y })
                 ]
                 []
             , Html.div
@@ -655,7 +717,7 @@ renderRelicTooltip state ( firstRelic, restOfRelics ) =
                 , style "left" "50px"
                 , style "top" "0px"
                 ]
-                (List.map (renderRelicTooltipBody state) (firstRelic :: Debug.log "hihi" restOfRelics))
+                (List.map (renderRelicTooltipBody state) relics)
             ]
         ]
 
@@ -734,7 +796,11 @@ floorRelicView relicData =
                 offsetY =
                     String.fromInt (y * renderOffsetMultiplier + 15)
             in
-            Html.div [ class ("absolute " ++ Relic.relicTextColor relicData.rarity), style "left" (offsetX ++ "px"), style "top" (offsetY ++ "px") ]
+            Html.div
+                [ class ("absolute " ++ Relic.relicTextColor relicData.rarity)
+                , style "left" (offsetX ++ "px")
+                , style "top" (offsetY ++ "px")
+                ]
                 [ Html.text "o" ]
 
 

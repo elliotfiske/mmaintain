@@ -92,6 +92,10 @@ type Direction
     | Down
     | Left
     | Right
+    | UpLeft
+    | UpRight
+    | DownLeft
+    | DownRight
 
 
 type ActionOnGamestate
