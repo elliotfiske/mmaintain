@@ -234,7 +234,7 @@ byRelicRarity relic =
 updateWithRelics : ActionOnGamestate -> GameState -> GameState
 updateWithRelics action state =
     RelicDict.values state.relicDict
-        -- todo: only have held relics modify state
+        -- todo: only have held relics modify state (performance concern)
         |> List.foldl (Relic.relicMiddleware action) state
 
 
@@ -445,6 +445,15 @@ internalExecuteActionOnGameState action state =
                     withNoOp state
 
 
+executeActionOnGameState : ActionOnGamestate -> GameState -> ( GameState, Types.BackendTrigger )
+executeActionOnGameState actionOnGamestate state =
+    let
+        stateAfterRelicMiddleware =
+            updateWithRelics actionOnGamestate state
+    in
+    internalExecuteActionOnGameState actionOnGamestate stateAfterRelicMiddleware
+
+
 activateGenerosityTrap : RelicData -> PersonData -> Int -> GameState -> GameState
 activateGenerosityTrap relicData personData numDoubles state =
     let
@@ -458,12 +467,3 @@ activateGenerosityTrap relicData personData numDoubles state =
             playerEarnsExperience personData.id xpEarned state
     in
     { newState | relicDict = newRelicDict }
-
-
-executeActionOnGameState : ActionOnGamestate -> GameState -> ( GameState, Types.BackendTrigger )
-executeActionOnGameState actionOnGamestate state =
-    let
-        stateAfterRelicMiddleware =
-            updateWithRelics actionOnGamestate state
-    in
-    internalExecuteActionOnGameState actionOnGamestate stateAfterRelicMiddleware

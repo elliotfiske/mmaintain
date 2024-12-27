@@ -1,5 +1,18 @@
 module GameObjectTypes exposing (..)
 
+{-| This is the "topmost" (for now) Types module. It knows about all the types relating to the GameState and
+the objects within.
+
+It _doesn't_ know about things like a "frontend" vs a "backend".
+
+Also note that it can't have the idea of a "PersonDict" or "RelicDict" because those are dependent on
+what a Person and Relic is.
+
+GameObjectTypes => Types => Rest of world
+GameObjectTypes => RelicDict/PersonDict/DirtDict => Types
+
+-}
+
 
 type PersonId
     = PersonId Int
@@ -36,12 +49,6 @@ relicIdToInt (RelicId id) =
 relicIdToString : RelicId -> String
 relicIdToString id =
     String.fromInt (relicIdToInt id)
-
-
-type GameObject
-    = Person PersonData
-    | Dirt DirtData
-    | Relic RelicData
 
 
 type alias PersonStats =

@@ -142,13 +142,6 @@ dropAndDoubleActivationButton myId droppers relicId =
             [ Html.text "Claim XP" ]
 
 
-personDictToString : List PersonId -> String
-personDictToString personDict =
-    personDict
-        |> List.map (\personId -> "Person " ++ GameObjectTypes.personIdToString personId)
-        |> String.join ", "
-
-
 cleanFastStrengthMultiplier : RelicRarity -> Int -> Float
 cleanFastStrengthMultiplier rarity xp =
     case rarity of
@@ -241,6 +234,9 @@ xpMultiplierForPlayer relics person =
             1
 
 
+{-| Some relics are interested in actions against the GameState. This function
+lets relics modify the GameState in response to actions.
+-}
 relicMiddleware : ActionOnGamestate -> RelicData -> GameState -> GameState
 relicMiddleware action relic state =
     case relic.relicType of

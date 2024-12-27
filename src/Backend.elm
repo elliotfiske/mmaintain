@@ -49,35 +49,6 @@ init =
 
 update : BackendMsg -> Model -> ( Model, Cmd BackendMsg )
 update msg model =
-    let
-        ( newModel, cmd ) =
-            maybeDoUpdate msg model
-    in
-    case assembleBackendModel newModel of
-        ValidBackendModel _ ->
-            ( newModel, cmd )
-
-        InvalidBackendModel _ ->
-            -- TODO: Attempted to get to an invalid state! Cancel the action. In the future it would be good to log this (to a Google Sheet maybe?)
-            ( model, Cmd.none )
-
-
-maybeDoUpdate : BackendMsg -> Model -> ( Model, Cmd BackendMsg )
-maybeDoUpdate msg model =
-    let
-        assembledModel =
-            assembleBackendModel model
-    in
-    case assembledModel of
-        ValidBackendModel validModel ->
-            actualUpdate msg model validModel
-
-        InvalidBackendModel _ ->
-            ( model, Cmd.none )
-
-
-actualUpdate : BackendMsg -> Model -> ValidBackendModelData -> ( Model, Cmd BackendMsg )
-actualUpdate msg model assembledModel =
     case msg of
         NoOpBackendMsg ->
             ( model, Cmd.none )
@@ -85,66 +56,17 @@ actualUpdate msg model assembledModel =
         ClientConnected sessionId clientId ->
             let
                 ( newModel, cmd, personId ) =
-                    createPersonIfNeeded sessionId clientId model assembledModel
+                    createPersonIfNeeded sessionId clientId model
             in
             ( newModel, cmd )
-                |> andThen (addClientToList clientId sessionId personId)
+                |> andThenModel (addClientToList clientId sessionId personId)
 
         ClientDisconnected _ clientId ->
             ( { model | connectedClients = List.filter (\c -> c /= clientId) model.connectedClients }, Cmd.none )
 
 
-type alias ValidBackendModelData =
-    { sessionIdToPersonData : Dict.Dict SessionId PersonData }
-
-
-type AssembledBackendModel
-    = ValidBackendModel ValidBackendModelData
-    | InvalidBackendModel String
-
-
-assembleBackendModel : Model -> AssembledBackendModel
-assembleBackendModel model =
-    case assembleSessionIdsToPersonData model of
-        Ok dict ->
-            ValidBackendModel
-                { sessionIdToPersonData = dict }
-
-        Err msg ->
-            InvalidBackendModel msg
-
-
-type alias AssembleStep =
-    Result String (Dict.Dict SessionId PersonData)
-
-
-assembleSessionIdsToPersonData : Model -> AssembleStep
-assembleSessionIdsToPersonData model =
-    Dict.foldl (convertPersonIdToPersonData model.gameState.personDict) (Ok Dict.empty) model.sessionIdToPersonId
-
-
-convertPersonIdToPersonData : RealPersonDict -> SessionId -> PersonId -> AssembleStep -> AssembleStep
-convertPersonIdToPersonData dict sessionId personId acc =
-    Result.andThen (addPersonDataToDict dict sessionId personId) acc
-
-
-addPersonDataToDict : RealPersonDict -> SessionId -> PersonId -> Dict.Dict SessionId PersonData -> AssembleStep
-addPersonDataToDict dict sessionId personId acc =
-    case PersonDict.get personId dict of
-        Nothing ->
-            Err
-                ("Could not find person with ID "
-                    ++ GameObjectTypes.personIdToString personId
-                    ++ " which was mapped from session ID "
-                    ++ sessionId
-                )
-
-        Just personData ->
-            Ok (Dict.insert sessionId personData acc)
-
-
-andThen : (Model -> ( Model, Cmd msg )) -> ( Model, Cmd msg ) -> ( Model, Cmd msg )
-andThen updateFunc ( model, cmd ) =
+andThenModel : (Model -> ( Model, Cmd msg )) -> ( Model, Cmd msg ) -> ( Model, Cmd msg )
+andThenModel updateFunc ( model, cmd ) =
     let
         ( newModel, newCmd ) =
             updateFunc model
@@ -152,35 +74,35 @@ andThen updateFunc ( model, cmd ) =
     ( newModel, Cmd.batch [ newCmd, cmd ] )
 
 
-addClientToList : ClientId -> SessionId -> PersonData -> Model -> ( Model, Cmd BackendMsg )
-addClientToList clientId sessionId personData model =
+addClientToList : ClientId -> SessionId -> PersonId -> Model -> ( Model, Cmd BackendMsg )
+addClientToList clientId sessionId personId model =
     let
         newState : FrontendPlayingState
         newState =
             { gameState = model.gameState
-            , myId = personData.id
+            , myId = personId
             , targetPosition = Nothing
             }
     in
     ( { model
-        | sessionIdToPersonId = Dict.insert sessionId personData.id model.sessionIdToPersonId
+        | sessionIdToPersonId = Dict.insert sessionId personId model.sessionIdToPersonId
         , connectedClients = clientId :: model.connectedClients
       }
     , sendToFrontend clientId (UpdateFullState newState)
     )
 
 
-createPersonIfNeeded : SessionId -> ClientId -> Model -> ValidBackendModelData -> ( Model, Cmd BackendMsg, PersonData )
-createPersonIfNeeded sessionId clientId model assembledModel =
-    case Dict.get sessionId assembledModel.sessionIdToPersonData of
-        Just personData ->
-            ( model, Cmd.none, personData )
+createPersonIfNeeded : SessionId -> ClientId -> Model -> ( Model, Cmd BackendMsg, PersonId )
+createPersonIfNeeded sessionId clientId model =
+    case Dict.get sessionId model.sessionIdToPersonId of
+        Just personId ->
+            ( model, Cmd.none, personId )
 
         Nothing ->
             createPerson clientId model
 
 
-createPerson : ClientId -> Model -> ( Model, Cmd BackendMsg, PersonData )
+createPerson : ClientId -> Model -> ( Model, Cmd BackendMsg, PersonId )
 createPerson clientId model =
     let
         newPerson : PersonData
@@ -198,7 +120,7 @@ createPerson clientId model =
     in
     ( { incrementedModel | gameState = newGamestate }
     , forwardToEveryoneButMe (AddPerson newPerson) clientId model
-    , newPerson
+    , newPerson.id
     )
 
 
@@ -208,6 +130,7 @@ type alias CreateDirtArgs =
 
 createDirt : CreateDirtArgs -> Model -> ( Model, Cmd BackendMsg )
 createDirt args model =
+    -- todo: we manaually tweak the dirtDict here for no good reason. We should just use the GameState functions.
     let
         newDirt : GameObjectTypes.DirtData
         newDirt =
@@ -478,7 +401,7 @@ andThenAddDirtToSpot point ( model, msg ) =
             else
                 modBy 800 randomValue + 300
     in
-    andThen (addDirtToSpot point dirtAmount) ( newModel, msg )
+    andThenModel (addDirtToSpot point dirtAmount) ( newModel, msg )
 
 
 addDirtToSpot : Types.Point -> Int -> Model -> ( Model, Cmd BackendMsg )
