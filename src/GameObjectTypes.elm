@@ -14,6 +14,10 @@ GameObjectTypes => RelicDict/PersonDict/DirtDict => Types
 -}
 
 
+type alias Point =
+    { x : Int, y : Int }
+
+
 type PersonId
     = PersonId Int
 
@@ -61,14 +65,13 @@ type alias PersonData =
     { id : PersonId
     , name : String
     , experience : Int
-    , x : Int
-    , y : Int
+    , position : Point
     , stats : PersonStats
     }
 
 
 type alias DirtData =
-    { id : DirtId, amount : Int, x : Int, y : Int }
+    { id : DirtId, amount : Int, position : Point }
 
 
 type alias RelicData =
@@ -77,7 +80,7 @@ type alias RelicData =
 
 type RelicPosition
     = HeldBy PersonId
-    | OnFloor Int Int
+    | OnFloor Point
 
 
 type RelicType

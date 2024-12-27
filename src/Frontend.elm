@@ -132,7 +132,7 @@ tryGetRelicHolder people relicData =
                 Just holder ->
                     Ok (Just holder)
 
-        GameObjectTypes.OnFloor _ _ ->
+        GameObjectTypes.OnFloor _ ->
             Ok Nothing
 
 
@@ -330,7 +330,7 @@ moveMeTowardsTargetPoint state =
         ( Just target, Just me ) ->
             let
                 direction =
-                    GameObject.directionToMoveFrom { x = me.x, y = me.y } { x = target.x, y = target.y }
+                    GameObject.directionToMoveFrom me.position target
 
                 maybeAction =
                     Maybe.map (MovePerson state.myId) direction
@@ -663,8 +663,8 @@ renderTooltipLayer state =
         |> Dict.Extra.filterGroupBy
             (\relicData ->
                 case relicData.position of
-                    GameObjectTypes.OnFloor x y ->
-                        Just ( x, y )
+                    GameObjectTypes.OnFloor point ->
+                        Just ( point.x, point.y )
 
                     GameObjectTypes.HeldBy _ ->
                         Nothing
@@ -741,26 +741,26 @@ renderOffsetMultiplier =
 
 
 personView : PersonData -> Html.Html FrontendMsg
-personView { id, name, x, y } =
+personView { id, name, position } =
     let
         offsetX =
-            String.fromInt (x * renderOffsetMultiplier)
+            String.fromInt (position.x * renderOffsetMultiplier)
 
         offsetY =
-            String.fromInt (y * renderOffsetMultiplier)
+            String.fromInt (position.y * renderOffsetMultiplier)
     in
     Html.div [ class "absolute sprite person", style "left" (offsetX ++ "px"), style "top" (offsetY ++ "px") ]
         []
 
 
 dirtView : GameObjectTypes.DirtData -> Html.Html FrontendMsg
-dirtView { x, y, amount } =
+dirtView { position, amount } =
     let
         offsetX =
-            String.fromInt (x * renderOffsetMultiplier)
+            String.fromInt (position.x * renderOffsetMultiplier)
 
         offsetY =
-            String.fromInt (y * renderOffsetMultiplier + 15)
+            String.fromInt (position.y * renderOffsetMultiplier + 15)
     in
     Html.div [ class "absolute text-orange-500", style "left" (offsetX ++ "px"), style "top" (offsetY ++ "px") ]
         [ Html.text (String.fromInt amount) ]
@@ -772,13 +772,13 @@ floorRelicView relicData =
         GameObjectTypes.HeldBy _ ->
             text ""
 
-        GameObjectTypes.OnFloor x y ->
+        GameObjectTypes.OnFloor position ->
             let
                 offsetX =
-                    String.fromInt (x * renderOffsetMultiplier)
+                    String.fromInt (position.x * renderOffsetMultiplier)
 
                 offsetY =
-                    String.fromInt (y * renderOffsetMultiplier + 15)
+                    String.fromInt (position.y * renderOffsetMultiplier + 15)
             in
             Html.div
                 [ class ("absolute " ++ Relic.relicTextColor relicData.rarity)
@@ -837,9 +837,9 @@ tryCleaning state assembledModel =
         myRelicCount =
             List.length assembledModel.me.heldRelics
     in
-    case GameObject.getDirtAtLocation myself.x myself.y state.gameState.dirtDict of
+    case GameObject.getDirtAtLocation myself.position state.gameState.dirtDict of
         Nothing ->
-            case GameObject.getRelicAtLocation myself.x myself.y state.gameState.relicDict of
+            case GameObject.getRelicAtLocation myself.position state.gameState.relicDict of
                 Nothing ->
                     GameStateNoOp
 

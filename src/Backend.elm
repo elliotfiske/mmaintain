@@ -4,10 +4,9 @@ import Dict
 import DirtDict
 import GameObject exposing (executeActionOnGameState)
 import GameObjectTypes exposing (ActionOnGamestate(..), PersonData, PersonId(..))
-import GameState exposing (updateGameStateDirtDict, updateGameStatePersonDict, updateGameStateRelicDict)
+import GameState exposing (updateGameStateDirtDict, updateGameStateRelicDict)
 import Lamdera exposing (ClientId, SessionId, sendToFrontend)
 import List
-import PersonDict
 import Relic
 import RelicDict
 import Types exposing (..)
@@ -74,6 +73,16 @@ andThenModel updateFunc ( model, cmd ) =
     ( newModel, Cmd.batch [ newCmd, cmd ] )
 
 
+executeActionOnModel : Model -> ActionOnGamestate -> ( Model, BackendTrigger )
+executeActionOnModel model action =
+    let
+        ( newGameState, backendTrigger ) =
+            model.gameState
+                |> executeActionOnGameState action
+    in
+    ( { model | gameState = newGameState }, backendTrigger )
+
+
 addClientToList : ClientId -> SessionId -> PersonId -> Model -> ( Model, Cmd BackendMsg )
 addClientToList clientId sessionId personId model =
     let
@@ -105,27 +114,26 @@ createPersonIfNeeded sessionId clientId model =
 createPerson : ClientId -> Model -> ( Model, Cmd BackendMsg, PersonId )
 createPerson clientId model =
     let
-        newPerson : PersonData
+        ( newPersonId, incModel ) =
+            getAndIncrementBiggestId model
+
         newPerson =
-            GameObject.createPerson (PersonId model.biggestId) "Person"
+            GameObject.createPerson (PersonId newPersonId) "Person"
 
-        newPersonDict =
-            PersonDict.insert newPerson.id newPerson model.gameState.personDict
+        createPersonAction =
+            AddPerson newPerson
 
-        newGamestate =
-            updateGameStatePersonDict newPersonDict model.gameState
-
-        incrementedModel =
-            incrementBiggestId model
+        ( finalModel, _ ) =
+            executeActionOnModel incModel createPersonAction
     in
-    ( { incrementedModel | gameState = newGamestate }
-    , forwardToEveryoneButMe (AddPerson newPerson) clientId model
+    ( finalModel
+    , forwardToEveryoneButMe createPersonAction clientId model
     , newPerson.id
     )
 
 
 type alias CreateDirtArgs =
-    { x : Int, y : Int, amount : Int }
+    { point : GameObjectTypes.Point, amount : Int }
 
 
 createDirt : CreateDirtArgs -> Model -> ( Model, Cmd BackendMsg )
@@ -134,7 +142,7 @@ createDirt args model =
     let
         newDirt : GameObjectTypes.DirtData
         newDirt =
-            { x = args.x, y = args.y, amount = args.amount, id = GameObjectTypes.DirtId model.biggestId }
+            { position = args.point, amount = args.amount, id = GameObjectTypes.DirtId model.biggestId }
 
         newDirtDict =
             DirtDict.insert newDirt.id newDirt model.gameState.dirtDict
@@ -211,18 +219,13 @@ updateFromFrontend _ clientId msg model =
         PleaseActivateRelic personId relicId ->
             let
                 actionsFromActivation =
-                    model.gameState
-                        |> Relic.createActionOnGameStateFromRelicActivation personId relicId
+                    Relic.createActionOnGameStateFromRelicActivation personId relicId model.gameState
 
-                ( newGameState, backendTriggers ) =
-                    model.gameState
-                        |> executeActionOnGameState actionsFromActivation
-
-                newModel =
-                    { model | gameState = newGameState }
+                ( newModel, relicBackendTriggers ) =
+                    executeActionOnModel model actionsFromActivation
 
                 ( newModel2, actionsFromTrigger ) =
-                    executeBackendTrigger backendTriggers newModel
+                    executeBackendTrigger relicBackendTriggers newModel
             in
             ( newModel2
             , Cmd.batch
@@ -234,6 +237,23 @@ updateFromFrontend _ clientId msg model =
 
 executeBackendTrigger : BackendTrigger -> Model -> ( Model, ActionOnGamestate )
 executeBackendTrigger trigger model =
+    let
+        ( newModel, newAction ) =
+            updateModelFromTrigger trigger model
+
+        ( finalModel, _ ) =
+            executeActionOnModel newModel newAction
+    in
+    ( finalModel, newAction )
+
+
+{-| Given a backend trigger, update the model and return the action that should be performed on the gamestate.
+
+(so far the "update model" is just incrementing our random number and ID generators)
+
+-}
+updateModelFromTrigger : BackendTrigger -> Model -> ( Model, ActionOnGamestate )
+updateModelFromTrigger trigger model =
     case trigger of
         NoOpBackendTrigger ->
             ( model, GameStateNoOp )
@@ -246,60 +266,61 @@ executeBackendTrigger trigger model =
             doRelicRoll personId dirtData model
 
 
-doRelicRoll : PersonId -> GameObjectTypes.DirtData -> Model -> ( Model, ActionOnGamestate )
-doRelicRoll who killedDirt model =
+getRandomRelicRarityAndType : Model -> ( Maybe GameObjectTypes.RelicRarity, GameObjectTypes.RelicType, Model )
+getRandomRelicRarityAndType model =
     let
         ( randomRarity, newModel ) =
             getRandomValue model
 
-        ( randomTypeIndex, newModel2 ) =
+        ( randomTypeValue, newModel2 ) =
             getRandomValue newModel
 
         randomType =
-            relicTypeRoll randomTypeIndex
+            relicTypeRoll randomTypeValue
 
         maybeRarity =
             randomRarity
                 |> modBy 100
                 |> rarityRoll
-
-        ( newId, incModel ) =
-            getAndIncrementBiggestId newModel2
-
-        maybeNewRelic =
-            Maybe.map
-                (\rarity ->
-                    { id = GameObjectTypes.RelicId newId
-                    , relicType = randomType
-                    , position = GameObjectTypes.OnFloor killedDirt.x killedDirt.y
-                    , rarity = rarity
-                    , exp = 0
-                    }
-                )
-                maybeRarity
-
-        newRelicDict =
-            case maybeNewRelic of
-                Nothing ->
-                    model.gameState.relicDict
-
-                Just newRelic ->
-                    RelicDict.insert newRelic.id newRelic model.gameState.relicDict
-
-        finalModel =
-            { incModel | gameState = updateGameStateRelicDict newRelicDict incModel.gameState }
-
-        action =
-            case maybeNewRelic of
-                Nothing ->
-                    GameStateNoOp
-
-                Just relic ->
-                    AddRelic relic
     in
-    ( finalModel, action )
+    ( maybeRarity, randomType, newModel2 )
 
 
+doRelicRoll : PersonId -> GameObjectTypes.DirtData -> Model -> ( Model, ActionOnGamestate )
+doRelicRoll who killedDirt model =
+    let
+        ( randomRarity, randomType, newModel ) =
+            getRandomRelicRarityAndType model
+    in
+    case randomRarity of
+        Nothing ->
+            -- unlucky! no relic for you
+            ( newModel, GameStateNoOp )
+
+        Just rarity ->
+            addRelic killedDirt.position randomType rarity newModel
+
+
+addRelic : GameObjectTypes.Point -> GameObjectTypes.RelicType -> GameObjectTypes.RelicRarity -> Model -> ( Model, ActionOnGamestate )
+addRelic position relicType rarity model =
+    let
+        ( newId, incModel ) =
+            getAndIncrementBiggestId model
+
+        newRelic =
+            { id = GameObjectTypes.RelicId newId
+            , relicType = relicType
+            , position = GameObjectTypes.OnFloor position
+            , rarity = rarity
+            , exp = 0
+            }
+    in
+    ( incModel, AddRelic newRelic )
+
+
+{-| Roll for the rarity of a relic.
+NOTE: this is also where we check if the player gets a relic at all. `Nothing` means no relic dropped.
+-}
 rarityRoll : Int -> Maybe GameObjectTypes.RelicRarity
 rarityRoll randomValue =
     if randomValue < 2 then
@@ -361,7 +382,7 @@ debugAddRelic model =
         newRelic =
             { id = GameObjectTypes.RelicId newId
             , relicType = GameObjectTypes.DropAndDouble []
-            , position = GameObjectTypes.OnFloor 2 2
+            , position = GameObjectTypes.OnFloor { x = 2, y = 2 }
             , rarity = GameObjectTypes.Legendary
             , exp = 0
             }
@@ -388,7 +409,7 @@ addSomeDirt model =
         )
 
 
-andThenAddDirtToSpot : Point -> ( Model, Cmd BackendMsg ) -> ( Model, Cmd BackendMsg )
+andThenAddDirtToSpot : GameObjectTypes.Point -> ( Model, Cmd BackendMsg ) -> ( Model, Cmd BackendMsg )
 andThenAddDirtToSpot point ( model, msg ) =
     let
         ( randomValue, newModel ) =
@@ -404,15 +425,15 @@ andThenAddDirtToSpot point ( model, msg ) =
     andThenModel (addDirtToSpot point dirtAmount) ( newModel, msg )
 
 
-addDirtToSpot : Types.Point -> Int -> Model -> ( Model, Cmd BackendMsg )
-addDirtToSpot { x, y } amount model =
+addDirtToSpot : GameObjectTypes.Point -> Int -> Model -> ( Model, Cmd BackendMsg )
+addDirtToSpot point amount model =
     let
         existingDirt =
-            GameObject.getDirtAtLocation x y model.gameState.dirtDict
+            GameObject.getDirtAtLocation point model.gameState.dirtDict
     in
     case existingDirt of
         Nothing ->
-            createDirt { x = x, y = y, amount = amount } model
+            createDirt { point = point, amount = amount } model
 
         Just dirt ->
             changeDirtAmount dirt model amount

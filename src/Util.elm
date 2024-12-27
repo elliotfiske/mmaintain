@@ -1,6 +1,7 @@
 module Util exposing (..)
 
 import Dict
+import GameObjectTypes
 import List.Extra
 import Types
 
@@ -115,7 +116,7 @@ type alias GenerateGridOfPointsArgs =
     }
 
 
-generateGridOfPoints : GenerateGridOfPointsArgs -> List Types.Point
+generateGridOfPoints : GenerateGridOfPointsArgs -> List GameObjectTypes.Point
 generateGridOfPoints { minX, maxX, minY, maxY } =
     List.concatMap (\x -> List.map (\y -> { x = x, y = y }) (List.range minY maxY)) (List.range minX maxX)
 

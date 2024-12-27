@@ -5,37 +5,41 @@ import GameObjectTypes exposing (..)
 import PersonDict exposing (PersonDict)
 import Relic exposing (..)
 import RelicDict
-import String exposing (toInt)
-import Types exposing (BackendTrigger(..), GameState, Point, RealDirtDict, RealRelicDict)
+import Types exposing (BackendTrigger(..), GameState, RealDirtDict, RealRelicDict)
 import Util
 
 
 movePerson : Direction -> PersonData -> PersonData
 movePerson direction person =
+    { person | position = newPoint direction person.position }
+
+
+newPoint : Direction -> GameObjectTypes.Point -> GameObjectTypes.Point
+newPoint direction point =
     case direction of
         Up ->
-            { person | y = person.y - 1 }
+            { point | y = point.y - 1 }
 
         Down ->
-            { person | y = person.y + 1 }
+            { point | y = point.y + 1 }
 
         Left ->
-            { person | x = person.x - 1 }
+            { point | x = point.x - 1 }
 
         Right ->
-            { person | x = person.x + 1 }
+            { point | x = point.x + 1 }
 
         UpLeft ->
-            { person | x = person.x - 1, y = person.y - 1 }
+            { point | x = point.x - 1, y = point.y - 1 }
 
         UpRight ->
-            { person | x = person.x + 1, y = person.y - 1 }
+            { point | x = point.x + 1, y = point.y - 1 }
 
         DownLeft ->
-            { person | x = person.x - 1, y = person.y + 1 }
+            { point | x = point.x - 1, y = point.y + 1 }
 
         DownRight ->
-            { person | x = person.x + 1, y = person.y + 1 }
+            { point | x = point.x + 1, y = point.y + 1 }
 
 
 type DirectionDifferenceVertical
@@ -109,7 +113,7 @@ pickUpRelic personId relic =
 
 dropRelic : PersonData -> RelicData -> RelicData
 dropRelic personData relicData =
-    { relicData | position = OnFloor personData.x personData.y }
+    { relicData | position = OnFloor personData.position }
 
 
 createPerson : PersonId -> String -> PersonData
@@ -117,8 +121,7 @@ createPerson id name =
     { id = id
     , name = name
     , experience = 0
-    , x = 3
-    , y = 3
+    , position = { x = 3, y = 3 }
     , stats =
         { cleanCount = 0
         , clearCount = 0
@@ -180,34 +183,34 @@ changeDirtAmount id amount dict =
     DirtDict.update id (Maybe.map (setDirtAmount amount)) dict
 
 
-dirtIsAtLocation : Int -> Int -> GameObjectTypes.DirtData -> Bool
-dirtIsAtLocation x y dirtData =
-    dirtData.x == x && dirtData.y == y
+dirtIsAtLocation : GameObjectTypes.Point -> GameObjectTypes.DirtData -> Bool
+dirtIsAtLocation pos dirtData =
+    pos == dirtData.position
 
 
-getDirtAtLocation : Int -> Int -> RealDirtDict -> Maybe DirtData
-getDirtAtLocation x y dict =
+getDirtAtLocation : GameObjectTypes.Point -> RealDirtDict -> Maybe DirtData
+getDirtAtLocation point dict =
     dict
         |> DirtDict.values
-        |> List.filter (dirtIsAtLocation x y)
+        |> List.filter (dirtIsAtLocation point)
         |> List.head
 
 
-relicIsAtLocation : Int -> Int -> GameObjectTypes.RelicData -> Bool
-relicIsAtLocation x y { position } =
-    case position of
+relicIsAtLocation : GameObjectTypes.Point -> GameObjectTypes.RelicData -> Bool
+relicIsAtLocation positionToCheck relicData =
+    case relicData.position of
         HeldBy _ ->
             False
 
-        OnFloor relicX relicY ->
-            x == relicX && y == relicY
+        OnFloor floorPosition ->
+            floorPosition == positionToCheck
 
 
-getRelicAtLocation : Int -> Int -> RealRelicDict -> Maybe RelicData
-getRelicAtLocation x y dict =
+getRelicAtLocation : GameObjectTypes.Point -> RealRelicDict -> Maybe RelicData
+getRelicAtLocation point dict =
     dict
         |> RelicDict.values
-        |> List.filter (relicIsAtLocation x y)
+        |> List.filter (relicIsAtLocation point)
         |> List.sortBy byRelicRarity
         |> List.head
 

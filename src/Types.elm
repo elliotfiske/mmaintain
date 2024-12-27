@@ -45,10 +45,6 @@ type alias FrontendModel =
     }
 
 
-type alias Point =
-    { x : Int, y : Int }
-
-
 type alias FrontendPlayingState =
     { gameState : GameState
     , myId : PersonId

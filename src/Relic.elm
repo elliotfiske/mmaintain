@@ -210,7 +210,7 @@ relicHolder relic =
         HeldBy personId ->
             Just personId
 
-        OnFloor _ _ ->
+        OnFloor _ ->
             Nothing
 
 
