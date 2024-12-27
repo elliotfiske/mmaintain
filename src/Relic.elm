@@ -104,10 +104,10 @@ relicBody state relic =
                     dropDoubleCurrentExperience relic.rarity (List.length people)
 
                 me =
-                    PersonDict.get state.myId state.personDict
+                    PersonDict.get state.myId state.gameState.personDict
 
                 playerXpMultiplier =
-                    Maybe.map (xpMultiplierForPlayer state.relicDict) me
+                    Maybe.map (xpMultiplierForPlayer state.gameState.relicDict) me
                         |> Maybe.withDefault 1
                         |> round
 

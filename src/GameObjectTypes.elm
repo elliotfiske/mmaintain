@@ -11,8 +11,8 @@ personIdToInt (PersonId id) =
 
 
 personIdToString : PersonId -> String
-personIdToString id =
-    String.fromInt (personIdToInt id)
+personIdToString =
+    personIdToInt >> String.fromInt
 
 
 type DirtId

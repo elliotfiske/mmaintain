@@ -51,8 +51,12 @@ config =
     , NoUnused.CustomTypeConstructorArgs.rule
     , NoUnused.Dependencies.rule
     , NoUnused.Exports.rule
+        |> Rule.ignoreErrorsForDirectories ["generated/", "Evergreen/"]
     , NoUnused.Parameters.rule
+        |> Rule.ignoreErrorsForDirectories ["generated/", "Evergreen/"]
     , NoUnused.Patterns.rule
+        |> Rule.ignoreErrorsForDirectories ["generated/", "Evergreen/"]
     , NoUnused.Variables.rule
+        |> Rule.ignoreErrorsForDirectories ["generated/", "Evergreen/"]
     , Simplify.rule Simplify.defaults
     ]

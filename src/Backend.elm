@@ -4,6 +4,7 @@ import Dict
 import DirtDict
 import GameObject exposing (executeActionOnGameState)
 import GameObjectTypes exposing (ActionOnGamestate(..), PersonData, PersonId(..))
+import GameState exposing (updateGameStateDirtDict, updateGameStatePersonDict, updateGameStateRelicDict)
 import Lamdera exposing (ClientId, SessionId, sendToFrontend)
 import List
 import PersonDict
@@ -38,9 +39,7 @@ init : ( Model, Cmd BackendMsg )
 init =
     ( { connectedClients = []
       , sessionIdToPersonId = Dict.empty
-      , personDict = PersonDict.empty
-      , relicDict = RelicDict.empty
-      , dirtDict = DirtDict.empty
+      , gameState = GameState.empty
       , biggestId = 0
       , bigRandom = 46296
       }
@@ -121,7 +120,7 @@ type alias AssembleStep =
 
 assembleSessionIdsToPersonData : Model -> AssembleStep
 assembleSessionIdsToPersonData model =
-    Dict.foldl (convertPersonIdToPersonData model.personDict) (Ok Dict.empty) model.sessionIdToPersonId
+    Dict.foldl (convertPersonIdToPersonData model.gameState.personDict) (Ok Dict.empty) model.sessionIdToPersonId
 
 
 convertPersonIdToPersonData : RealPersonDict -> SessionId -> PersonId -> AssembleStep -> AssembleStep
@@ -158,9 +157,7 @@ addClientToList clientId sessionId personData model =
     let
         newState : FrontendPlayingState
         newState =
-            { personDict = model.personDict
-            , relicDict = model.relicDict
-            , dirtDict = model.dirtDict
+            { gameState = model.gameState
             , myId = personData.id
             , targetPosition = Nothing
             }
@@ -191,12 +188,15 @@ createPerson clientId model =
             GameObject.createPerson (PersonId model.biggestId) "Person"
 
         newPersonDict =
-            PersonDict.insert newPerson.id newPerson model.personDict
+            PersonDict.insert newPerson.id newPerson model.gameState.personDict
+
+        newGamestate =
+            updateGameStatePersonDict newPersonDict model.gameState
 
         incrementedModel =
             incrementBiggestId model
     in
-    ( { incrementedModel | personDict = newPersonDict }
+    ( { incrementedModel | gameState = newGamestate }
     , forwardToEveryoneButMe (AddPerson newPerson) clientId model
     , newPerson
     )
@@ -214,12 +214,15 @@ createDirt args model =
             { x = args.x, y = args.y, amount = args.amount, id = GameObjectTypes.DirtId model.biggestId }
 
         newDirtDict =
-            DirtDict.insert newDirt.id newDirt model.dirtDict
+            DirtDict.insert newDirt.id newDirt model.gameState.dirtDict
+
+        newGameState =
+            updateGameStateDirtDict newDirtDict model.gameState
 
         incrementedModel =
             incrementBiggestId model
     in
-    ( { incrementedModel | dirtDict = newDirtDict }, Lamdera.broadcast (OtherClientPerformedAction Server (AddDirt newDirt)) )
+    ( { incrementedModel | gameState = newGameState }, Lamdera.broadcast (OtherClientPerformedAction Server (AddDirt newDirt)) )
 
 
 incrementBiggestId : Model -> Model
@@ -244,23 +247,6 @@ getRandomValue model =
     ( model.bigRandom, { model | bigRandom = nextRandom } )
 
 
-constructGameState : Model -> GameState
-constructGameState model =
-    { personDict = model.personDict
-    , relicDict = model.relicDict
-    , dirtDict = model.dirtDict
-    }
-
-
-updateModelFromGameState : Model -> GameState -> Model
-updateModelFromGameState model gameState =
-    { model
-        | personDict = gameState.personDict
-        , relicDict = gameState.relicDict
-        , dirtDict = gameState.dirtDict
-    }
-
-
 updateFromFrontend : SessionId -> ClientId -> ToBackend -> Model -> ( Model, Cmd BackendMsg )
 updateFromFrontend _ clientId msg model =
     -- todo: currently we allow anybody to do anything. Need to check "legality" of action (a client could
@@ -272,20 +258,23 @@ updateFromFrontend _ clientId msg model =
         ClientPerformsAction actionOnGamestate ->
             let
                 ( newGameState, trigger ) =
-                    model
-                        |> constructGameState
+                    model.gameState
                         |> executeActionOnGameState actionOnGamestate
 
                 newModel =
-                    updateModelFromGameState model newGameState
+                    { model | gameState = newGameState }
 
-                -- todo: handle `trigger` here. Will update model and potentially have a new action to send back to the client. This could include an action to the original client!
+                -- Updates model with the triggered "Backend Triggers" and potentially send a new action to send back to the client.
+                --   This will include the original client!
                 ( newerModel, actionsFromTrigger ) =
                     executeBackendTrigger trigger newModel
             in
             ( newerModel
             , Cmd.batch
-                [ forwardToEveryoneButMe actionOnGamestate clientId model
+                [ -- "everyone but me" needs to know about the action "I" performed
+                  forwardToEveryoneButMe actionOnGamestate clientId model
+
+                -- but even "I" need to know about the backend trigger fired by "my" action
                 , Lamdera.broadcast (OtherClientPerformedAction Server actionsFromTrigger)
                 ]
             )
@@ -299,20 +288,24 @@ updateFromFrontend _ clientId msg model =
         PleaseActivateRelic personId relicId ->
             let
                 actionsFromActivation =
-                    model
-                        |> constructGameState
+                    model.gameState
                         |> Relic.createActionOnGameStateFromRelicActivation personId relicId
 
                 ( newGameState, backendTriggers ) =
-                    model
-                        |> constructGameState
+                    model.gameState
                         |> executeActionOnGameState actionsFromActivation
 
                 newModel =
-                    updateModelFromGameState model newGameState
+                    { model | gameState = newGameState }
+
+                ( newModel2, actionsFromTrigger ) =
+                    executeBackendTrigger backendTriggers newModel
             in
-            ( newModel
-            , Lamdera.broadcast (OtherClientPerformedAction Server actionsFromActivation)
+            ( newModel2
+            , Cmd.batch
+                [ Lamdera.broadcast (OtherClientPerformedAction Server actionsFromActivation)
+                , Lamdera.broadcast (OtherClientPerformedAction Server actionsFromTrigger)
+                ]
             )
 
 
@@ -322,7 +315,8 @@ executeBackendTrigger trigger model =
         NoOpBackendTrigger ->
             ( model, GameStateNoOp )
 
-        BatchTrigger backendTriggers ->
+        -- TODO: unimplemented
+        BatchTrigger _ ->
             ( model, GameStateNoOp )
 
         ClearedPollution personId dirtData ->
@@ -364,13 +358,13 @@ doRelicRoll who killedDirt model =
         newRelicDict =
             case maybeNewRelic of
                 Nothing ->
-                    model.relicDict
+                    model.gameState.relicDict
 
                 Just newRelic ->
-                    RelicDict.insert newRelic.id newRelic model.relicDict
+                    RelicDict.insert newRelic.id newRelic model.gameState.relicDict
 
         finalModel =
-            { incModel | relicDict = newRelicDict }
+            { incModel | gameState = updateGameStateRelicDict newRelicDict incModel.gameState }
 
         action =
             case maybeNewRelic of
@@ -450,9 +444,12 @@ debugAddRelic model =
             }
 
         newRelicDict =
-            RelicDict.insert newRelic.id newRelic model.relicDict
+            RelicDict.insert newRelic.id newRelic model.gameState.relicDict
+
+        newModel =
+            { incModel | gameState = updateGameStateRelicDict newRelicDict incModel.gameState }
     in
-    ( { incModel | relicDict = newRelicDict }, Lamdera.broadcast (OtherClientPerformedAction Server (AddRelic newRelic)) )
+    ( newModel, Lamdera.broadcast (OtherClientPerformedAction Server (AddRelic newRelic)) )
 
 
 addSomeDirt : Model -> ( Model, Cmd BackendMsg )
@@ -488,7 +485,7 @@ addDirtToSpot : Types.Point -> Int -> Model -> ( Model, Cmd BackendMsg )
 addDirtToSpot { x, y } amount model =
     let
         existingDirt =
-            GameObject.getDirtAtLocation x y model.dirtDict
+            GameObject.getDirtAtLocation x y model.gameState.dirtDict
     in
     case existingDirt of
         Nothing ->
@@ -502,9 +499,14 @@ changeDirtAmount : GameObjectTypes.DirtData -> Model -> Int -> ( Model, Cmd Back
 changeDirtAmount dirt model amount =
     let
         newDirtDict =
-            DirtDict.insert dirt.id { dirt | amount = amount } model.dirtDict
+            DirtDict.insert dirt.id { dirt | amount = amount } model.gameState.dirtDict
+
+        newModel =
+            { model | gameState = updateGameStateDirtDict newDirtDict model.gameState }
     in
-    ( { model | dirtDict = newDirtDict }, Lamdera.broadcast (OtherClientPerformedAction Server (ChangeDirtAmount dirt.id amount)) )
+    ( newModel
+    , Lamdera.broadcast (OtherClientPerformedAction Server (ChangeDirtAmount dirt.id amount))
+    )
 
 
 forwardToEveryoneButMe : ActionOnGamestate -> ClientId -> Model -> Cmd BackendMsg

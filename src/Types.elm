@@ -50,9 +50,7 @@ type alias Point =
 
 
 type alias FrontendPlayingState =
-    { personDict : PersonDict PersonData
-    , relicDict : RelicDict RelicData
-    , dirtDict : DirtDict DirtData
+    { gameState : GameState
     , myId : PersonId
     , targetPosition : Maybe Point
     }
@@ -65,9 +63,7 @@ type FrontendState
 
 
 type alias BackendModel =
-    { personDict : PersonDict PersonData
-    , relicDict : RelicDict RelicData
-    , dirtDict : DirtDict DirtData
+    { gameState : GameState
     , connectedClients : List ClientId
     , sessionIdToPersonId : Dict SessionId PersonId
     , biggestId : Int

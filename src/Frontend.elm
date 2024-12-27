@@ -76,7 +76,7 @@ createValidFrontendModel myself relicsByPerson =
 
 extractMyself : FrontendPlayingState -> Result String PersonData
 extractMyself state =
-    case PersonDict.get state.myId state.personDict of
+    case PersonDict.get state.myId state.gameState.personDict of
         Nothing ->
             Err
                 ("You said my ID was "
@@ -94,14 +94,14 @@ type alias AssembleRelicsByPersonStep =
 
 assembleRelicsByPerson : FrontendPlayingState -> Result String (PersonDict.PersonDict PersonWithRelics)
 assembleRelicsByPerson state =
-    state.relicDict
+    state.gameState.relicDict
         |> RelicDict.values
-        |> List.foldl (tryUpdatingRelicHolderDict state.personDict) (Ok (emptyRelicsByPerson state))
+        |> List.foldl (tryUpdatingRelicHolderDict state.gameState.personDict) (Ok (emptyRelicsByPerson state))
 
 
 emptyRelicsByPerson : FrontendPlayingState -> PersonDict.PersonDict PersonWithRelics
 emptyRelicsByPerson state =
-    state.personDict
+    state.gameState.personDict
         |> PersonDict.values
         |> List.foldl (\p d -> PersonDict.insert p.id { person = p, heldRelics = [] } d) PersonDict.empty
 
@@ -254,11 +254,11 @@ update msg model =
         NoOpFrontendMsg ->
             ( model, Cmd.none )
 
-        UrlClicked urlRequest ->
+        UrlClicked _ ->
             -- unhandled for now (may eventually use for stuff like "join my park" links, or logging in)
             ( model, Cmd.none )
 
-        UrlChanged url ->
+        UrlChanged _ ->
             -- also unhandled
             ( model, Cmd.none )
 
@@ -283,7 +283,7 @@ update msg model =
         DebugGenerateRelic ->
             ( model, Lamdera.sendToBackend PleaseGenerateRelic )
 
-        Tick posix ->
+        Tick _ ->
             moveMeTowardsMyTargetIfAny model
 
         ClickTarget point ->
@@ -326,7 +326,7 @@ moveMeTowardsMyTargetIfAny model =
 
 moveMeTowardsTargetPoint : FrontendPlayingState -> ( FrontendPlayingState, Cmd FrontendMsg )
 moveMeTowardsTargetPoint state =
-    case ( state.targetPosition, PersonDict.get state.myId state.personDict ) of
+    case ( state.targetPosition, PersonDict.get state.myId state.gameState.personDict ) of
         ( Just target, Just me ) ->
             let
                 direction =
@@ -367,31 +367,15 @@ updateModelWithAction actionOnGamestate model =
 
 
 updateStateWithAction : ActionOnGamestate -> FrontendPlayingState -> FrontendPlayingState
-updateStateWithAction action { personDict, dirtDict, relicDict, myId, targetPosition } =
+updateStateWithAction action { gameState, myId, targetPosition } =
     let
-        gameState =
-            { personDict = personDict, dirtDict = dirtDict, relicDict = relicDict }
-
         ( newState, _ ) =
             GameObject.executeActionOnGameState action gameState
     in
-    { personDict = newState.personDict
-    , dirtDict = newState.dirtDict
-    , relicDict = newState.relicDict
+    { gameState = newState
     , myId = myId
     , targetPosition = targetPosition
     }
-
-
-gameStateToFrontendState : PersonId -> GameState -> FrontendState
-gameStateToFrontendState myId gameState =
-    Playing
-        { personDict = gameState.personDict
-        , relicDict = gameState.relicDict
-        , dirtDict = gameState.dirtDict
-        , myId = myId
-        , targetPosition = Nothing
-        }
 
 
 updateFromBackend : ToFrontend -> Model -> ( Model, Cmd FrontendMsg )
@@ -403,7 +387,7 @@ updateFromBackend msg model =
         UpdateFullState frontendState ->
             ( { model | state = Playing frontendState }, Cmd.none )
 
-        OtherClientPerformedAction id action ->
+        OtherClientPerformedAction _ action ->
             ( updateModelWithAction action model, Cmd.none )
 
 
@@ -432,7 +416,7 @@ renderModel model =
 
 renderModals : FrontendPlayingState -> ValidFrontendModelData -> Html.Html FrontendMsg
 renderModals state model =
-    if DirtDict.size state.dirtDict == 0 then
+    if DirtDict.size state.gameState.dirtDict == 0 then
         node "dialog"
             [ id "my_modal_1"
             , class "modal"
@@ -515,14 +499,14 @@ debugStuff state =
 
 
 debugDicts : FrontendPlayingState -> Html.Html FrontendMsg
-debugDicts { personDict, relicDict, dirtDict, myId } =
+debugDicts { gameState, myId } =
     Html.text
         ("PersonDict: "
-            ++ String.fromInt (PersonDict.size personDict)
+            ++ String.fromInt (PersonDict.size gameState.personDict)
             ++ "\nRelicDict: "
-            ++ String.fromInt (RelicDict.size relicDict)
+            ++ String.fromInt (RelicDict.size gameState.relicDict)
             ++ "\nDirtDict: "
-            ++ String.fromInt (DirtDict.size dirtDict)
+            ++ String.fromInt (DirtDict.size gameState.dirtDict)
             ++ "\nMyId: "
             ++ GameObjectTypes.personIdToString myId
         )
@@ -539,7 +523,7 @@ renderMap state =
 
 renderDirt : FrontendPlayingState -> List (Html.Html FrontendMsg)
 renderDirt state =
-    DirtDict.values state.dirtDict
+    DirtDict.values state.gameState.dirtDict
         |> List.map dirtView
 
 
@@ -569,7 +553,7 @@ renderCleanStrength : FrontendPlayingState -> ValidFrontendModelData -> Html.Htm
 renderCleanStrength state modelData =
     let
         strength =
-            GameObject.cleanStrengthForPlayer state.relicDict modelData.me.person
+            GameObject.cleanStrengthForPlayer state.gameState.relicDict modelData.me.person
     in
     Html.div [ class "w-full prose" ]
         [ Html.h3 [ class "text-center" ]
@@ -598,7 +582,7 @@ renderXPMultiplier : FrontendPlayingState -> ValidFrontendModelData -> Html.Html
 renderXPMultiplier state modelData =
     let
         xpMultiplier =
-            Relic.xpMultiplierForPlayer state.relicDict modelData.me.person
+            Relic.xpMultiplierForPlayer state.gameState.relicDict modelData.me.person
     in
     if xpMultiplier == 1 then
         Html.text ""
@@ -668,14 +652,14 @@ lockedSlotView lockedUntil =
 
 renderFloorRelics : FrontendPlayingState -> List (Html FrontendMsg)
 renderFloorRelics state =
-    RelicDict.values state.relicDict
+    RelicDict.values state.gameState.relicDict
         |> List.map floorRelicView
 
 
 renderTooltipLayer : FrontendPlayingState -> List (Html.Html FrontendMsg)
 renderTooltipLayer state =
     -- Group relics by location
-    RelicDict.values state.relicDict
+    RelicDict.values state.gameState.relicDict
         |> Dict.Extra.filterGroupBy
             (\relicData ->
                 case relicData.position of
@@ -748,7 +732,7 @@ relicRarityBadge rarity =
 
 renderPeople : FrontendPlayingState -> List (Html.Html FrontendMsg)
 renderPeople state =
-    PersonDict.values state.personDict
+    PersonDict.values state.gameState.personDict
         |> List.map personView
 
 
@@ -853,9 +837,9 @@ tryCleaning state assembledModel =
         myRelicCount =
             List.length assembledModel.me.heldRelics
     in
-    case GameObject.getDirtAtLocation myself.x myself.y state.dirtDict of
+    case GameObject.getDirtAtLocation myself.x myself.y state.gameState.dirtDict of
         Nothing ->
-            case GameObject.getRelicAtLocation myself.x myself.y state.relicDict of
+            case GameObject.getRelicAtLocation myself.x myself.y state.gameState.relicDict of
                 Nothing ->
                     GameStateNoOp
 
