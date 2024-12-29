@@ -326,3 +326,61 @@ activateRelicWithPersonData state person relic =
 
         _ ->
             ( state, NoOpBackendTrigger )
+
+
+{-| Roll for the rarity of a relic.
+NOTE: this is also where we check if the player gets a relic at all. `Nothing` means no relic dropped.
+-}
+rarityRoll : Int -> Maybe GameObjectTypes.RelicRarity
+rarityRoll rawRandomValue =
+    let
+        randomValue =
+            modBy 100 rawRandomValue
+    in
+    if randomValue < 2 then
+        Just GameObjectTypes.Legendary
+
+    else if randomValue < 10 then
+        Just GameObjectTypes.Epic
+
+    else if randomValue < 20 then
+        Just GameObjectTypes.Rare
+
+    else if randomValue < 50 then
+        Just GameObjectTypes.Uncommon
+
+    else if randomValue < 70 then
+        Just GameObjectTypes.Common
+
+    else
+        Nothing
+
+
+relicWeights : List ( Int, GameObjectTypes.RelicType )
+relicWeights =
+    [ ( 60, GameObjectTypes.CleanFast )
+    , ( 5, GameObjectTypes.DropAndDouble [] )
+    , ( 30, GameObjectTypes.MoreXP )
+    ]
+
+
+relicTypeRoll : Int -> GameObjectTypes.RelicType
+relicTypeRoll rawRandomValue =
+    let
+        totalWeights =
+            List.sum (List.map Tuple.first relicWeights)
+
+        randomValue =
+            modBy totalWeights rawRandomValue
+    in
+    List.foldl
+        (\( weight, relicType ) ( acc, chosenRelicType ) ->
+            if acc < randomValue then
+                ( acc + weight, relicType )
+
+            else
+                ( acc, chosenRelicType )
+        )
+        ( 0, GameObjectTypes.CleanFast )
+        relicWeights
+        |> Tuple.second

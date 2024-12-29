@@ -1,14 +1,12 @@
 module Backend exposing (app)
 
 import Dict
-import DirtDict
 import GameObject exposing (executeActionOnGameState)
 import GameObjectTypes exposing (ActionOnGamestate(..), PersonData, PersonId(..))
-import GameState exposing (updateGameStateDirtDict, updateGameStateRelicDict)
-import Lamdera exposing (ClientId, SessionId, sendToFrontend)
+import GameState
+import Lamdera as L
 import List
 import Relic
-import RelicDict
 import Types exposing (..)
 import Util
 
@@ -18,7 +16,7 @@ type alias Model =
 
 
 app =
-    Lamdera.backend
+    L.backend
         { init = init
         , update = update
         , updateFromFrontend = updateFromFrontend
@@ -29,8 +27,8 @@ app =
 subscriptions : a -> Sub BackendMsg
 subscriptions _ =
     Sub.batch
-        [ Lamdera.onConnect ClientConnected
-        , Lamdera.onDisconnect ClientDisconnected
+        [ L.onConnect ClientConnected
+        , L.onDisconnect ClientDisconnected
         ]
 
 
@@ -53,65 +51,48 @@ update msg model =
             ( model, Cmd.none )
 
         ClientConnected sessionId clientId ->
-            let
-                ( newModel, cmd, personId ) =
-                    createPersonIfNeeded sessionId clientId model
-            in
-            ( newModel, cmd )
-                |> andThenModel (addClientToList clientId sessionId personId)
+            handleClientConnected sessionId clientId model
 
         ClientDisconnected _ clientId ->
             ( { model | connectedClients = List.filter (\c -> c /= clientId) model.connectedClients }, Cmd.none )
 
 
-andThenModel : (Model -> ( Model, Cmd msg )) -> ( Model, Cmd msg ) -> ( Model, Cmd msg )
-andThenModel updateFunc ( model, cmd ) =
+handleClientConnected : L.SessionId -> L.ClientId -> Model -> ( Model, Cmd BackendMsg )
+handleClientConnected sessionId clientId model =
     let
-        ( newModel, newCmd ) =
-            updateFunc model
-    in
-    ( newModel, Cmd.batch [ newCmd, cmd ] )
+        ( newModel, newPersonCmd, personId ) =
+            createPersonIfNeeded sessionId clientId model
 
+        updatedModel =
+            { newModel
+                | connectedClients = clientId :: newModel.connectedClients
+                , sessionIdToPersonId = Dict.insert sessionId personId newModel.sessionIdToPersonId
+            }
 
-executeActionOnModel : Model -> ActionOnGamestate -> ( Model, BackendTrigger )
-executeActionOnModel model action =
-    let
-        ( newGameState, backendTrigger ) =
-            model.gameState
-                |> executeActionOnGameState action
-    in
-    ( { model | gameState = newGameState }, backendTrigger )
-
-
-addClientToList : ClientId -> SessionId -> PersonId -> Model -> ( Model, Cmd BackendMsg )
-addClientToList clientId sessionId personId model =
-    let
         newState : FrontendPlayingState
         newState =
-            { gameState = model.gameState
+            { gameState = updatedModel.gameState
             , myId = personId
             , targetPosition = Nothing
             }
+
+        dumpStateToNewClientCmd =
+            L.sendToFrontend clientId (UpdateFullState newState)
     in
-    ( { model
-        | sessionIdToPersonId = Dict.insert sessionId personId model.sessionIdToPersonId
-        , connectedClients = clientId :: model.connectedClients
-      }
-    , sendToFrontend clientId (UpdateFullState newState)
-    )
+    ( updatedModel, Cmd.batch [ newPersonCmd, dumpStateToNewClientCmd ] )
 
 
-createPersonIfNeeded : SessionId -> ClientId -> Model -> ( Model, Cmd BackendMsg, PersonId )
+createPersonIfNeeded : L.SessionId -> L.ClientId -> Model -> ( Model, Cmd BackendMsg, PersonId )
 createPersonIfNeeded sessionId clientId model =
     case Dict.get sessionId model.sessionIdToPersonId of
-        Just personId ->
-            ( model, Cmd.none, personId )
+        Just existingPersonId ->
+            ( model, Cmd.none, existingPersonId )
 
         Nothing ->
             createPerson clientId model
 
 
-createPerson : ClientId -> Model -> ( Model, Cmd BackendMsg, PersonId )
+createPerson : L.ClientId -> Model -> ( Model, Cmd BackendMsg, PersonId )
 createPerson clientId model =
     let
         ( newPersonId, incModel ) =
@@ -138,47 +119,21 @@ type alias CreateDirtArgs =
 
 createDirt : CreateDirtArgs -> Model -> ( Model, Cmd BackendMsg )
 createDirt args model =
-    -- todo: we manaually tweak the dirtDict here for no good reason. We should just use the GameState functions.
     let
+        ( newId, incrementedModel ) =
+            getAndIncrementBiggestId model
+
         newDirt : GameObjectTypes.DirtData
         newDirt =
-            { position = args.point, amount = args.amount, id = GameObjectTypes.DirtId model.biggestId }
+            { position = args.point, amount = args.amount, id = GameObjectTypes.DirtId newId }
 
-        newDirtDict =
-            DirtDict.insert newDirt.id newDirt model.gameState.dirtDict
-
-        newGameState =
-            updateGameStateDirtDict newDirtDict model.gameState
-
-        incrementedModel =
-            incrementBiggestId model
+        ( finalModel, _ ) =
+            executeActionOnModel incrementedModel (AddDirt newDirt)
     in
-    ( { incrementedModel | gameState = newGameState }, Lamdera.broadcast (OtherClientPerformedAction Server (AddDirt newDirt)) )
+    ( finalModel, L.broadcast (OtherClientPerformedAction Server (AddDirt newDirt)) )
 
 
-incrementBiggestId : Model -> Model
-incrementBiggestId model =
-    { model | biggestId = model.biggestId + 1 }
-
-
-getAndIncrementBiggestId : Model -> ( Int, Model )
-getAndIncrementBiggestId model =
-    ( model.biggestId, incrementBiggestId model )
-
-
-{-| Return a "random enough" number.
-todo: use the actual random Generator instead
--}
-getRandomValue : Model -> ( Int, Model )
-getRandomValue model =
-    let
-        nextRandom =
-            modBy 2301875097 (model.bigRandom * 348987 + 174039)
-    in
-    ( model.bigRandom, { model | bigRandom = nextRandom } )
-
-
-updateFromFrontend : SessionId -> ClientId -> ToBackend -> Model -> ( Model, Cmd BackendMsg )
+updateFromFrontend : L.SessionId -> L.ClientId -> ToBackend -> Model -> ( Model, Cmd BackendMsg )
 updateFromFrontend _ clientId msg model =
     -- todo: currently we allow anybody to do anything. Need to check "legality" of action (a client could
     -- currently move other characters, for instance)
@@ -206,7 +161,7 @@ updateFromFrontend _ clientId msg model =
                   forwardToEveryoneButMe actionOnGamestate clientId model
 
                 -- but even "I" need to know about the backend trigger fired by "my" action
-                , Lamdera.broadcast (OtherClientPerformedAction Server actionsFromTrigger)
+                , L.broadcast (OtherClientPerformedAction Server actionsFromTrigger)
                 ]
             )
 
@@ -229,22 +184,10 @@ updateFromFrontend _ clientId msg model =
             in
             ( newModel2
             , Cmd.batch
-                [ Lamdera.broadcast (OtherClientPerformedAction Server actionsFromActivation)
-                , Lamdera.broadcast (OtherClientPerformedAction Server actionsFromTrigger)
+                [ L.broadcast (OtherClientPerformedAction Server actionsFromActivation)
+                , L.broadcast (OtherClientPerformedAction Server actionsFromTrigger)
                 ]
             )
-
-
-executeBackendTrigger : BackendTrigger -> Model -> ( Model, ActionOnGamestate )
-executeBackendTrigger trigger model =
-    let
-        ( newModel, newAction ) =
-            updateModelFromTrigger trigger model
-
-        ( finalModel, _ ) =
-            executeActionOnModel newModel newAction
-    in
-    ( finalModel, newAction )
 
 
 {-| Given a backend trigger, update the model and return the action that should be performed on the gamestate.
@@ -276,12 +219,10 @@ getRandomRelicRarityAndType model =
             getRandomValue newModel
 
         randomType =
-            relicTypeRoll randomTypeValue
+            Relic.relicTypeRoll randomTypeValue
 
         maybeRarity =
-            randomRarity
-                |> modBy 100
-                |> rarityRoll
+            Relic.rarityRoll randomRarity
     in
     ( maybeRarity, randomType, newModel2 )
 
@@ -318,60 +259,6 @@ addRelic position relicType rarity model =
     ( incModel, AddRelic newRelic )
 
 
-{-| Roll for the rarity of a relic.
-NOTE: this is also where we check if the player gets a relic at all. `Nothing` means no relic dropped.
--}
-rarityRoll : Int -> Maybe GameObjectTypes.RelicRarity
-rarityRoll randomValue =
-    if randomValue < 2 then
-        Just GameObjectTypes.Legendary
-
-    else if randomValue < 10 then
-        Just GameObjectTypes.Epic
-
-    else if randomValue < 20 then
-        Just GameObjectTypes.Rare
-
-    else if randomValue < 50 then
-        Just GameObjectTypes.Uncommon
-
-    else if randomValue < 70 then
-        Just GameObjectTypes.Common
-
-    else
-        Nothing
-
-
-relicWeights : List ( Int, GameObjectTypes.RelicType )
-relicWeights =
-    [ ( 60, GameObjectTypes.CleanFast )
-    , ( 5, GameObjectTypes.DropAndDouble [] )
-    , ( 30, GameObjectTypes.MoreXP )
-    ]
-
-
-relicTypeRoll : Int -> GameObjectTypes.RelicType
-relicTypeRoll rawRandomValue =
-    let
-        totalWeights =
-            List.sum (List.map Tuple.first relicWeights)
-
-        randomValue =
-            modBy totalWeights rawRandomValue
-    in
-    List.foldl
-        (\( weight, relicType ) ( acc, chosenRelicType ) ->
-            if acc < randomValue then
-                ( acc + weight, relicType )
-
-            else
-                ( acc, chosenRelicType )
-        )
-        ( 0, GameObjectTypes.CleanFast )
-        relicWeights
-        |> Tuple.second
-
-
 debugAddRelic : Model -> ( Model, Cmd BackendMsg )
 debugAddRelic model =
     let
@@ -387,13 +274,13 @@ debugAddRelic model =
             , exp = 0
             }
 
-        newRelicDict =
-            RelicDict.insert newRelic.id newRelic model.gameState.relicDict
+        action =
+            AddRelic newRelic
 
-        newModel =
-            { incModel | gameState = updateGameStateRelicDict newRelicDict incModel.gameState }
+        ( newModel, _ ) =
+            executeActionOnModel incModel action
     in
-    ( newModel, Lamdera.broadcast (OtherClientPerformedAction Server (AddRelic newRelic)) )
+    ( newModel, L.broadcast (OtherClientPerformedAction Server (AddRelic newRelic)) )
 
 
 addSomeDirt : Model -> ( Model, Cmd BackendMsg )
@@ -427,35 +314,64 @@ andThenAddDirtToSpot point ( model, msg ) =
 
 addDirtToSpot : GameObjectTypes.Point -> Int -> Model -> ( Model, Cmd BackendMsg )
 addDirtToSpot point amount model =
-    let
-        existingDirt =
-            GameObject.getDirtAtLocation point model.gameState.dirtDict
-    in
-    case existingDirt of
-        Nothing ->
-            createDirt { point = point, amount = amount } model
-
-        Just dirt ->
-            changeDirtAmount dirt model amount
+    createDirt { point = point, amount = amount } model
 
 
-changeDirtAmount : GameObjectTypes.DirtData -> Model -> Int -> ( Model, Cmd BackendMsg )
-changeDirtAmount dirt model amount =
-    let
-        newDirtDict =
-            DirtDict.insert dirt.id { dirt | amount = amount } model.gameState.dirtDict
 
-        newModel =
-            { model | gameState = updateGameStateDirtDict newDirtDict model.gameState }
-    in
-    ( newModel
-    , Lamdera.broadcast (OtherClientPerformedAction Server (ChangeDirtAmount dirt.id amount))
-    )
+--- Commonly used utilities ----
 
 
-forwardToEveryoneButMe : ActionOnGamestate -> ClientId -> Model -> Cmd BackendMsg
+getAndIncrementBiggestId : Model -> ( Int, Model )
+getAndIncrementBiggestId model =
+    ( model.biggestId, { model | biggestId = model.biggestId + 1 } )
+
+
+forwardToEveryoneButMe : ActionOnGamestate -> L.ClientId -> Model -> Cmd BackendMsg
 forwardToEveryoneButMe action myClientId model =
     model.connectedClients
         |> List.filter (\c -> c /= myClientId)
-        |> List.map (\id -> sendToFrontend id (OtherClientPerformedAction (Client id) action))
+        |> List.map (\id -> L.sendToFrontend id (OtherClientPerformedAction (Client id) action))
         |> Cmd.batch
+
+
+executeBackendTrigger : BackendTrigger -> Model -> ( Model, ActionOnGamestate )
+executeBackendTrigger trigger model =
+    let
+        ( newModel, newAction ) =
+            updateModelFromTrigger trigger model
+
+        ( finalModel, _ ) =
+            executeActionOnModel newModel newAction
+    in
+    ( finalModel, newAction )
+
+
+{-| Return a "random enough" number.
+todo: use the actual random Generator instead
+-}
+getRandomValue : Model -> ( Int, Model )
+getRandomValue model =
+    let
+        nextRandom =
+            modBy 2301875097 (model.bigRandom * 348987 + 174039)
+    in
+    ( model.bigRandom, { model | bigRandom = nextRandom } )
+
+
+andThenModel : (Model -> ( Model, Cmd msg )) -> ( Model, Cmd msg ) -> ( Model, Cmd msg )
+andThenModel updateFunc ( model, cmd ) =
+    let
+        ( newModel, newCmd ) =
+            updateFunc model
+    in
+    ( newModel, Cmd.batch [ newCmd, cmd ] )
+
+
+executeActionOnModel : Model -> ActionOnGamestate -> ( Model, BackendTrigger )
+executeActionOnModel model action =
+    let
+        ( newGameState, backendTrigger ) =
+            model.gameState
+                |> executeActionOnGameState action
+    in
+    ( { model | gameState = newGameState }, backendTrigger )

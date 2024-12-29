@@ -26,3 +26,7 @@ body, html {
     from { background-position: 0px; }
     to { background-position: 150px; }  /* Total width of spritesheet */
 }
+
+dialog::backdrop {
+    background-color: rgba(0, 0, 0, 0.5);
+}

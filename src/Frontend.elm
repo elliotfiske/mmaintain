@@ -269,9 +269,11 @@ update msg model =
                     Task.attempt (\_ -> NoOpFrontendMsg) (Browser.Dom.focus "main-map")
 
                 newModel =
-                    modelResettingTarget model
+                    model
+                        |> modelUpdateTarget Nothing
+                        |> updateModelWithAction action
             in
-            ( updateModelWithAction action newModel, Cmd.batch [ Lamdera.sendToBackend (ClientPerformsAction action), refocus ] )
+            ( newModel, Cmd.batch [ Lamdera.sendToBackend (ClientPerformsAction action), refocus ] )
 
         ActivatedRelic myId relicId ->
             -- todo: set "loading" state, since this is a backend-authoritative action and it could take time
@@ -287,19 +289,14 @@ update msg model =
             moveMeTowardsMyTargetIfAny model
 
         ClickTarget point ->
-            case model.state of
-                Playing state ->
-                    ( { model | state = Playing { state | targetPosition = Just point } }, Cmd.none )
-
-                _ ->
-                    ( model, Cmd.none )
+            ( modelUpdateTarget (Just point) model, Cmd.none )
 
 
-modelResettingTarget : Model -> Model
-modelResettingTarget model =
+modelUpdateTarget : Maybe GameObjectTypes.Point -> Model -> Model
+modelUpdateTarget maybePoint model =
     case model.state of
         Playing state ->
-            { model | state = Playing { state | targetPosition = Nothing } }
+            { model | state = Playing { state | targetPosition = maybePoint } }
 
         _ ->
             model
@@ -414,10 +411,27 @@ renderModel model =
             renderPlayingState playingState
 
 
+renderPlayingState : FrontendPlayingState -> Html.Html FrontendMsg
+renderPlayingState state =
+    case assembleFrontendModel state of
+        ValidFrontendModel validFrontendModelData ->
+            Html.div [ class "h-full" ]
+                [ debugStuff state
+                , renderModals state validFrontendModelData
+                , Html.div [ class "flex justify-end h-full" ]
+                    [ renderMap state
+                    , renderMyHUD state validFrontendModelData
+                    ]
+                ]
+
+        InvalidFrontendModel errorMessage ->
+            Html.text ("Error assembling model: " ++ errorMessage)
+
+
 renderModals : FrontendPlayingState -> ValidFrontendModelData -> Html.Html FrontendMsg
 renderModals state model =
     if DirtDict.size state.gameState.dirtDict == 0 then
-        node "dialog"
+        node "modal-dialog"
             [ id "my_modal_1"
             , class "modal"
             , attribute "open" "true"
@@ -446,13 +460,17 @@ renderModals state model =
                     [ Html.form
                         [ method "dialog"
                         ]
-                        [ {- if there is a button in form, it will close the modal -}
+                        [ {- if there is a button in a form, it will close the modal -}
                           button
                             [ class "btn btn-primary"
                             , Html.Events.onClick
                                 ClickedPleaseMakeMeDirty
                             ]
                             [ text "I'M NOT DONE, ADD MORE DIRT!" ]
+                        , button
+                            [ class "btn btn-primary"
+                            ]
+                            [ text "example button" ]
                         ]
                     ]
                 ]
@@ -460,23 +478,6 @@ renderModals state model =
 
     else
         text ""
-
-
-renderPlayingState : FrontendPlayingState -> Html.Html FrontendMsg
-renderPlayingState state =
-    case assembleFrontendModel state of
-        ValidFrontendModel validFrontendModelData ->
-            Html.div [ class "h-full" ]
-                [ debugStuff state
-                , renderModals state validFrontendModelData
-                , Html.div [ class "flex justify-end h-full" ]
-                    [ renderMap state
-                    , renderMyHUD state validFrontendModelData
-                    ]
-                ]
-
-        InvalidFrontendModel errorMessage ->
-            Html.text ("Error assembling model: " ++ errorMessage)
 
 
 renderMyHUD : FrontendPlayingState -> ValidFrontendModelData -> Html.Html FrontendMsg
