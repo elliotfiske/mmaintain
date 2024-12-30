@@ -72,9 +72,7 @@ handleClientConnected sessionId clientId model =
         newState : FrontendPlayingState
         newState =
             { gameState = updatedModel.gameState
-
-            -- not real
-            , me = { person = GameObject.createPerson personId "hola", heldRelics = [] }
+            , myId = personId
             , targetPosition = Nothing
             }
 
@@ -107,7 +105,7 @@ createPerson clientId model =
             AddPerson newPerson
 
         ( finalModel, _ ) =
-            executeActionOnModel incModel createPersonAction
+            executeActionOnModel (Client (PersonId newPersonId)) incModel createPersonAction
     in
     ( finalModel
     , forwardToEveryoneButMe createPersonAction clientId model
@@ -130,13 +128,40 @@ createDirt args model =
             { position = args.point, amount = args.amount, id = GameObjectTypes.DirtId newId }
 
         ( finalModel, _ ) =
-            executeActionOnModel incrementedModel (AddDirt newDirt)
+            executeActionOnModel Server incrementedModel (AddDirt newDirt)
     in
     ( finalModel, L.broadcast (OtherClientPerformedAction Server (AddDirt newDirt)) )
 
 
+handleClientPerformedAction : PersonId -> L.ClientId -> ActionOnGamestate -> Model -> ( Model, Cmd BackendMsg )
+handleClientPerformedAction personId clientId actionOnGamestate model =
+    let
+        ( newGameState, trigger ) =
+            model.gameState
+                |> executeActionOnGameState (Client personId) actionOnGamestate
+
+        newModel =
+            { model | gameState = newGameState }
+
+        -- Updates model with the triggered "Backend Triggers" and potentially send a new action to send back to the client.
+        --   This will include the original client!
+        ( newerModel, actionsFromTrigger ) =
+            -- todo: "Server" is incorrect here (placeholder)
+            executeBackendTrigger Server trigger newModel
+    in
+    ( newerModel
+    , Cmd.batch
+        [ -- "everyone but me" needs to know about the action "I" performed
+          forwardToEveryoneButMe actionOnGamestate clientId model
+
+        -- but even "I" need to know about the backend trigger fired by "my" action
+        , L.broadcast (OtherClientPerformedAction Server actionsFromTrigger)
+        ]
+    )
+
+
 updateFromFrontend : L.SessionId -> L.ClientId -> ToBackend -> Model -> ( Model, Cmd BackendMsg )
-updateFromFrontend _ clientId msg model =
+updateFromFrontend sessionId clientId msg model =
     -- todo: currently we allow anybody to do anything. Need to check "legality" of action (a client could
     -- currently move other characters, for instance)
     case msg of
@@ -145,27 +170,15 @@ updateFromFrontend _ clientId msg model =
 
         ClientPerformsAction actionOnGamestate ->
             let
-                ( newGameState, trigger ) =
-                    model.gameState
-                        |> executeActionOnGameState actionOnGamestate
-
-                newModel =
-                    { model | gameState = newGameState }
-
-                -- Updates model with the triggered "Backend Triggers" and potentially send a new action to send back to the client.
-                --   This will include the original client!
-                ( newerModel, actionsFromTrigger ) =
-                    executeBackendTrigger trigger newModel
+                maybePersonId =
+                    Dict.get sessionId model.sessionIdToPersonId
             in
-            ( newerModel
-            , Cmd.batch
-                [ -- "everyone but me" needs to know about the action "I" performed
-                  forwardToEveryoneButMe actionOnGamestate clientId model
+            case maybePersonId of
+                Nothing ->
+                    ( model, Cmd.none )
 
-                -- but even "I" need to know about the backend trigger fired by "my" action
-                , L.broadcast (OtherClientPerformedAction Server actionsFromTrigger)
-                ]
-            )
+                Just personId ->
+                    handleClientPerformedAction personId clientId actionOnGamestate model
 
         PleaseMakeMeDirty ->
             addSomeDirt model
@@ -179,10 +192,10 @@ updateFromFrontend _ clientId msg model =
                     Relic.createActionOnGameStateFromRelicActivation personId relicId model.gameState
 
                 ( newModel, relicBackendTriggers ) =
-                    executeActionOnModel model actionsFromActivation
+                    executeActionOnModel (Client personId) model actionsFromActivation
 
                 ( newModel2, actionsFromTrigger ) =
-                    executeBackendTrigger relicBackendTriggers newModel
+                    executeBackendTrigger (Client personId) relicBackendTriggers newModel
             in
             ( newModel2
             , Cmd.batch
@@ -209,6 +222,10 @@ updateModelFromTrigger trigger model =
 
         ClearedPollution personId dirtData ->
             doRelicRoll personId dirtData model
+
+        NuhUh personId ->
+            -- TODO: Unimplemented
+            ( model, GameStateNoOp )
 
 
 getRandomRelicRarityAndType : Model -> ( Maybe GameObjectTypes.RelicRarity, GameObjectTypes.RelicType, Model )
@@ -253,12 +270,11 @@ addRelic position relicType rarity model =
         newRelic =
             { id = GameObjectTypes.RelicId newId
             , relicType = relicType
-            , position = GameObjectTypes.OnFloor position
             , rarity = rarity
             , exp = 0
             }
     in
-    ( incModel, AddRelic newRelic )
+    ( incModel, AddRelic newRelic position )
 
 
 debugAddRelic : Model -> ( Model, Cmd BackendMsg )
@@ -267,22 +283,24 @@ debugAddRelic model =
         ( newId, incModel ) =
             getAndIncrementBiggestId model
 
+        arbitraryPosition =
+            { x = 2, y = 2 }
+
         newRelic : GameObjectTypes.RelicData
         newRelic =
             { id = GameObjectTypes.RelicId newId
             , relicType = GameObjectTypes.DropAndDouble []
-            , position = GameObjectTypes.OnFloor { x = 2, y = 2 }
             , rarity = GameObjectTypes.Legendary
             , exp = 0
             }
 
         action =
-            AddRelic newRelic
+            AddRelic newRelic arbitraryPosition
 
         ( newModel, _ ) =
-            executeActionOnModel incModel action
+            executeActionOnModel Server incModel action
     in
-    ( newModel, L.broadcast (OtherClientPerformedAction Server (AddRelic newRelic)) )
+    ( newModel, L.broadcast (OtherClientPerformedAction Server action) )
 
 
 addSomeDirt : Model -> ( Model, Cmd BackendMsg )
@@ -332,18 +350,18 @@ forwardToEveryoneButMe : ActionOnGamestate -> L.ClientId -> Model -> Cmd Backend
 forwardToEveryoneButMe action myClientId model =
     model.connectedClients
         |> List.filter (\c -> c /= myClientId)
-        |> List.map (\id -> L.sendToFrontend id (OtherClientPerformedAction (Client id) action))
+        |> List.map (\id -> L.sendToFrontend id (OtherClientPerformedAction Server action))
         |> Cmd.batch
 
 
-executeBackendTrigger : BackendTrigger -> Model -> ( Model, ActionOnGamestate )
-executeBackendTrigger trigger model =
+executeBackendTrigger : ActionPerformer -> BackendTrigger -> Model -> ( Model, ActionOnGamestate )
+executeBackendTrigger performer trigger model =
     let
         ( newModel, newAction ) =
             updateModelFromTrigger trigger model
 
         ( finalModel, _ ) =
-            executeActionOnModel newModel newAction
+            executeActionOnModel performer newModel newAction
     in
     ( finalModel, newAction )
 
@@ -369,11 +387,11 @@ andThenModel updateFunc ( model, cmd ) =
     ( newModel, Cmd.batch [ newCmd, cmd ] )
 
 
-executeActionOnModel : Model -> ActionOnGamestate -> ( Model, BackendTrigger )
-executeActionOnModel model action =
+executeActionOnModel : ActionPerformer -> Model -> ActionOnGamestate -> ( Model, BackendTrigger )
+executeActionOnModel actorId model action =
     let
         ( newGameState, backendTrigger ) =
             model.gameState
-                |> executeActionOnGameState action
+                |> executeActionOnGameState actorId action
     in
     ( { model | gameState = newGameState }, backendTrigger )

@@ -75,7 +75,7 @@ type alias DirtData =
 
 
 type alias RelicData =
-    { id : RelicId, relicType : RelicType, position : RelicPosition, rarity : RelicRarity, exp : Int }
+    { id : RelicId, relicType : RelicType, rarity : RelicRarity, exp : Int }
 
 
 type RelicPosition
@@ -108,12 +108,16 @@ type Direction
     | DownRight
 
 
+
+-- TODO: Incorporate `ActionPerformer` straight into this type instead of passing it in parallel everywhere
+
+
 type ActionOnGamestate
     = MovePerson PersonId Direction
     | Clean PersonId DirtId
     | ChangeDirtAmount DirtId Int
     | AddDirt DirtData
-    | AddRelic RelicData
+    | AddRelic RelicData Point
     | AddPerson PersonData
     | PickUpRelic RelicId PersonId
     | DropRelic RelicId PersonId

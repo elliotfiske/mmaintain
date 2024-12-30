@@ -32,10 +32,18 @@ type alias PersonWithRelics =
     { person : PersonData, heldRelics : List RelicData }
 
 
+type alias RelicLocation =
+    ( Int, Int, Int )
+
+
+type alias RelicsByLocation =
+    Dict RelicLocation RealRelicDict
+
+
 type alias GameState =
     { personDict : PersonDict PersonData
-    , relicDict : RelicDict RelicData
     , dirtDict : RealDirtDict
+    , relicsByPosition : RelicsByLocation
     }
 
 
@@ -47,7 +55,7 @@ type alias FrontendModel =
 
 type alias FrontendPlayingState =
     { gameState : GameState
-    , me : PersonWithRelics
+    , myId : PersonId
     , targetPosition : Maybe Point
     }
 
@@ -71,6 +79,8 @@ type BackendTrigger
     = NoOpBackendTrigger
     | ClearedPollution PersonId DirtData
     | BatchTrigger (List BackendTrigger)
+      -- Player is out of sync with the backend and needs the full state sent down
+    | NuhUh PersonId
 
 
 type FrontendMsg
@@ -100,7 +110,7 @@ type BackendMsg
 
 
 type ActionPerformer
-    = Client ClientId
+    = Client PersonId
     | Server
 
 

@@ -1,5 +1,6 @@
 module GameObject exposing (..)
 
+import Dict exposing (Dict)
 import DirtDict exposing (DirtDict)
 import GameObjectTypes exposing (..)
 import PersonDict exposing (PersonDict)
@@ -106,14 +107,99 @@ directionToMoveFrom from to =
             Nothing
 
 
-pickUpRelic : PersonId -> RelicData -> RelicData
-pickUpRelic personId relic =
-    { relic | position = HeldBy personId }
+pickUpRelic : PersonId -> RelicId -> GameState -> ( GameState, Types.BackendTrigger )
+pickUpRelic takerId relicId state =
+    let
+        maybeTaker =
+            PersonDict.get takerId state.personDict
+
+        existingRelicsOnGround =
+            maybeTaker
+                |> Maybe.map (\taker -> getRelicsAtFloorPoint taker.position state)
+                |> Maybe.withDefault RelicDict.empty
+                |> Debug.log "Floor relics I'm taking from"
+
+        maybeTargetRelic =
+            RelicDict.get relicId existingRelicsOnGround
+                |> Debug.log "Relic I'm taking"
+    in
+    case ( maybeTaker, maybeTargetRelic ) of
+        ( Just taker, Just targetRelic ) ->
+            let
+                newState =
+                    moveRelicFromFloorToPlayer taker targetRelic existingRelicsOnGround state
+            in
+            ( newState, NoOpBackendTrigger )
+
+        _ ->
+            ( state, NuhUh takerId )
 
 
-dropRelic : PersonData -> RelicData -> RelicData
-dropRelic personData relicData =
-    { relicData | position = OnFloor personData.position }
+moveRelicFromFloorToPlayer : PersonData -> RelicData -> RealRelicDict -> GameState -> GameState
+moveRelicFromFloorToPlayer taker relicData floorDictToRemoveFrom state =
+    let
+        newFloorRelicDict =
+            RelicDict.remove relicData.id floorDictToRemoveFrom
+
+        existingHeldRelics =
+            Dict.get (Relic.playerHolderToLocation taker.id) state.relicsByPosition
+                |> Maybe.withDefault RelicDict.empty
+
+        newHeldRelics =
+            RelicDict.insert relicData.id relicData existingHeldRelics
+                |> Debug.log "New held relics"
+
+        newRelicsByPosition =
+            state.relicsByPosition
+                |> Dict.insert (Relic.playerHolderToLocation taker.id) newHeldRelics
+                |> Dict.insert (Relic.floorPointToLocation taker.position) newFloorRelicDict
+    in
+    { state | relicsByPosition = newRelicsByPosition }
+
+
+dropRelic : PersonId -> RelicId -> GameState -> ( GameState, Types.BackendTrigger )
+dropRelic dropperId relicId state =
+    let
+        maybeDropper =
+            PersonDict.get dropperId state.personDict
+
+        existingRelicsHeldByPlayer =
+            Relic.getRelicsHeldByPlayer dropperId state
+
+        maybeRelicBeingDropped =
+            RelicDict.get relicId existingRelicsHeldByPlayer
+    in
+    case ( maybeDropper, maybeRelicBeingDropped ) of
+        ( Just dropper, Just relic ) ->
+            let
+                newState =
+                    moveRelicFromPlayerToFloor dropper relic existingRelicsHeldByPlayer state
+            in
+            ( newState, NoOpBackendTrigger )
+
+        _ ->
+            ( state, NuhUh dropperId )
+
+
+moveRelicFromPlayerToFloor : PersonData -> RelicData -> RealRelicDict -> GameState -> GameState
+moveRelicFromPlayerToFloor dropper relicData heldDictToRemoveFrom state =
+    let
+        newHeldRelicDict =
+            RelicDict.remove relicData.id heldDictToRemoveFrom
+
+        existingFloorRelics =
+            Dict.get (Relic.floorPointToLocation dropper.position) state.relicsByPosition
+                |> Maybe.withDefault RelicDict.empty
+
+        newFloorRelics =
+            RelicDict.insert relicData.id relicData existingFloorRelics
+
+        newRelicsByPosition =
+            state.relicsByPosition
+                |> Dict.insert (Relic.playerHolderToLocation dropper.id) newHeldRelicDict
+                |> Dict.insert (Relic.floorPointToLocation dropper.position) newFloorRelics
+    in
+    { state | relicsByPosition = newRelicsByPosition }
 
 
 createPerson : PersonId -> String -> PersonData
@@ -196,21 +282,11 @@ getDirtAtLocation point dict =
         |> List.head
 
 
-relicIsAtLocation : GameObjectTypes.Point -> GameObjectTypes.RelicData -> Bool
-relicIsAtLocation positionToCheck relicData =
-    case relicData.position of
-        HeldBy _ ->
-            False
-
-        OnFloor floorPosition ->
-            floorPosition == positionToCheck
-
-
-getRelicAtLocation : GameObjectTypes.Point -> RealRelicDict -> Maybe RelicData
-getRelicAtLocation point dict =
-    dict
+getRarestRelicAtLocation : GameObjectTypes.Point -> GameState -> Maybe RelicData
+getRarestRelicAtLocation point state =
+    Dict.get (Relic.floorPointToLocation point) state.relicsByPosition
+        |> Maybe.withDefault RelicDict.empty
         |> RelicDict.values
-        |> List.filter (relicIsAtLocation point)
         |> List.sortBy byRelicRarity
         |> List.head
 
@@ -234,11 +310,19 @@ byRelicRarity relic =
             -4
 
 
-updateWithRelics : ActionOnGamestate -> GameState -> GameState
-updateWithRelics action state =
-    RelicDict.values state.relicDict
-        -- todo: only have held relics modify state (performance concern)
-        |> List.foldl (Relic.relicMiddleware action) state
+updateWithRelics : Types.ActionPerformer -> ActionOnGamestate -> GameState -> GameState
+updateWithRelics actorId action state =
+    case actorId of
+        Types.Server ->
+            -- Don't apply relic middleware for server actions
+            state
+
+        Types.Client personId ->
+            Dict.get (Relic.playerHolderToLocation personId) state.relicsByPosition
+                |> Maybe.withDefault RelicDict.empty
+                |> RelicDict.values
+                |> List.foldl (Relic.relicMiddleware action)
+                    state
 
 
 relicSlotThreshholds : List Int
@@ -309,12 +393,13 @@ addClearStats personId ( state, trigger ) =
             ( state, trigger )
 
 
-cleanStrengthForPlayer : RealRelicDict -> PersonData -> Int
-cleanStrengthForPlayer relics person =
+cleanStrengthForPlayer : GameState -> PersonData -> Int
+cleanStrengthForPlayer state person =
     let
         heldRelics =
-            RelicDict.values relics
-                |> List.filter (\relic -> relicHolder relic == Just person.id)
+            Dict.get (Relic.playerHolderToLocation person.id) state.relicsByPosition
+                |> Maybe.withDefault RelicDict.empty
+                |> RelicDict.values
 
         baseXP =
             toFloat (10 + Util.levelForExp person.experience)
@@ -357,7 +442,7 @@ playerEarnsExperience personId xpEarned state =
             let
                 xpAfterMultiplier =
                     toFloat xpEarned
-                        * Relic.xpMultiplierForPlayer state.relicDict player
+                        * Relic.xpMultiplierForPlayer state player
                         |> round
 
                 newPlayer =
@@ -388,7 +473,7 @@ internalExecuteActionOnGameState action state =
                             1
 
                         Just player ->
-                            cleanStrengthForPlayer state.relicDict player
+                            cleanStrengthForPlayer state player
             in
             state
                 |> addCleanStats personId
@@ -403,22 +488,10 @@ internalExecuteActionOnGameState action state =
             withNoOp { state | personDict = PersonDict.insert personData.id personData state.personDict }
 
         PickUpRelic relicId personId ->
-            withNoOp { state | relicDict = RelicDict.update relicId (Maybe.map (pickUpRelic personId)) state.relicDict }
+            pickUpRelic personId relicId state
 
         DropRelic relicId personId ->
-            let
-                maybeDropper =
-                    PersonDict.get personId state.personDict
-
-                maybeRelic =
-                    RelicDict.get relicId state.relicDict
-            in
-            case ( maybeDropper, maybeRelic ) of
-                ( Just dropper, Just relic ) ->
-                    withNoOp { state | relicDict = RelicDict.insert relicId (dropRelic dropper relic) state.relicDict }
-
-                _ ->
-                    withNoOp state
+            dropRelic personId relicId state
 
         ChangeDirtAmount dirtId int ->
             withNoOp { state | dirtDict = changeDirtAmount dirtId int state.dirtDict }
@@ -426,8 +499,16 @@ internalExecuteActionOnGameState action state =
         AddDirt dirtData ->
             withNoOp { state | dirtDict = DirtDict.insert dirtData.id dirtData state.dirtDict }
 
-        AddRelic relicData ->
-            withNoOp { state | relicDict = RelicDict.insert relicData.id relicData state.relicDict }
+        AddRelic relicData floorPoint ->
+            let
+                existingRelicDict =
+                    Dict.get (Relic.floorPointToLocation floorPoint) state.relicsByPosition
+                        |> Maybe.withDefault RelicDict.empty
+
+                newRelicDict =
+                    RelicDict.insert relicData.id relicData existingRelicDict
+            in
+            withNoOp { state | relicsByPosition = Dict.insert (Relic.floorPointToLocation floorPoint) newRelicDict state.relicsByPosition }
 
         GameStateNoOp ->
             withNoOp state
@@ -435,24 +516,32 @@ internalExecuteActionOnGameState action state =
         ActivateGenerosityTrap personId relicId numDoubles ->
             let
                 maybeRelic =
-                    RelicDict.get relicId state.relicDict
+                    Dict.get (Relic.playerHolderToLocation personId) state.relicsByPosition
+                        |> Maybe.withDefault RelicDict.empty
+                        |> RelicDict.get relicId
 
                 maybeFella =
                     PersonDict.get personId state.personDict
             in
             case ( maybeRelic, maybeFella ) of
                 ( Just relicData, Just fella ) ->
-                    withNoOp (activateGenerosityTrap relicData fella numDoubles state)
+                    case relicData.relicType of
+                        DropAndDouble _ ->
+                            withNoOp (activateGenerosityTrap relicData fella numDoubles state)
+
+                        _ ->
+                            -- User tried to activate Generosity on a relic that wasn't Generosity. Cheating???
+                            ( state, NuhUh personId )
 
                 _ ->
-                    withNoOp state
+                    ( state, NuhUh personId )
 
 
-executeActionOnGameState : ActionOnGamestate -> GameState -> ( GameState, Types.BackendTrigger )
-executeActionOnGameState actionOnGamestate state =
+executeActionOnGameState : Types.ActionPerformer -> ActionOnGamestate -> GameState -> ( GameState, Types.BackendTrigger )
+executeActionOnGameState who actionOnGamestate state =
     let
         stateAfterRelicMiddleware =
-            updateWithRelics actionOnGamestate state
+            updateWithRelics who actionOnGamestate state
     in
     internalExecuteActionOnGameState actionOnGamestate stateAfterRelicMiddleware
 
@@ -460,8 +549,15 @@ executeActionOnGameState actionOnGamestate state =
 activateGenerosityTrap : RelicData -> PersonData -> Int -> GameState -> GameState
 activateGenerosityTrap relicData personData numDoubles state =
     let
+        relicsHeldByPlayer =
+            Relic.getRelicsHeldByPlayer personData.id state
+
         newRelicDict =
-            RelicDict.remove relicData.id state.relicDict
+            RelicDict.remove relicData.id relicsHeldByPlayer
+
+        newRelicsByPosition =
+            state.relicsByPosition
+                |> Dict.insert (Relic.playerHolderToLocation personData.id) newRelicDict
 
         xpEarned =
             Relic.dropDoubleCurrentExperience relicData.rarity numDoubles
@@ -469,4 +565,4 @@ activateGenerosityTrap relicData personData numDoubles state =
         newState =
             playerEarnsExperience personData.id xpEarned state
     in
-    { newState | relicDict = newRelicDict }
+    { newState | relicsByPosition = newRelicsByPosition }

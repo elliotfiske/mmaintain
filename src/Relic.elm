@@ -1,5 +1,6 @@
 module Relic exposing (..)
 
+import Dict
 import GameObjectTypes exposing (..)
 import Html
 import Html.Attributes
@@ -98,16 +99,16 @@ relicBody state relic =
         DropAndDouble people ->
             let
                 alreadyDropped =
-                    List.member state.me.person.id people
+                    List.member state.myId people
 
                 baseExp =
                     dropDoubleCurrentExperience relic.rarity (List.length people)
 
                 me =
-                    PersonDict.get state.me.person.id state.gameState.personDict
+                    PersonDict.get state.myId state.gameState.personDict
 
                 playerXpMultiplier =
-                    Maybe.map (xpMultiplierForPlayer state.gameState.relicDict) me
+                    Maybe.map (xpMultiplierForPlayer state.gameState) me
                         |> Maybe.withDefault 1
                         |> round
 
@@ -125,7 +126,7 @@ relicBody state relic =
                             ""
                        )
                 )
-                ++ [ dropAndDoubleActivationButton state.me.person.id people relic.id
+                ++ [ dropAndDoubleActivationButton state.myId people relic.id
                    ]
 
 
@@ -204,22 +205,13 @@ dropDoubleCurrentExperience rarity droppedPeople =
     dropDoubleBaseExperience rarity * 2 ^ droppedPeople
 
 
-relicHolder : RelicData -> Maybe PersonId
-relicHolder relic =
-    case relic.position of
-        HeldBy personId ->
-            Just personId
-
-        OnFloor _ ->
-            Nothing
-
-
-xpMultiplierForPlayer : RealRelicDict -> PersonData -> Float
-xpMultiplierForPlayer relics person =
+xpMultiplierForPlayer : GameState -> PersonData -> Float
+xpMultiplierForPlayer state person =
     let
         heldRelics =
-            RelicDict.values relics
-                |> List.filter (\relic -> relicHolder relic == Just person.id)
+            Dict.get (playerHolderToLocation person.id) state.relicsByPosition
+                |> Maybe.withDefault RelicDict.empty
+                |> RelicDict.values
     in
     heldRelics
         |> List.foldl
@@ -265,21 +257,73 @@ handleDroppingDoubler relicId relic personId people state =
 
             newRelic =
                 { relic | relicType = DropAndDouble newPersonList }
-
-            newRelicDict =
-                RelicDict.insert relic.id newRelic state.relicDict
         in
-        { state | relicDict = newRelicDict }
+        updateRelicAtLocation (playerHolderToLocation personId) newRelic state
 
     else
         state
+
+
+playerHolderToLocation : PersonId -> RelicLocation
+playerHolderToLocation (PersonId rawId) =
+    ( -1, rawId, 0 )
+
+
+floorPointToLocation : Point -> RelicLocation
+floorPointToLocation { x, y } =
+    ( 0, x, y )
+
+
+getRelicsAtFloorPoint : Point -> GameState -> RealRelicDict
+getRelicsAtFloorPoint point state =
+    Dict.get (floorPointToLocation point) state.relicsByPosition
+        |> Maybe.withDefault RelicDict.empty
+
+
+getRelicsHeldByPlayer : PersonId -> GameState -> RealRelicDict
+getRelicsHeldByPlayer personId state =
+    Dict.get (playerHolderToLocation personId) state.relicsByPosition
+        |> Maybe.withDefault RelicDict.empty
+
+
+getRelicAtLocation : RelicLocation -> RelicId -> GameState -> Maybe RelicData
+getRelicAtLocation location relicId state =
+    Dict.get location state.relicsByPosition
+        |> Maybe.andThen (RelicDict.get relicId)
+
+
+updateRelicAtLocation : RelicLocation -> RelicData -> GameState -> GameState
+updateRelicAtLocation location relic state =
+    let
+        maybeRelicDict =
+            Dict.get location state.relicsByPosition
+
+        newRelicDict =
+            case maybeRelicDict of
+                Just relicDict ->
+                    RelicDict.insert relic.id relic relicDict
+
+                Nothing ->
+                    RelicDict.insert relic.id relic RelicDict.empty
+    in
+    { state | relicsByPosition = Dict.insert location newRelicDict state.relicsByPosition }
+
+
+relicLocationIsOnFloor : RelicLocation -> Bool
+relicLocationIsOnFloor ( floor, _, _ ) =
+    floor == 0
+
+
+floorRelicLocationToFloorPoint : RelicLocation -> Point
+floorRelicLocationToFloorPoint ( _, x, y ) =
+    { x = x, y = y }
 
 
 createActionOnGameStateFromRelicActivation : PersonId -> RelicId -> GameState -> ActionOnGamestate
 createActionOnGameStateFromRelicActivation activatorId relicId state =
     let
         maybeRelic =
-            RelicDict.get relicId state.relicDict
+            getRelicAtLocation (playerHolderToLocation activatorId) relicId state
 
         maybePerson =
             PersonDict.get activatorId state.personDict
@@ -301,7 +345,7 @@ maybeActivateRelic : PersonId -> RelicId -> GameState -> ( GameState, Types.Back
 maybeActivateRelic activatorId relicId state =
     let
         maybeRelic =
-            RelicDict.get relicId state.relicDict
+            getRelicAtLocation (playerHolderToLocation activatorId) relicId state
 
         maybePerson =
             PersonDict.get activatorId state.personDict

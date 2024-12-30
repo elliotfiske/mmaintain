@@ -28,5 +28,5 @@ customElements.define('modal-dialog',
 )
 
 exports.init = async function(app) {
-    console.log("I'm alive!!!")
+    console.log("Instantiated custom modal dialog component")
 }

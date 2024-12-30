@@ -30,96 +30,6 @@ type alias Model =
     FrontendModel
 
 
-type alias ValidFrontendModelData =
-    { relicsByPerson : PersonDict.PersonDict Types.PersonWithRelics }
-
-
-type AssembledFrontendModel
-    = ValidFrontendModel ValidFrontendModelData
-    | InvalidFrontendModel String
-
-
-assembleFrontendModel : FrontendPlayingState -> AssembledFrontendModel
-assembleFrontendModel state =
-    case assembleRelicsByPerson state of
-        Err message ->
-            InvalidFrontendModel message
-
-        Ok relicsByPerson ->
-            ValidFrontendModel { relicsByPerson = relicsByPerson }
-
-
-type alias AssembleRelicsByPersonStep =
-    Result String (PersonDict.PersonDict PersonWithRelics)
-
-
-assembleRelicsByPerson : FrontendPlayingState -> Result String (PersonDict.PersonDict PersonWithRelics)
-assembleRelicsByPerson state =
-    state.gameState.relicDict
-        |> RelicDict.values
-        |> List.foldl (tryUpdatingRelicHolderDict state.gameState.personDict) (Ok (emptyRelicsByPerson state))
-
-
-emptyRelicsByPerson : FrontendPlayingState -> PersonDict.PersonDict PersonWithRelics
-emptyRelicsByPerson state =
-    state.gameState.personDict
-        |> PersonDict.values
-        |> List.foldl (\p d -> PersonDict.insert p.id { person = p, heldRelics = [] } d) PersonDict.empty
-
-
-tryUpdatingRelicHolderDict : RealPersonDict -> GameObjectTypes.RelicData -> AssembleRelicsByPersonStep -> AssembleRelicsByPersonStep
-tryUpdatingRelicHolderDict people relicData dictSoFarResult =
-    let
-        relicHolderResult =
-            tryGetRelicHolder people relicData
-    in
-    Result.map2 (addRelicToHolderDict relicData) relicHolderResult dictSoFarResult
-
-
-tryGetRelicHolder : RealPersonDict -> GameObjectTypes.RelicData -> Result String (Maybe PersonData)
-tryGetRelicHolder people relicData =
-    case relicData.position of
-        GameObjectTypes.HeldBy personId ->
-            case PersonDict.get personId people of
-                Nothing ->
-                    Err
-                        ("Relic with ID "
-                            ++ relicIdToString relicData.id
-                            ++ " thinks it is held by person with ID "
-                            ++ GameObjectTypes.personIdToString personId
-                            ++ ", but no such person was found in the PersonDict."
-                        )
-
-                Just holder ->
-                    Ok (Just holder)
-
-        GameObjectTypes.OnFloor _ ->
-            Ok Nothing
-
-
-addRelicToHolderDict :
-    GameObjectTypes.RelicData
-    -> Maybe PersonData
-    -> PersonDict.PersonDict PersonWithRelics
-    -> PersonDict.PersonDict PersonWithRelics
-addRelicToHolderDict relicData maybeHolder dictSoFar =
-    case maybeHolder of
-        Nothing ->
-            dictSoFar
-
-        Just holder ->
-            case PersonDict.get holder.id dictSoFar of
-                Nothing ->
-                    PersonDict.insert holder.id { person = holder, heldRelics = [ relicData ] } dictSoFar
-
-                Just existingList ->
-                    let
-                        updatedList =
-                            { existingList | heldRelics = relicData :: existingList.heldRelics }
-                    in
-                    PersonDict.insert holder.id updatedList dictSoFar
-
-
 app =
     Lamdera.frontend
         { init = init
@@ -136,8 +46,23 @@ subscriptions : Model -> Sub FrontendMsg
 subscriptions model =
     Sub.batch
         [ onKeyDown (keyDecoder model)
-        , Time.every 50 Tick
+        , maybeFireEveryTick model
         ]
+
+
+maybeFireEveryTick : Model -> Sub FrontendMsg
+maybeFireEveryTick model =
+    case model.state of
+        Playing playingState ->
+            case playingState.targetPosition of
+                Just _ ->
+                    Time.every 50 Tick
+
+                Nothing ->
+                    Sub.none
+
+        _ ->
+            Sub.none
 
 
 keyDecoder : Model -> Decode.Decoder FrontendMsg
@@ -160,43 +85,38 @@ toKey model str =
 
 handleKey : FrontendPlayingState -> String -> FrontendMsg
 handleKey state key =
-    case assembleFrontendModel state of
-        ValidFrontendModel assembledModel ->
-            case key of
-                "w" ->
-                    PerformAction (MovePerson state.me.person.id Up)
+    case key of
+        "w" ->
+            PerformAction (MovePerson state.myId Up)
 
-                "s" ->
-                    PerformAction (MovePerson state.me.person.id Down)
+        "s" ->
+            PerformAction (MovePerson state.myId Down)
 
-                "a" ->
-                    PerformAction (MovePerson state.me.person.id Left)
+        "a" ->
+            PerformAction (MovePerson state.myId Left)
 
-                "d" ->
-                    PerformAction (MovePerson state.me.person.id Right)
+        "d" ->
+            PerformAction (MovePerson state.myId Right)
 
-                "ArrowUp" ->
-                    PerformAction (MovePerson state.me.person.id Up)
+        "ArrowUp" ->
+            PerformAction (MovePerson state.myId Up)
 
-                "ArrowDown" ->
-                    PerformAction (MovePerson state.me.person.id Down)
+        "ArrowDown" ->
+            PerformAction (MovePerson state.myId Down)
 
-                "ArrowLeft" ->
-                    PerformAction (MovePerson state.me.person.id Left)
+        "ArrowLeft" ->
+            PerformAction (MovePerson state.myId Left)
 
-                "ArrowRight" ->
-                    PerformAction (MovePerson state.me.person.id Right)
+        "ArrowRight" ->
+            PerformAction (MovePerson state.myId Right)
 
-                "r" ->
-                    DebugGenerateRelic
+        "r" ->
+            DebugGenerateRelic
 
-                " " ->
-                    PerformAction (tryCleaning state assembledModel)
+        " " ->
+            PerformAction (tryCleaning state)
 
-                _ ->
-                    NoOpFrontendMsg
-
-        InvalidFrontendModel _ ->
+        _ ->
             NoOpFrontendMsg
 
 
@@ -231,8 +151,9 @@ update msg model =
 
                 newModel =
                     model
+                        -- if the player hits any key, cancel moving to the clicked target
                         |> modelUpdateTarget Nothing
-                        |> updateModelWithAction action
+                        |> updateModelWithActionFromMyself action
             in
             ( newModel, Cmd.batch [ Lamdera.sendToBackend (ClientPerformsAction action), refocus ] )
 
@@ -284,34 +205,45 @@ moveMeTowardsMyTargetIfAny model =
 
 moveMeTowardsTargetPoint : FrontendPlayingState -> ( FrontendPlayingState, Cmd FrontendMsg )
 moveMeTowardsTargetPoint state =
-    case ( state.targetPosition, PersonDict.get state.me.person.id state.gameState.personDict ) of
+    case ( state.targetPosition, PersonDict.get state.myId state.gameState.personDict ) of
         ( Just target, Just me ) ->
             let
                 direction =
                     GameObject.directionToMoveFrom me.position target
-
-                maybeAction =
-                    Maybe.map (MovePerson state.me.person.id) direction
-
-                ( newState, action ) =
-                    case maybeAction of
-                        Just a ->
-                            ( updateStateWithAction a state, Lamdera.sendToBackend (ClientPerformsAction a) )
-
-                        Nothing ->
-                            ( state, Cmd.none )
             in
-            ( newState, action )
+            case direction of
+                Just dir ->
+                    let
+                        ( newState, action ) =
+                            ( updateStateWithAction (Client state.myId) (MovePerson state.myId dir) state
+                            , Lamdera.sendToBackend (ClientPerformsAction (MovePerson state.myId dir))
+                            )
+                    in
+                    ( newState, action )
+
+                Nothing ->
+                    -- we're already at the target
+                    ( { state | targetPosition = Nothing }, Cmd.none )
 
         _ ->
             ( state, Cmd.none )
 
 
-updateModelWithAction : ActionOnGamestate -> Model -> Model
-updateModelWithAction actionOnGamestate model =
+updateModelWithActionFromMyself : ActionOnGamestate -> Model -> Model
+updateModelWithActionFromMyself actionOnGamestate model =
+    case model.state of
+        Playing playingState ->
+            updateModelWithAction (Client playingState.myId) actionOnGamestate model
+
+        _ ->
+            model
+
+
+updateModelWithAction : ActionPerformer -> ActionOnGamestate -> Model -> Model
+updateModelWithAction who actionOnGamestate model =
     case model.state of
         Playing playState ->
-            { model | state = Playing (updateStateWithAction actionOnGamestate playState) }
+            { model | state = Playing (updateStateWithAction who actionOnGamestate playState) }
 
         Loading ->
             -- TODO: action came down when the app was still loading. We assume this can't happen – it
@@ -324,11 +256,11 @@ updateModelWithAction actionOnGamestate model =
             model
 
 
-updateStateWithAction : ActionOnGamestate -> FrontendPlayingState -> FrontendPlayingState
-updateStateWithAction action prevState =
+updateStateWithAction : ActionPerformer -> ActionOnGamestate -> FrontendPlayingState -> FrontendPlayingState
+updateStateWithAction who action prevState =
     let
         ( newState, _ ) =
-            GameObject.executeActionOnGameState action prevState.gameState
+            GameObject.executeActionOnGameState who action prevState.gameState
     in
     { prevState | gameState = newState }
 
@@ -342,8 +274,8 @@ updateFromBackend msg model =
         UpdateFullState frontendState ->
             ( { model | state = Playing frontendState }, Cmd.none )
 
-        OtherClientPerformedAction _ action ->
-            ( updateModelWithAction action model, Cmd.none )
+        OtherClientPerformedAction who action ->
+            ( updateModelWithAction who action model, Cmd.none )
 
 
 view : Model -> Browser.Document FrontendMsg
@@ -369,25 +301,35 @@ renderModel model =
             renderPlayingState playingState
 
 
+extractMyself : FrontendPlayingState -> Maybe PersonData
+extractMyself state =
+    case PersonDict.get state.myId state.gameState.personDict of
+        Just myself ->
+            Just myself
+
+        Nothing ->
+            Nothing
+
+
 renderPlayingState : FrontendPlayingState -> Html.Html FrontendMsg
 renderPlayingState state =
-    case assembleFrontendModel state of
-        ValidFrontendModel validFrontendModelData ->
+    case extractMyself state of
+        Just me ->
             Html.div [ class "h-full" ]
                 [ debugStuff state
-                , renderModals state validFrontendModelData
+                , renderModals state me
                 , Html.div [ class "flex justify-end h-full" ]
                     [ renderMap state
-                    , renderMyHUD state validFrontendModelData
+                    , renderMyHUD state me
                     ]
                 ]
 
-        InvalidFrontendModel errorMessage ->
-            Html.text ("Error assembling model: " ++ errorMessage)
+        Nothing ->
+            Html.text ("I couldn't find YOU in the dictionary of players. Your ID is " ++ GameObjectTypes.personIdToString state.myId)
 
 
-renderModals : FrontendPlayingState -> ValidFrontendModelData -> Html.Html FrontendMsg
-renderModals state model =
+renderModals : FrontendPlayingState -> PersonData -> Html.Html FrontendMsg
+renderModals state me =
     if DirtDict.size state.gameState.dirtDict == 0 then
         node "modal-dialog"
             [ id "my_modal_1"
@@ -407,9 +349,9 @@ renderModals state model =
                     ]
                     [ text
                         ("Congratulations, the park is clean! You did this many clean actions: "
-                            ++ String.fromInt state.me.person.stats.cleanCount
+                            ++ String.fromInt me.stats.cleanCount
                             ++ " and you finished off this many pollution patches: "
-                            ++ String.fromInt state.me.person.stats.clearCount
+                            ++ String.fromInt me.stats.clearCount
                         )
                     ]
                 , div
@@ -438,14 +380,14 @@ renderModals state model =
         text ""
 
 
-renderMyHUD : FrontendPlayingState -> ValidFrontendModelData -> Html.Html FrontendMsg
-renderMyHUD state assembledModel =
+renderMyHUD : FrontendPlayingState -> PersonData -> Html.Html FrontendMsg
+renderMyHUD state me =
     Html.div [ class "flex flex-col items-center h-full bg-base-100 mx-3" ]
-        [ renderXP state.me.person
-        , renderExpProgress state
-        , renderCleanStrength state assembledModel
-        , renderXPMultiplier state assembledModel
-        , renderHeldRelics state assembledModel
+        [ renderXP me
+        , renderExpProgress me
+        , renderCleanStrength state me
+        , renderXPMultiplier state me
+        , renderHeldRelics state me
         ]
 
 
@@ -458,16 +400,16 @@ debugStuff state =
 
 
 debugDicts : FrontendPlayingState -> Html.Html FrontendMsg
-debugDicts { gameState, me } =
+debugDicts { gameState, myId } =
     Html.text
         ("PersonDict: "
             ++ String.fromInt (PersonDict.size gameState.personDict)
-            ++ "\nRelicDict: "
-            ++ String.fromInt (RelicDict.size gameState.relicDict)
+            ++ "\nRelics By Position Dict: "
+            ++ String.fromInt (Dict.size gameState.relicsByPosition)
             ++ "\nDirtDict: "
             ++ String.fromInt (DirtDict.size gameState.dirtDict)
             ++ "\nMyId: "
-            ++ GameObjectTypes.personIdToString me.person.id
+            ++ GameObjectTypes.personIdToString myId
         )
 
 
@@ -508,11 +450,11 @@ levelProgressBar person =
         ]
 
 
-renderCleanStrength : FrontendPlayingState -> ValidFrontendModelData -> Html.Html FrontendMsg
-renderCleanStrength state modelData =
+renderCleanStrength : FrontendPlayingState -> PersonData -> Html.Html FrontendMsg
+renderCleanStrength state me =
     let
         strength =
-            GameObject.cleanStrengthForPlayer state.gameState.relicDict state.me.person
+            GameObject.cleanStrengthForPlayer state.gameState me
     in
     Html.div [ class "w-full prose" ]
         [ Html.h3 [ class "text-center" ]
@@ -520,14 +462,14 @@ renderCleanStrength state modelData =
         ]
 
 
-renderExpProgress : FrontendPlayingState -> Html.Html FrontendMsg
-renderExpProgress state =
+renderExpProgress : PersonData -> Html.Html FrontendMsg
+renderExpProgress me =
     let
         myLevel =
-            Util.levelForExp state.me.person.experience
+            Util.levelForExp me.experience
 
         myExp =
-            state.me.person.experience
+            me.experience
 
         myNextLevelExp : Int
         myNextLevelExp =
@@ -537,11 +479,11 @@ renderExpProgress state =
         [ Html.text (String.fromInt myExp ++ "/" ++ String.fromInt myNextLevelExp ++ " xp") ]
 
 
-renderXPMultiplier : FrontendPlayingState -> ValidFrontendModelData -> Html.Html FrontendMsg
-renderXPMultiplier state modelData =
+renderXPMultiplier : FrontendPlayingState -> PersonData -> Html.Html FrontendMsg
+renderXPMultiplier state me =
     let
         xpMultiplier =
-            Relic.xpMultiplierForPlayer state.gameState.relicDict state.me.person
+            Relic.xpMultiplierForPlayer state.gameState me
     in
     if xpMultiplier == 1 then
         Html.text ""
@@ -553,8 +495,13 @@ renderXPMultiplier state modelData =
             ]
 
 
-renderHeldRelics : FrontendPlayingState -> ValidFrontendModelData -> Html.Html FrontendMsg
-renderHeldRelics state model =
+renderHeldRelics : FrontendPlayingState -> PersonData -> Html.Html FrontendMsg
+renderHeldRelics state me =
+    let
+        myRelics =
+            Relic.getRelicsHeldByPlayer state.myId state.gameState
+                |> RelicDict.values
+    in
     Html.div [ class "w-full flex flex-col flex-gro" ]
         [ Html.div [ class "prose mt-8" ]
             [ Html.h2 [ class "text-center" ]
@@ -562,9 +509,9 @@ renderHeldRelics state model =
             ]
         , Html.div [ class "flex flex-col gap-2 flex-grow flex-wrap h-[660px] p-2", id "relic-list" ]
             (renderRelicList
-                state.me.heldRelics
+                myRelics
                 state
-                ++ renderRelicSlots state.me
+                ++ renderRelicSlots me (List.length myRelics)
             )
         ]
 
@@ -574,17 +521,17 @@ renderRelicList list state =
     List.map (heldRelicView state) list
 
 
-renderRelicSlots : PersonWithRelics -> List (Html.Html FrontendMsg)
-renderRelicSlots person =
+renderRelicSlots : PersonData -> Int -> List (Html.Html FrontendMsg)
+renderRelicSlots person currentNumRelics =
     let
         myLevel =
-            Util.levelForExp person.person.experience
+            Util.levelForExp person.experience
 
         totalUnlockedSlots =
             GameObject.relicSlotsForLevel myLevel
 
         numAvailableSlots =
-            totalUnlockedSlots - List.length person.heldRelics
+            totalUnlockedSlots - currentNumRelics
 
         lockedSlots =
             GameObject.lockedRelicSlots myLevel
@@ -609,26 +556,42 @@ lockedSlotView lockedUntil =
         ]
 
 
+relicsOnFloor : FrontendPlayingState -> List ( GameObjectTypes.Point, List GameObjectTypes.RelicData )
+relicsOnFloor state =
+    Dict.toList state.gameState.relicsByPosition
+        |> List.filter (\( position, _ ) -> Relic.relicLocationIsOnFloor position)
+        |> List.map relicLocationAndDictToFloorRelics
+
+
+rarestRelicAtPoints : FrontendPlayingState -> List ( GameObjectTypes.Point, GameObjectTypes.RelicData )
+rarestRelicAtPoints state =
+    relicsOnFloor state
+        |> List.filterMap rarestRelicAtPoint
+
+
+rarestRelicAtPoint : ( GameObjectTypes.Point, List GameObjectTypes.RelicData ) -> Maybe ( GameObjectTypes.Point, GameObjectTypes.RelicData )
+rarestRelicAtPoint ( point, relics ) =
+    case List.sortBy GameObject.byRelicRarity relics |> List.head of
+        Just relic ->
+            Just ( point, relic )
+
+        Nothing ->
+            Nothing
+
+
+relicLocationAndDictToFloorRelics : ( Types.RelicLocation, RealRelicDict ) -> ( GameObjectTypes.Point, List GameObjectTypes.RelicData )
+relicLocationAndDictToFloorRelics ( position, relicDict ) =
+    ( Relic.floorRelicLocationToFloorPoint position, RelicDict.values relicDict )
+
+
 renderFloorRelics : FrontendPlayingState -> List (Html FrontendMsg)
 renderFloorRelics state =
-    RelicDict.values state.gameState.relicDict
-        |> List.map floorRelicView
+    List.map floorRelicView (rarestRelicAtPoints state)
 
 
 renderTooltipLayer : FrontendPlayingState -> List (Html.Html FrontendMsg)
 renderTooltipLayer state =
-    -- Group relics by location
-    RelicDict.values state.gameState.relicDict
-        |> Dict.Extra.filterGroupBy
-            (\relicData ->
-                case relicData.position of
-                    GameObjectTypes.OnFloor point ->
-                        Just ( point.x, point.y )
-
-                    GameObjectTypes.HeldBy _ ->
-                        Nothing
-            )
-        |> Dict.toList
+    relicsOnFloor state
         |> List.map (renderRelicTooltip state)
 
 
@@ -636,8 +599,8 @@ tooltipClasses =
     "absolute invisible z-50 group-hover:visible opacity-0 group-hover:opacity-100 transition"
 
 
-renderRelicTooltip : FrontendPlayingState -> ( ( Int, Int ), List GameObjectTypes.RelicData ) -> Html.Html FrontendMsg
-renderRelicTooltip state ( ( x, y ), relics ) =
+renderRelicTooltip : FrontendPlayingState -> ( GameObjectTypes.Point, List GameObjectTypes.RelicData ) -> Html.Html FrontendMsg
+renderRelicTooltip state ( { x, y }, relics ) =
     let
         offsetX =
             String.fromInt (x * renderOffsetMultiplier)
@@ -725,26 +688,21 @@ dirtView { position, amount } =
         [ Html.text (String.fromInt amount) ]
 
 
-floorRelicView : GameObjectTypes.RelicData -> Html.Html FrontendMsg
-floorRelicView relicData =
-    case relicData.position of
-        GameObjectTypes.HeldBy _ ->
-            text ""
+floorRelicView : ( GameObjectTypes.Point, GameObjectTypes.RelicData ) -> Html.Html FrontendMsg
+floorRelicView ( floorPosition, relicData ) =
+    let
+        offsetX =
+            String.fromInt (floorPosition.x * renderOffsetMultiplier)
 
-        GameObjectTypes.OnFloor position ->
-            let
-                offsetX =
-                    String.fromInt (position.x * renderOffsetMultiplier)
-
-                offsetY =
-                    String.fromInt (position.y * renderOffsetMultiplier + 15)
-            in
-            Html.div
-                [ class ("absolute " ++ Relic.relicTextColor relicData.rarity)
-                , style "left" (offsetX ++ "px")
-                , style "top" (offsetY ++ "px")
-                ]
-                [ Html.text "o" ]
+        offsetY =
+            String.fromInt (floorPosition.y * renderOffsetMultiplier + 15)
+    in
+    Html.div
+        [ class ("absolute " ++ Relic.relicTextColor relicData.rarity)
+        , style "left" (offsetX ++ "px")
+        , style "top" (offsetY ++ "px")
+        ]
+        [ Html.text "o" ]
 
 
 heldRelicView : FrontendPlayingState -> GameObjectTypes.RelicData -> Html.Html FrontendMsg
@@ -752,7 +710,7 @@ heldRelicView state relicData =
     let
         cardTitle =
             [ Html.div [ class "flex justify-between w-full" ]
-                [ Html.text (Relic.relicName relicData.relicType), dropButton relicData.id state.me.person.id ]
+                [ Html.text (Relic.relicName relicData.relicType), dropButton relicData.id state.myId ]
             ]
     in
     card "h-52"
@@ -787,27 +745,39 @@ card extraClasses title content =
         ]
 
 
-tryCleaning : FrontendPlayingState -> ValidFrontendModelData -> ActionOnGamestate
-tryCleaning state assembledModel =
+tryCleaning : FrontendPlayingState -> ActionOnGamestate
+tryCleaning state =
     let
-        myself =
-            state.me.person
-
-        myRelicCount =
-            List.length state.me.heldRelics
+        maybeMe =
+            extractMyself state
     in
-    case GameObject.getDirtAtLocation myself.position state.gameState.dirtDict of
+    case maybeMe of
         Nothing ->
-            case GameObject.getRelicAtLocation myself.position state.gameState.relicDict of
+            GameStateNoOp
+
+        Just me ->
+            performClean me state
+
+
+performClean : PersonData -> FrontendPlayingState -> ActionOnGamestate
+performClean me state =
+    -- TODO: You'll be back here when we implement "no dropping relics on dirt". Hello future me!
+    let
+        myRelicCount =
+            RelicDict.size (Relic.getRelicsHeldByPlayer state.myId state.gameState)
+    in
+    case GameObject.getDirtAtLocation me.position state.gameState.dirtDict of
+        Nothing ->
+            case GameObject.getRarestRelicAtLocation me.position state.gameState of
                 Nothing ->
                     GameStateNoOp
 
                 Just relic ->
-                    if myRelicCount < GameObject.relicSlotsForLevel (Util.levelForExp myself.experience) then
-                        PickUpRelic relic.id myself.id
+                    if myRelicCount < GameObject.relicSlotsForLevel (Util.levelForExp me.experience) then
+                        PickUpRelic relic.id me.id
 
                     else
                         GameStateNoOp
 
         Just dirt ->
-            Clean myself.id dirt.id
+            Clean me.id dirt.id
