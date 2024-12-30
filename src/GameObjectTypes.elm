@@ -115,7 +115,6 @@ type Direction
 type ActionOnGamestate
     = MovePerson PersonId Direction
     | Clean PersonId DirtId
-    | ChangeDirtAmount DirtId Int
     | AddDirt DirtData
     | AddRelic RelicData Point
     | AddPerson PersonData

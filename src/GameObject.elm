@@ -279,6 +279,27 @@ getDirtAtLocation point dict =
         |> List.head
 
 
+addOrModifyDirt : DirtData -> GameState -> ( GameState, Types.BackendTrigger )
+addOrModifyDirt dirtData state =
+    let
+        dirtId =
+            dirtData.id
+
+        maybeExistingDirt =
+            getDirtAtLocation dirtData.position state.dirtDict
+    in
+    case maybeExistingDirt of
+        Nothing ->
+            ( { state | dirtDict = DirtDict.insert dirtId dirtData state.dirtDict }, NoOpBackendTrigger )
+
+        Just existingDirt ->
+            let
+                newDirtDict =
+                    changeDirtAmount existingDirt.id dirtData.amount state.dirtDict
+            in
+            ( { state | dirtDict = newDirtDict }, NoOpBackendTrigger )
+
+
 getRarestRelicAtLocation : GameObjectTypes.Point -> GameState -> Maybe RelicData
 getRarestRelicAtLocation point state =
     Dict.get (Relic.floorPointToLocation point) state.relicsByPosition
@@ -490,11 +511,8 @@ internalExecuteActionOnGameState action state =
         DropRelic relicId personId ->
             dropRelic personId relicId state
 
-        ChangeDirtAmount dirtId int ->
-            withNoOp { state | dirtDict = changeDirtAmount dirtId int state.dirtDict }
-
         AddDirt dirtData ->
-            withNoOp { state | dirtDict = DirtDict.insert dirtData.id dirtData state.dirtDict }
+            addOrModifyDirt dirtData state
 
         AddRelic relicData floorPoint ->
             let
