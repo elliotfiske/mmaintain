@@ -47,7 +47,7 @@ type alias FrontendModel =
 
 type alias FrontendPlayingState =
     { gameState : GameState
-    , myId : PersonId
+    , me : PersonWithRelics
     , targetPosition : Maybe Point
     }
 
