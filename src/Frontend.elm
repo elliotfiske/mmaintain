@@ -342,7 +342,7 @@ renderModals state me =
                 [ h3
                     [ class "text-lg font-bold"
                     ]
-                    [ text "THE PARK IS CLEAN!!!" ]
+                    [ text "THE PARK IS CLEAN!!!!" ]
                 , img [ src "yeah.gif", class "w-full" ] []
                 , p
                     [ class "py-4"

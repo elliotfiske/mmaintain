@@ -117,11 +117,9 @@ pickUpRelic takerId relicId state =
             maybeTaker
                 |> Maybe.map (\taker -> getRelicsAtFloorPoint taker.position state)
                 |> Maybe.withDefault RelicDict.empty
-                |> Debug.log "Floor relics I'm taking from"
 
         maybeTargetRelic =
             RelicDict.get relicId existingRelicsOnGround
-                |> Debug.log "Relic I'm taking"
     in
     case ( maybeTaker, maybeTargetRelic ) of
         ( Just taker, Just targetRelic ) ->
@@ -147,7 +145,6 @@ moveRelicFromFloorToPlayer taker relicData floorDictToRemoveFrom state =
 
         newHeldRelics =
             RelicDict.insert relicData.id relicData existingHeldRelics
-                |> Debug.log "New held relics"
 
         newRelicsByPosition =
             state.relicsByPosition
