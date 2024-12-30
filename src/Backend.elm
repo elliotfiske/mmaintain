@@ -72,7 +72,9 @@ handleClientConnected sessionId clientId model =
         newState : FrontendPlayingState
         newState =
             { gameState = updatedModel.gameState
-            , myId = personId
+
+            -- not real
+            , me = { person = GameObject.createPerson personId "hola", heldRelics = [] }
             , targetPosition = Nothing
             }
 

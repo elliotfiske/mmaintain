@@ -442,7 +442,7 @@ renderMyHUD : FrontendPlayingState -> ValidFrontendModelData -> Html.Html Fronte
 renderMyHUD state assembledModel =
     Html.div [ class "flex flex-col items-center h-full bg-base-100 mx-3" ]
         [ renderXP state.me.person
-        , renderExpProgress assembledModel
+        , renderExpProgress state
         , renderCleanStrength state assembledModel
         , renderXPMultiplier state assembledModel
         , renderHeldRelics state assembledModel
@@ -520,14 +520,14 @@ renderCleanStrength state modelData =
         ]
 
 
-renderExpProgress : ValidFrontendModelData -> Html.Html FrontendMsg
-renderExpProgress model =
+renderExpProgress : FrontendPlayingState -> Html.Html FrontendMsg
+renderExpProgress state =
     let
         myLevel =
-            Util.levelForExp model.me.person.experience
+            Util.levelForExp state.me.person.experience
 
         myExp =
-            model.me.person.experience
+            state.me.person.experience
 
         myNextLevelExp : Int
         myNextLevelExp =
@@ -791,10 +791,10 @@ tryCleaning : FrontendPlayingState -> ValidFrontendModelData -> ActionOnGamestat
 tryCleaning state assembledModel =
     let
         myself =
-            assembledModel.me.person
+            state.me.person
 
         myRelicCount =
-            List.length assembledModel.me.heldRelics
+            List.length state.me.heldRelics
     in
     case GameObject.getDirtAtLocation myself.position state.gameState.dirtDict of
         Nothing ->

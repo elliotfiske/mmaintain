@@ -98,13 +98,13 @@ relicBody state relic =
         DropAndDouble people ->
             let
                 alreadyDropped =
-                    List.member state.myId people
+                    List.member state.me.person.id people
 
                 baseExp =
                     dropDoubleCurrentExperience relic.rarity (List.length people)
 
                 me =
-                    PersonDict.get state.myId state.gameState.personDict
+                    PersonDict.get state.me.person.id state.gameState.personDict
 
                 playerXpMultiplier =
                     Maybe.map (xpMultiplierForPlayer state.gameState.relicDict) me
@@ -125,7 +125,7 @@ relicBody state relic =
                             ""
                        )
                 )
-                ++ [ dropAndDoubleActivationButton state.myId people relic.id
+                ++ [ dropAndDoubleActivationButton state.me.person.id people relic.id
                    ]
 
 
