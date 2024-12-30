@@ -1,5 +1,6 @@
 module Frontend exposing (..)
 
+import BaseUI as UI
 import Browser exposing (UrlRequest(..))
 import Browser.Dom
 import Browser.Events exposing (onKeyDown)
@@ -116,6 +117,9 @@ handleKey state key =
         " " ->
             PerformAction (tryCleaning state)
 
+        "`" ->
+            ToggleDebugStuff
+
         _ ->
             NoOpFrontendMsg
 
@@ -124,6 +128,7 @@ init : Url.Url -> Nav.Key -> ( Model, Cmd FrontendMsg )
 init url key =
     ( { key = key
       , state = Loading
+      , showingDebugStuff = False
       }
     , Cmd.none
     )
@@ -172,6 +177,9 @@ update msg model =
 
         ClickTarget point ->
             ( modelUpdateTarget (Just point) model, Cmd.none )
+
+        ToggleDebugStuff ->
+            ( { model | showingDebugStuff = not model.showingDebugStuff }, Cmd.none )
 
 
 modelUpdateTarget : Maybe GameObjectTypes.Point -> Model -> Model
@@ -298,7 +306,7 @@ renderModel model =
             Html.text ("Error: " ++ string)
 
         Playing playingState ->
-            renderPlayingState playingState
+            renderPlayingState model.showingDebugStuff playingState
 
 
 extractMyself : FrontendPlayingState -> Maybe PersonData
@@ -311,12 +319,12 @@ extractMyself state =
             Nothing
 
 
-renderPlayingState : FrontendPlayingState -> Html.Html FrontendMsg
-renderPlayingState state =
+renderPlayingState : Bool -> FrontendPlayingState -> Html.Html FrontendMsg
+renderPlayingState showDebugStuff state =
     case extractMyself state of
         Just me ->
             Html.div [ class "h-full" ]
-                [ debugStuff state
+                [ debugStuff showDebugStuff state
                 , renderModals state me
                 , Html.div [ class "flex justify-end h-full" ]
                     [ renderMap state
@@ -331,50 +339,32 @@ renderPlayingState state =
 renderModals : FrontendPlayingState -> PersonData -> Html.Html FrontendMsg
 renderModals state me =
     if DirtDict.size state.gameState.dirtDict == 0 then
-        node "modal-dialog"
-            [ id "my_modal_1"
-            , class "modal"
-            , attribute "open" "true"
-            ]
-            [ div
-                [ class "modal-box"
-                ]
-                [ h3
+        UI.dialog
+            { title =
+                h3
                     [ class "text-lg font-bold"
                     ]
                     [ text "THE PARK IS CLEAN!!!!" ]
-                , img [ src "yeah.gif", class "w-full" ] []
-                , p
-                    [ class "py-4"
-                    ]
-                    [ text
-                        ("Congratulations, the park is clean! You did this many clean actions: "
-                            ++ String.fromInt me.stats.cleanCount
-                            ++ " and you finished off this many pollution patches: "
-                            ++ String.fromInt me.stats.clearCount
-                        )
-                    ]
-                , div
-                    [ class "modal-action"
-                    ]
-                    [ Html.form
-                        [ method "dialog"
-                        ]
-                        [ {- if there is a button in a form, it will close the modal -}
-                          button
-                            [ class "btn btn-primary"
-                            , Html.Events.onClick
-                                ClickedPleaseMakeMeDirty
-                            ]
-                            [ text "I'M NOT DONE, ADD MORE DIRT!" ]
-                        , button
-                            [ class "btn btn-primary"
-                            ]
-                            [ text "example button" ]
+            , body =
+                Html.div []
+                    [ img [ src "yeah.gif", class "w-full" ] []
+                    , p
+                        [ class "py-4" ]
+                        [ text
+                            ("Congratulations, the park is clean! You did this many clean actions: "
+                                ++ String.fromInt me.stats.cleanCount
+                                ++ " and you finished off this many pollution patches: "
+                                ++ String.fromInt me.stats.clearCount
+                            )
                         ]
                     ]
-                ]
-            ]
+            , actions =
+                button
+                    [ class "btn btn-primary"
+                    , Html.Events.onClick ClickedPleaseMakeMeDirty
+                    ]
+                    [ text "I'M NOT DONE, ADD MORE DIRT!" ]
+            }
 
     else
         text ""
@@ -391,12 +381,16 @@ renderMyHUD state me =
         ]
 
 
-debugStuff : FrontendPlayingState -> Html.Html FrontendMsg
-debugStuff state =
-    Html.div [ class "flex flex-col absolute" ]
-        [ debugDicts state
-        , Html.button [ Html.Events.onClick ClickedPleaseMakeMeDirty, class "btn btn-primary" ] [ text "Add Dirt" ]
-        ]
+debugStuff : Bool -> FrontendPlayingState -> Html.Html FrontendMsg
+debugStuff showDebugStuff state =
+    if showDebugStuff then
+        Html.div [ class "flex flex-col absolute" ]
+            [ debugDicts state
+            , Html.button [ Html.Events.onClick ClickedPleaseMakeMeDirty, class "btn btn-primary" ] [ text "Add Dirt" ]
+            ]
+
+    else
+        Html.text ""
 
 
 debugDicts : FrontendPlayingState -> Html.Html FrontendMsg
@@ -541,14 +535,14 @@ renderRelicSlots person currentNumRelics =
 
 availableRelicView : Html.Html FrontendMsg
 availableRelicView =
-    card "h-52"
+    UI.card "h-52"
         [ Html.div [ class "text-center" ] [ Html.text "Free Slot" ] ]
         []
 
 
 lockedSlotView : Int -> Html.Html FrontendMsg
 lockedSlotView lockedUntil =
-    card "h-52"
+    UI.card "h-52"
         [ Outlined.lock 16 Coloring.Inherit, Html.text "Locked" ]
         [ Html.div
             [ class "" ]
@@ -636,7 +630,7 @@ renderRelicTooltipBody state relicData =
                 [ Html.text (Relic.relicName relicData.relicType) ]
             ]
     in
-    card "h-auto"
+    UI.card "h-auto"
         cardTitle
         [ relicRarityBadge relicData.rarity
         , Html.div
@@ -713,7 +707,7 @@ heldRelicView state relicData =
                 [ Html.text (Relic.relicName relicData.relicType), dropButton relicData.id state.myId ]
             ]
     in
-    card "h-52"
+    UI.card "h-52"
         cardTitle
         [ Html.div
             [ class ("badge dark:text-black " ++ Relic.relicBgColor relicData.rarity) ]
@@ -732,17 +726,6 @@ dropButton relicId myId =
         , id "drop-button"
         ]
         [ Outlined.file_download 18 Coloring.Inherit ]
-
-
-card : String -> List (Html.Html FrontendMsg) -> List (Html.Html FrontendMsg) -> Html.Html FrontendMsg
-card extraClasses title content =
-    Html.div [ class ("card card-compact bg-base-300 shadow-xl w-52 " ++ extraClasses) ]
-        [ Html.div
-            [ class "card-body" ]
-            (Html.h2 [ class "card-title" ] title
-                :: content
-            )
-        ]
 
 
 tryCleaning : FrontendPlayingState -> ActionOnGamestate

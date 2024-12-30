@@ -50,6 +50,7 @@ type alias GameState =
 type alias FrontendModel =
     { key : Key
     , state : FrontendState
+    , showingDebugStuff : Bool
     }
 
 
@@ -92,6 +93,7 @@ type FrontendMsg
     | ActivatedRelic PersonId RelicId
     | ClickTarget Point
     | Tick Posix
+    | ToggleDebugStuff
     | NoOpFrontendMsg
 
 
