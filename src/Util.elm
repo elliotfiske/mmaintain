@@ -3,7 +3,6 @@ module Util exposing (..)
 import Dict
 import GameObjectTypes
 import List.Extra
-import Types
 
 
 xOrigin : number
@@ -16,14 +15,14 @@ yOrigin =
     0
 
 
-xMax : number
-xMax =
-    10
+mapXMax : number
+mapXMax =
+    100
 
 
-yMax : number
-yMax =
-    1
+mapYMax : number
+mapYMax =
+    100
 
 
 expForLevel : Int -> Int
@@ -131,3 +130,54 @@ groupWhile : (a -> a -> Bool) -> List a -> List (List a)
 groupWhile predicate list =
     List.Extra.groupWhile predicate list
         |> List.map (\( a, rest ) -> a :: rest)
+
+
+{-| Rules for camera movement:
+
+Must not go lower than 0,0
+Must not go lower than the map size - window size
+
+Should be as close as possible to the previous camera position
+
+Player should remain at least 3 tiles away from the edge of the screen, unless they are at the edge of the map
+
+-}
+calculateCameraPosition : GameObjectTypes.Point -> GameObjectTypes.Point -> GameObjectTypes.Point -> GameObjectTypes.Point
+calculateCameraPosition windowSize prevCamera playerPosition =
+    let
+        xMin =
+            0
+
+        yMin =
+            0
+
+        xCamera =
+            prevCamera.x
+
+        yCamera =
+            prevCamera.y
+
+        cameraBuffer =
+            3
+
+        xNewCamera =
+            if playerPosition.x - xCamera < cameraBuffer then
+                Basics.max xMin (playerPosition.x - cameraBuffer)
+
+            else if playerPosition.x - xCamera > windowSize.x - cameraBuffer then
+                Basics.min (mapXMax - windowSize.x) (playerPosition.x - (windowSize.x - cameraBuffer))
+
+            else
+                xCamera
+
+        yNewCamera =
+            if playerPosition.y - yCamera < cameraBuffer then
+                Basics.max yMin (playerPosition.y - cameraBuffer)
+
+            else if playerPosition.y - yCamera > windowSize.y - cameraBuffer then
+                Basics.min (mapYMax - windowSize.y) (playerPosition.y - (windowSize.y - cameraBuffer))
+
+            else
+                yCamera
+    in
+    { x = xNewCamera, y = yNewCamera }

@@ -69,11 +69,10 @@ handleClientConnected sessionId clientId model =
                 , sessionIdToPersonId = Dict.insert sessionId personId newModel.sessionIdToPersonId
             }
 
-        newState : FrontendPlayingState
+        newState : BackendToFrontendState
         newState =
             { gameState = updatedModel.gameState
             , myId = personId
-            , targetPosition = Nothing
             }
 
         dumpStateToNewClientCmd =

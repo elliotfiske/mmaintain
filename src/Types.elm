@@ -50,7 +50,6 @@ type alias GameState =
 type alias FrontendModel =
     { key : Key
     , state : FrontendState
-    , showingDebugStuff : Bool
     }
 
 
@@ -58,7 +57,14 @@ type alias FrontendPlayingState =
     { gameState : GameState
     , myId : PersonId
     , targetPosition : Maybe Point
+    , showingDebugStuff : Bool
+    , mapSize : Maybe { width : Float, height : Float }
+    , cameraPosition : Point
     }
+
+
+type alias BackendToFrontendState =
+    { gameState : GameState, myId : PersonId }
 
 
 type FrontendState
@@ -94,6 +100,7 @@ type FrontendMsg
     | ClickTarget Point
     | Tick Posix
     | ToggleDebugStuff
+    | ReceivedMapSize { width : Float, height : Float }
     | NoOpFrontendMsg
 
 
@@ -119,4 +126,4 @@ type ActionPerformer
 type ToFrontend
     = NoOpToFrontend
     | OtherClientPerformedAction ActionPerformer ActionOnGamestate
-    | UpdateFullState FrontendPlayingState
+    | UpdateFullState BackendToFrontendState

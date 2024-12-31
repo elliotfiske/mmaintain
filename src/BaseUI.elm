@@ -1,7 +1,7 @@
-module BaseUI exposing (card, dialog)
+module BaseUI exposing (card, dialog, simpleTitle)
 
-import Html exposing (Html, div, h3, img, node, p, text)
-import Html.Attributes exposing (attribute, class, id, src)
+import Html exposing (Html, div, h1, node, text)
+import Html.Attributes exposing (attribute, class)
 
 
 card : String -> List (Html msg) -> List (Html msg) -> Html msg
@@ -33,6 +33,11 @@ dialog content =
     node "modal-dialog"
         [ class "modal", attribute "open" "true" ]
         [ div
-            [ class "modal-box" ]
+            [ class "modal-box prose" ]
             [ content.title, content.body, actionContent ]
         ]
+
+
+simpleTitle : String -> Html msg
+simpleTitle title =
+    h1 [] [ text title ]

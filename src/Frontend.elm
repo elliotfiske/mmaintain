@@ -1,4 +1,4 @@
-module Frontend exposing (..)
+port module Frontend exposing (..)
 
 import BaseUI as UI
 import Browser exposing (UrlRequest(..))
@@ -6,15 +6,15 @@ import Browser.Dom
 import Browser.Events exposing (onKeyDown)
 import Browser.Navigation as Nav
 import Dict
-import Dict.Extra
 import DirtDict
 import GameObject
-import GameObjectTypes exposing (ActionOnGamestate(..), Direction(..), PersonData, PersonId, relicIdToString)
+import GameObjectTypes exposing (ActionOnGamestate(..), Direction(..), PersonData, PersonId)
 import Html exposing (..)
 import Html.Attributes exposing (..)
 import Html.Events
 import Json.Decode as Decode
 import Lamdera
+import Markdown
 import Material.Icons.Outlined as Outlined
 import Material.Icons.Types as Coloring
 import PersonDict
@@ -43,11 +43,15 @@ app =
         }
 
 
+port receiveElementSize : ({ width : Float, height : Float } -> msg) -> Sub msg
+
+
 subscriptions : Model -> Sub FrontendMsg
 subscriptions model =
     Sub.batch
         [ onKeyDown (keyDecoder model)
         , maybeFireEveryTick model
+        , receiveElementSize ReceivedMapSize
         ]
 
 
@@ -112,7 +116,11 @@ handleKey state key =
             PerformAction (MovePerson state.myId Right)
 
         "r" ->
-            DebugGenerateRelic
+            if state.showingDebugStuff then
+                DebugGenerateRelic
+
+            else
+                NoOpFrontendMsg
 
         " " ->
             PerformAction (tryCleaning state)
@@ -128,7 +136,6 @@ init : Url.Url -> Nav.Key -> ( Model, Cmd FrontendMsg )
 init url key =
     ( { key = key
       , state = Loading
-      , showingDebugStuff = False
       }
     , Cmd.none
     )
@@ -179,7 +186,25 @@ update msg model =
             ( modelUpdateTarget (Just point) model, Cmd.none )
 
         ToggleDebugStuff ->
-            ( { model | showingDebugStuff = not model.showingDebugStuff }, Cmd.none )
+            ( modelUpdateIfPlaying toggleDebugStuff model, Cmd.none )
+
+        ReceivedMapSize size ->
+            ( modelUpdateIfPlaying (\state -> { state | mapSize = Just size } |> updateCameraPosition) model, Cmd.none )
+
+
+toggleDebugStuff : FrontendPlayingState -> FrontendPlayingState
+toggleDebugStuff state =
+    { state | showingDebugStuff = not state.showingDebugStuff }
+
+
+modelUpdateIfPlaying : (FrontendPlayingState -> FrontendPlayingState) -> Model -> Model
+modelUpdateIfPlaying f model =
+    case model.state of
+        Playing state ->
+            { model | state = Playing (f state) }
+
+        _ ->
+            model
 
 
 modelUpdateTarget : Maybe GameObjectTypes.Point -> Model -> Model
@@ -271,6 +296,31 @@ updateStateWithAction who action prevState =
             GameObject.executeActionOnGameState who action prevState.gameState
     in
     { prevState | gameState = newState }
+        |> updateCameraPosition
+
+
+updateCameraPosition : FrontendPlayingState -> FrontendPlayingState
+updateCameraPosition state =
+    let
+        maybeMe =
+            extractMyself state
+    in
+    case ( maybeMe, state.mapSize ) of
+        ( Just me, Just mapSizePixels ) ->
+            let
+                prevCamera =
+                    state.cameraPosition
+
+                mapSizeTiles : GameObjectTypes.Point
+                mapSizeTiles =
+                    { x = truncate (mapSizePixels.width / renderOffsetMultiplier)
+                    , y = truncate (mapSizePixels.height / renderOffsetMultiplier)
+                    }
+            in
+            { state | cameraPosition = Util.calculateCameraPosition mapSizeTiles prevCamera me.position }
+
+        _ ->
+            state
 
 
 updateFromBackend : ToFrontend -> Model -> ( Model, Cmd FrontendMsg )
@@ -279,11 +329,40 @@ updateFromBackend msg model =
         NoOpToFrontend ->
             ( model, Cmd.none )
 
-        UpdateFullState frontendState ->
-            ( { model | state = Playing frontendState }, Cmd.none )
+        UpdateFullState stateDump ->
+            let
+                newState =
+                    case model.state of
+                        Loading ->
+                            Playing (initFrontendPlayingState stateDump)
+
+                        Error _ ->
+                            -- todo: is this really what we want? I'm not sure what state "Error" really represents (we don't even have a way to reach this state at the moment)
+                            Playing (initFrontendPlayingState stateDump)
+
+                        Playing playingState ->
+                            Playing (updatePlayingStateWithBackendStateDump stateDump playingState)
+            in
+            ( { model | state = newState }, Cmd.none )
 
         OtherClientPerformedAction who action ->
             ( updateModelWithAction who action model, Cmd.none )
+
+
+updatePlayingStateWithBackendStateDump : BackendToFrontendState -> FrontendPlayingState -> FrontendPlayingState
+updatePlayingStateWithBackendStateDump stateDump state =
+    { state | gameState = stateDump.gameState, myId = stateDump.myId }
+
+
+initFrontendPlayingState : BackendToFrontendState -> FrontendPlayingState
+initFrontendPlayingState { gameState, myId } =
+    { gameState = gameState
+    , myId = myId
+    , targetPosition = Nothing
+    , showingDebugStuff = False
+    , mapSize = Nothing
+    , cameraPosition = { x = 5, y = 5 }
+    }
 
 
 view : Model -> Browser.Document FrontendMsg
@@ -306,7 +385,7 @@ renderModel model =
             Html.text ("Error: " ++ string)
 
         Playing playingState ->
-            renderPlayingState model.showingDebugStuff playingState
+            renderPlayingState playingState
 
 
 extractMyself : FrontendPlayingState -> Maybe PersonData
@@ -319,13 +398,12 @@ extractMyself state =
             Nothing
 
 
-renderPlayingState : Bool -> FrontendPlayingState -> Html.Html FrontendMsg
-renderPlayingState showDebugStuff state =
+renderPlayingState : FrontendPlayingState -> Html.Html FrontendMsg
+renderPlayingState state =
     case extractMyself state of
         Just me ->
             Html.div [ class "h-full" ]
-                [ debugStuff showDebugStuff state
-                , renderModals state me
+                [ renderModals state me
                 , Html.div [ class "flex justify-end h-full" ]
                     [ renderMap state
                     , renderMyHUD state me
@@ -338,7 +416,22 @@ renderPlayingState showDebugStuff state =
 
 renderModals : FrontendPlayingState -> PersonData -> Html.Html FrontendMsg
 renderModals state me =
-    if DirtDict.size state.gameState.dirtDict == 0 then
+    if state.showingDebugStuff then
+        Html.div []
+            [ UI.dialog
+                { title = UI.simpleTitle "Debug Stuff :)"
+                , body =
+                    debugStuff state
+                , actions =
+                    button
+                        [ class "btn btn-primary"
+                        , Html.Events.onClick ToggleDebugStuff
+                        ]
+                        [ text "Close" ]
+                }
+            ]
+
+    else if DirtDict.size state.gameState.dirtDict == 0 then
         UI.dialog
             { title =
                 h3
@@ -372,7 +465,7 @@ renderModals state me =
 
 renderMyHUD : FrontendPlayingState -> PersonData -> Html.Html FrontendMsg
 renderMyHUD state me =
-    Html.div [ class "flex flex-col items-center h-full bg-base-100 mx-3" ]
+    Html.div [ class "flex flex-col items-center overflow-auto h-full bg-base-100 mx-3" ]
         [ renderXP me
         , renderExpProgress me
         , renderCleanStrength state me
@@ -381,28 +474,29 @@ renderMyHUD state me =
         ]
 
 
-debugStuff : Bool -> FrontendPlayingState -> Html.Html FrontendMsg
-debugStuff showDebugStuff state =
-    if showDebugStuff then
-        Html.div [ class "flex flex-col absolute" ]
-            [ debugDicts state
-            , Html.button [ Html.Events.onClick ClickedPleaseMakeMeDirty, class "btn btn-primary" ] [ text "Add Dirt" ]
-            ]
+debugStuff : FrontendPlayingState -> Html.Html FrontendMsg
+debugStuff state =
+    if state.showingDebugStuff then
+        Html.div [ class "flex flex-col" ]
+            ([ Html.button [ Html.Events.onClick ClickedPleaseMakeMeDirty, class "btn btn-primary" ] [ text "Add Dirt" ] ]
+                ++ debugDicts state
+            )
 
     else
         Html.text ""
 
 
-debugDicts : FrontendPlayingState -> Html.Html FrontendMsg
+debugDicts : FrontendPlayingState -> List (Html.Html FrontendMsg)
 debugDicts { gameState, myId } =
-    Html.text
+    Markdown.toHtml
+        Nothing
         ("PersonDict: "
             ++ String.fromInt (PersonDict.size gameState.personDict)
-            ++ "\nRelics By Position Dict: "
+            ++ "<br>Relics By Position Dict: "
             ++ String.fromInt (Dict.size gameState.relicsByPosition)
-            ++ "\nDirtDict: "
+            ++ "<br>DirtDict: "
             ++ String.fromInt (DirtDict.size gameState.dirtDict)
-            ++ "\nMyId: "
+            ++ "<br>MyId: "
             ++ GameObjectTypes.personIdToString myId
         )
 
@@ -413,13 +507,13 @@ renderMap state =
         ++ renderDirt state
         ++ renderFloorRelics state
         ++ renderTooltipLayer state
-        |> Html.div [ class "bg-green-800 flex-grow", id "main-map", tabindex 0 ]
+        |> Html.div [ class "bg-green-800 flex-grow relative overflow-hidden", id "main-map", tabindex 0 ]
 
 
 renderDirt : FrontendPlayingState -> List (Html.Html FrontendMsg)
 renderDirt state =
     DirtDict.values state.gameState.dirtDict
-        |> List.map dirtView
+        |> List.map (dirtView state.cameraPosition)
 
 
 renderXP : PersonData -> Html.Html FrontendMsg
@@ -501,7 +595,7 @@ renderHeldRelics state me =
             [ Html.h2 [ class "text-center" ]
                 [ Html.text "My Relics:" ]
             ]
-        , Html.div [ class "flex flex-col gap-2 flex-grow flex-wrap h-[660px] p-2", id "relic-list" ]
+        , Html.div [ class "flex flex-col gap-2 flex-grow flex-wrap p-2", id "relic-list" ]
             (renderRelicList
                 myRelics
                 state
@@ -535,14 +629,14 @@ renderRelicSlots person currentNumRelics =
 
 availableRelicView : Html.Html FrontendMsg
 availableRelicView =
-    UI.card "h-52"
+    UI.card ""
         [ Html.div [ class "text-center" ] [ Html.text "Free Slot" ] ]
         []
 
 
 lockedSlotView : Int -> Html.Html FrontendMsg
 lockedSlotView lockedUntil =
-    UI.card "h-52"
+    UI.card ""
         [ Outlined.lock 16 Coloring.Inherit, Html.text "Locked" ]
         [ Html.div
             [ class "" ]
@@ -580,7 +674,7 @@ relicLocationAndDictToFloorRelics ( position, relicDict ) =
 
 renderFloorRelics : FrontendPlayingState -> List (Html FrontendMsg)
 renderFloorRelics state =
-    List.map floorRelicView (rarestRelicAtPoints state)
+    List.map (floorRelicView state.cameraPosition) (rarestRelicAtPoints state)
 
 
 renderTooltipLayer : FrontendPlayingState -> List (Html.Html FrontendMsg)
@@ -649,47 +743,51 @@ relicRarityBadge rarity =
 renderPeople : FrontendPlayingState -> List (Html.Html FrontendMsg)
 renderPeople state =
     PersonDict.values state.gameState.personDict
-        |> List.map personView
+        |> List.map (personView state.cameraPosition)
 
 
+{-| The width in pixels of a game tile
+-}
 renderOffsetMultiplier =
     50
 
 
-personView : PersonData -> Html.Html FrontendMsg
-personView { id, name, position } =
-    let
-        offsetX =
-            String.fromInt (position.x * renderOffsetMultiplier)
+renderedOffset : GameObjectTypes.Point -> GameObjectTypes.Point -> ( String, String )
+renderedOffset objectPosition cameraOffset =
+    ( (objectPosition.x - cameraOffset.x)
+        * renderOffsetMultiplier
+        |> String.fromInt
+    , (objectPosition.y - cameraOffset.y)
+        * renderOffsetMultiplier
+        |> String.fromInt
+    )
 
-        offsetY =
-            String.fromInt (position.y * renderOffsetMultiplier)
+
+personView : GameObjectTypes.Point -> PersonData -> Html.Html FrontendMsg
+personView camera { id, name, position } =
+    let
+        ( offsetX, offsetY ) =
+            renderedOffset position camera
     in
     Html.div [ class "absolute sprite person", style "left" (offsetX ++ "px"), style "top" (offsetY ++ "px") ]
         []
 
 
-dirtView : GameObjectTypes.DirtData -> Html.Html FrontendMsg
-dirtView { position, amount } =
+dirtView : GameObjectTypes.Point -> GameObjectTypes.DirtData -> Html.Html FrontendMsg
+dirtView camera { position, amount } =
     let
-        offsetX =
-            String.fromInt (position.x * renderOffsetMultiplier)
-
-        offsetY =
-            String.fromInt (position.y * renderOffsetMultiplier + 15)
+        ( offsetX, offsetY ) =
+            renderedOffset position camera
     in
     Html.div [ class "absolute text-orange-500", style "left" (offsetX ++ "px"), style "top" (offsetY ++ "px") ]
         [ Html.text (String.fromInt amount) ]
 
 
-floorRelicView : ( GameObjectTypes.Point, GameObjectTypes.RelicData ) -> Html.Html FrontendMsg
-floorRelicView ( floorPosition, relicData ) =
+floorRelicView : GameObjectTypes.Point -> ( GameObjectTypes.Point, GameObjectTypes.RelicData ) -> Html.Html FrontendMsg
+floorRelicView camera ( floorPosition, relicData ) =
     let
-        offsetX =
-            String.fromInt (floorPosition.x * renderOffsetMultiplier)
-
-        offsetY =
-            String.fromInt (floorPosition.y * renderOffsetMultiplier + 15)
+        ( offsetX, offsetY ) =
+            renderedOffset floorPosition camera
     in
     Html.div
         [ class ("absolute " ++ Relic.relicTextColor relicData.rarity)
