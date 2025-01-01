@@ -22,6 +22,30 @@ body, html {
     background-image: url('/sprites/dude.png');
 }
 
+.relic {
+    background-image: url('/sprites/relic-common.png');
+}
+
+.relic.common {
+    /* no change */
+}
+
+.relic.uncommon {
+    filter: sepia(100%) brightness(70%) saturate(300%) hue-rotate(110deg);
+}
+
+.relic.rare {
+    filter: sepia(100%) brightness(50%) saturate(800%) hue-rotate(200deg);
+}
+
+.relic.epic {
+    filter: sepia(100%) brightness(65%) saturate(800%) hue-rotate(220deg);
+}
+
+.relic.legendary {
+    filter: sepia(100%) brightness(70%) saturate(300%) hue-rotate(300deg);
+}
+
 @keyframes play {
     from { background-position: 0px; }
     to { background-position: 150px; }  /* Total width of spritesheet */

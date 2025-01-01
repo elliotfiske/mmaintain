@@ -6,7 +6,7 @@ import Html.Attributes exposing (attribute, class)
 
 card : String -> List (Html msg) -> List (Html msg) -> Html msg
 card extraClasses title content =
-    Html.div [ class ("card card-compact bg-base-300 shadow-xl w-52 " ++ extraClasses) ]
+    Html.div [ class ("card card-compact bg-base-300 shadow-xl" ++ extraClasses) ]
         [ Html.div
             [ class "card-body" ]
             (Html.h2 [ class "card-title" ] title

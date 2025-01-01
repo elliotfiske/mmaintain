@@ -17,12 +17,12 @@ yOrigin =
 
 mapXMax : number
 mapXMax =
-    100
+    50
 
 
 mapYMax : number
 mapYMax =
-    100
+    50
 
 
 expForLevel : Int -> Int

@@ -44,6 +44,25 @@ relicTextColor rarity =
             "text-red-500"
 
 
+relicRarityToCssClass : RelicRarity -> String
+relicRarityToCssClass rarity =
+    case rarity of
+        Common ->
+            "common"
+
+        Uncommon ->
+            "uncommon"
+
+        Rare ->
+            "rare"
+
+        Epic ->
+            "epic"
+
+        Legendary ->
+            "legendary"
+
+
 relicBgColor : RelicRarity -> String
 relicBgColor rarity =
     case rarity of

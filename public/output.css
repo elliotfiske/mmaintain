@@ -2586,6 +2586,14 @@ html {
   z-index: 50;
 }
 
+.z-10 {
+  z-index: 10;
+}
+
+.z-20 {
+  z-index: 20;
+}
+
 .mx-3 {
   margin-left: 0.75rem;
   margin-right: 0.75rem;
@@ -2603,16 +2611,8 @@ html {
   height: 1rem;
 }
 
-.h-52 {
-  height: 13rem;
-}
-
 .h-8 {
   height: 2rem;
-}
-
-.h-\[660px\] {
-  height: 660px;
 }
 
 .h-auto {
@@ -2621,10 +2621,6 @@ html {
 
 .h-full {
   height: 100%;
-}
-
-.w-52 {
-  width: 13rem;
 }
 
 .w-64 {
@@ -2825,6 +2821,30 @@ body, html {
 
 .person {
   background-image: url('/sprites/dude.png');
+}
+
+.relic {
+  background-image: url('/sprites/relic-common.png');
+}
+
+.relic.common {
+  /* no change */
+}
+
+.relic.uncommon {
+  filter: sepia(100%) brightness(70%) saturate(300%) hue-rotate(110deg);
+}
+
+.relic.rare {
+  filter: sepia(100%) brightness(50%) saturate(800%) hue-rotate(200deg);
+}
+
+.relic.epic {
+  filter: sepia(100%) brightness(65%) saturate(800%) hue-rotate(220deg);
+}
+
+.relic.legendary {
+  filter: sepia(100%) brightness(70%) saturate(300%) hue-rotate(300deg);
 }
 
 @keyframes play {

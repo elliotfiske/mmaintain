@@ -1,8 +1,7 @@
 
 exports.init = async function(app) {
 
-    requestAnimationFrame(() => {
-
+    function observeElementIfExists() {
         const element = document.getElementById('main-map')
         const observer = new ResizeObserver(entries => {
             const entry = entries[0]
@@ -12,6 +11,12 @@ exports.init = async function(app) {
             }
         })
 
-        observer.observe(element)
-    })
+        if (element) {
+            observer.observe(element)
+        } else {
+            requestAnimationFrame(observeElementIfExists)
+        }
+    }
+
+    requestAnimationFrame(observeElementIfExists)
 }

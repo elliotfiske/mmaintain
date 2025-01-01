@@ -12,7 +12,22 @@ import Util
 
 movePerson : Direction -> PersonData -> PersonData
 movePerson direction person =
-    { person | position = newPoint direction person.position }
+    let
+        destination =
+            newPoint direction person.position
+
+        tooLow =
+            destination.y < Util.yOrigin || destination.x < Util.xOrigin
+
+        tooHigh =
+            destination.y >= Util.mapYMax || destination.x >= Util.mapXMax
+    in
+    if tooLow || tooHigh then
+        -- out of bounds, don't complete the move
+        person
+
+    else
+        { person | position = newPoint direction person.position }
 
 
 newPoint : Direction -> GameObjectTypes.Point -> GameObjectTypes.Point

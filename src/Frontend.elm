@@ -361,8 +361,9 @@ initFrontendPlayingState { gameState, myId } =
     , targetPosition = Nothing
     , showingDebugStuff = False
     , mapSize = Nothing
-    , cameraPosition = { x = 5, y = 5 }
+    , cameraPosition = { x = 0, y = 0 }
     }
+        |> updateCameraPosition
 
 
 view : Model -> Browser.Document FrontendMsg
@@ -684,26 +685,25 @@ renderTooltipLayer state =
 
 
 tooltipClasses =
-    "absolute invisible z-50 group-hover:visible opacity-0 group-hover:opacity-100 transition"
+    "absolute invisible group-hover:visible opacity-0 group-hover:opacity-100 transition"
 
 
 renderRelicTooltip : FrontendPlayingState -> ( GameObjectTypes.Point, List GameObjectTypes.RelicData ) -> Html.Html FrontendMsg
-renderRelicTooltip state ( { x, y }, relics ) =
+renderRelicTooltip state ( relicPileLocation, relics ) =
     let
-        offsetX =
-            String.fromInt (x * renderOffsetMultiplier)
-
-        offsetY =
-            String.fromInt (y * renderOffsetMultiplier + 15)
+        ( offsetX, offsetY ) =
+            renderedOffset relicPileLocation state.cameraPosition
     in
-    Html.div [ class "absolute", style "left" (offsetX ++ "px"), style "top" (offsetY ++ "px") ]
+    Html.div [ class "absolute z-50", style "left" (offsetX ++ "px"), style "top" (offsetY ++ "px") ]
         [ Html.div [ class "relative group" ]
             [ -- Empty space 32px by 32px for mouse event
               Html.div
-                [ class "absolute w-8 h-8"
+                [ class "absolute"
                 , style "left" "0px"
                 , style "top" "0px"
-                , Html.Events.onClick (ClickTarget { x = x, y = y })
+                , style "width" (String.fromInt renderOffsetMultiplier ++ "px")
+                , style "height" (String.fromInt renderOffsetMultiplier ++ "px")
+                , Html.Events.onClick (ClickTarget relicPileLocation)
                 ]
                 []
             , Html.div
@@ -769,7 +769,7 @@ personView camera { id, name, position } =
         ( offsetX, offsetY ) =
             renderedOffset position camera
     in
-    Html.div [ class "absolute sprite person", style "left" (offsetX ++ "px"), style "top" (offsetY ++ "px") ]
+    Html.div [ class "absolute sprite person z-20", style "left" (offsetX ++ "px"), style "top" (offsetY ++ "px") ]
         []
 
 
@@ -790,11 +790,11 @@ floorRelicView camera ( floorPosition, relicData ) =
             renderedOffset floorPosition camera
     in
     Html.div
-        [ class ("absolute " ++ Relic.relicTextColor relicData.rarity)
+        [ class ("absolute sprite relic z-10 " ++ Relic.relicRarityToCssClass relicData.rarity)
         , style "left" (offsetX ++ "px")
         , style "top" (offsetY ++ "px")
         ]
-        [ Html.text "o" ]
+        [ Html.text "" ]
 
 
 heldRelicView : FrontendPlayingState -> GameObjectTypes.RelicData -> Html.Html FrontendMsg
@@ -805,7 +805,7 @@ heldRelicView state relicData =
                 [ Html.text (Relic.relicName relicData.relicType), dropButton relicData.id state.myId ]
             ]
     in
-    UI.card "h-52"
+    UI.card ""
         cardTitle
         [ Html.div
             [ class ("badge dark:text-black " ++ Relic.relicBgColor relicData.rarity) ]
