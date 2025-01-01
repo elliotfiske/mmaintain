@@ -169,7 +169,7 @@ cleanFastStrengthMultiplier rarity xp =
             1.3
 
         Uncommon ->
-            2
+            1.8
 
         Rare ->
             2.2
