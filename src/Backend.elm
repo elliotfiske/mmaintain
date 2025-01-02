@@ -143,7 +143,6 @@ handleClientPerformedAction personId clientId actionOnGamestate model =
             { model | gameState = newGameState }
 
         -- Updates model with the triggered "Backend Triggers" and potentially send a new action to send back to the client.
-        --   This will include the original client!
         ( newerModel, actionsFromTrigger ) =
             -- todo: "Server" is incorrect here (placeholder)
             executeBackendTrigger Server trigger newModel
@@ -328,12 +327,7 @@ andThenAddDirtToSpot point ( model, msg ) =
             else
                 modBy 800 randomValue + 300
     in
-    andThenModel (addDirtToSpot point dirtAmount) ( newModel, msg )
-
-
-addDirtToSpot : GameObjectTypes.Point -> Int -> Model -> ( Model, Cmd BackendMsg )
-addDirtToSpot point amount model =
-    createDirt { point = point, amount = amount } model
+    andThenModel (createDirt { point = point, amount = dirtAmount }) ( newModel, msg )
 
 
 
@@ -359,6 +353,8 @@ executeBackendTrigger performer trigger model =
         ( newModel, newAction ) =
             updateModelFromTrigger trigger model
 
+        -- todo: currently we ignore recursive triggers, but they may
+        -- be useful in the future
         ( finalModel, _ ) =
             executeActionOnModel performer newModel newAction
     in
