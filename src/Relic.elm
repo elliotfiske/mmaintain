@@ -194,7 +194,7 @@ xpMultiplier rarity xp =
             5
 
         Epic ->
-            800
+            8
 
         Legendary ->
             15
