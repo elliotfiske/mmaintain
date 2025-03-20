@@ -2582,16 +2582,16 @@ html {
   position: relative;
 }
 
-.z-50 {
-  z-index: 50;
-}
-
 .z-10 {
   z-index: 10;
 }
 
 .z-20 {
   z-index: 20;
+}
+
+.z-50 {
+  z-index: 50;
 }
 
 .mx-3 {
@@ -2607,12 +2607,12 @@ html {
   display: flex;
 }
 
-.h-4 {
-  height: 1rem;
+.grid {
+  display: grid;
 }
 
-.h-8 {
-  height: 2rem;
+.h-4 {
+  height: 1rem;
 }
 
 .h-auto {
@@ -2623,12 +2623,20 @@ html {
   height: 100%;
 }
 
-.w-64 {
-  width: 16rem;
+.h-32 {
+  height: 8rem;
 }
 
-.w-8 {
-  width: 2rem;
+.h-64 {
+  height: 16rem;
+}
+
+.h-72 {
+  height: 18rem;
+}
+
+.w-64 {
+  width: 16rem;
 }
 
 .w-full {
@@ -2869,6 +2877,26 @@ dialog::backdrop {
 
 .group:hover .group-hover\:opacity-100 {
   opacity: 1;
+}
+
+@media (min-width: 640px) {
+  .sm\:flex-row {
+    flex-direction: row;
+  }
+
+  .sm\:flex-col {
+    flex-direction: column;
+  }
+}
+
+@media (min-width: 768px) {
+  .md\:h-full {
+    height: 100%;
+  }
+
+  .md\:flex-row {
+    flex-direction: row;
+  }
 }
 
 @media (prefers-color-scheme: dark) {

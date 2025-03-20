@@ -133,7 +133,7 @@ handleKey state key =
 
 
 init : Url.Url -> Nav.Key -> ( Model, Cmd FrontendMsg )
-init url key =
+init _ key =
     ( { key = key
       , state = Loading
       }
@@ -405,7 +405,7 @@ renderPlayingState state =
         Just me ->
             Html.div [ class "h-full" ]
                 [ renderModals state me
-                , Html.div [ class "flex justify-end h-full" ]
+                , Html.div [ class "flex justify-end h-full flex-col md:flex-row" ]
                     [ renderMap state
                     , renderMyHUD state me
                     ]
@@ -420,7 +420,7 @@ renderModals state me =
     if state.showingDebugStuff then
         Html.div []
             [ UI.dialog
-                { title = UI.simpleTitle "Debug Stuff :)"
+                { title = UI.simpleTitle "Debug Stuff! :)"
                 , body =
                     debugStuff state
                 , actions =
@@ -466,8 +466,9 @@ renderModals state me =
 
 renderMyHUD : FrontendPlayingState -> PersonData -> Html.Html FrontendMsg
 renderMyHUD state me =
-    Html.div [ class "flex flex-col items-center overflow-auto h-full bg-base-100 mx-3" ]
+    Html.div [ class "flex flex-col items-center overflow-auto bg-base-100 mx-3 h-64 md:h-full" ]
         [ renderXP me
+        , renderOnThisSquare state me
         , renderExpProgress me
         , renderCleanStrength state me
         , renderXPMultiplier state me
@@ -603,6 +604,18 @@ renderHeldRelics state me =
                 ++ renderRelicSlots me (List.length myRelics)
             )
         ]
+
+
+renderOnThisSquare : FrontendPlayingState -> PersonData -> Html.Html FrontendMsg
+renderOnThisSquare state me =
+    case GameObject.getDirtAtLocation me.position state.gameState.dirtDict of
+        Just dirt ->
+            Html.text ("Dirty dirty dirt! " ++  String.fromInt dirt.amount)
+
+        Nothing ->
+            GameObject.relicsAtLocation me.position state.gameState
+                |> List.map (heldRelicView state)
+                |> Html.div [ class "flex flex-col gap-2 flex-grow flex-wrap p-2" ]  
 
 
 renderRelicList : List GameObjectTypes.RelicData -> FrontendPlayingState -> List (Html.Html FrontendMsg)

@@ -317,11 +317,15 @@ addOrModifyDirt dirtData state =
 
 getRarestRelicAtLocation : GameObjectTypes.Point -> GameState -> Maybe RelicData
 getRarestRelicAtLocation point state =
+    relicsAtLocation point state
+        |> List.sortBy byRelicRarity
+        |> List.head
+
+relicsAtLocation : GameObjectTypes.Point -> GameState -> List RelicData
+relicsAtLocation point state =
     Dict.get (Relic.floorPointToLocation point) state.relicsByPosition
         |> Maybe.withDefault RelicDict.empty
         |> RelicDict.values
-        |> List.sortBy byRelicRarity
-        |> List.head
 
 
 byRelicRarity : RelicData -> Int
