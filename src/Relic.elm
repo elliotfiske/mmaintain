@@ -106,33 +106,16 @@ simpleRelicBody text =
     [ Html.text text ]
 
 
-{-| Returns the person ID who holds the relic, if any.
-
-TODO notes for later: this requires going backwards from the relic to the person, which we currently
-just have to search through all the people. This is a bit inefficient, but it's not a big deal for now.
-Can add an index later.
-
--}
-
-
-
--- relicHolder : FrontendPlayingState -> RelicId -> Maybe PersonId
--- relicHolder state relicId =
---     let
---         maybePersonId =
---             Dict.get (playerHolderToLocation state.myId) state.gameState.relicsByPosition
---                 |> Maybe.withDefault RelicDict.empty
---                 |> RelicDict.get relicId
---                 |> Maybe.map .holderId
---     in
---     Maybe.andThen (\personId -> PersonDict.get personId state.gameState.personDict) maybePersonId
+isRelicHeldByPerson : GameState -> RelicId -> PersonId -> Bool
+isRelicHeldByPerson state relicId personId =
+    RelicDict.member relicId (getRelicsHeldByPlayer personId state)
 
 
 relicBody : FrontendPlayingState -> RelicData -> PersonData -> List (Html.Html FrontendMsg)
 relicBody state relic me =
     let
-        cool =
-            False
+        heldByMe =
+            isRelicHeldByPerson state.gameState relic.id state.myId
     in
     case relic.relicType of
         CleanFast ->
@@ -168,8 +151,13 @@ relicBody state relic me =
                             ""
                        )
                 )
-                ++ [ dropAndDoubleActivationButton state.myId people relic.id
-                   ]
+                ++ (if heldByMe then
+                        [ dropAndDoubleActivationButton state.myId people relic.id
+                        ]
+
+                    else
+                        []
+                   )
 
 
 dropAndDoubleActivationButton : PersonId -> List PersonId -> RelicId -> Html.Html FrontendMsg
