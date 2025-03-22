@@ -106,8 +106,34 @@ simpleRelicBody text =
     [ Html.text text ]
 
 
-relicBody : FrontendPlayingState -> RelicData -> List (Html.Html FrontendMsg)
-relicBody state relic =
+{-| Returns the person ID who holds the relic, if any.
+
+TODO notes for later: this requires going backwards from the relic to the person, which we currently
+just have to search through all the people. This is a bit inefficient, but it's not a big deal for now.
+Can add an index later.
+
+-}
+
+
+
+-- relicHolder : FrontendPlayingState -> RelicId -> Maybe PersonId
+-- relicHolder state relicId =
+--     let
+--         maybePersonId =
+--             Dict.get (playerHolderToLocation state.myId) state.gameState.relicsByPosition
+--                 |> Maybe.withDefault RelicDict.empty
+--                 |> RelicDict.get relicId
+--                 |> Maybe.map .holderId
+--     in
+--     Maybe.andThen (\personId -> PersonDict.get personId state.gameState.personDict) maybePersonId
+
+
+relicBody : FrontendPlayingState -> RelicData -> PersonData -> List (Html.Html FrontendMsg)
+relicBody state relic me =
+    let
+        cool =
+            False
+    in
     case relic.relicType of
         CleanFast ->
             simpleRelicBody ("x" ++ String.fromFloat (cleanFastStrengthMultiplier relic.rarity relic.exp) ++ " to Cleaning Strength.")
@@ -123,16 +149,13 @@ relicBody state relic =
                 baseExp =
                     dropDoubleCurrentExperience relic.rarity (List.length people)
 
-                me =
-                    PersonDict.get state.myId state.gameState.personDict
-
                 playerXpMultiplier =
-                    Maybe.map (xpMultiplierForPlayer state.gameState) me
-                        |> Maybe.withDefault 1
-                        |> round
+                    xpMultiplierForPlayer state.gameState me
 
                 finalExp =
-                    baseExp * playerXpMultiplier
+                    toFloat baseExp
+                        * playerXpMultiplier
+                        |> round
             in
             Markdown.toHtml Nothing
                 ("Gain **"

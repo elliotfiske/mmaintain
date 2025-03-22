@@ -8,7 +8,7 @@ import Browser.Navigation as Nav
 import Dict
 import DirtDict
 import GameObject
-import GameObjectTypes exposing (ActionOnGamestate(..), Direction(..), PersonData, PersonId)
+import GameObjectTypes exposing (ActionOnGamestate(..), Direction(..), DirtData, PersonData, PersonId)
 import Html exposing (..)
 import Html.Attributes exposing (..)
 import Html.Events
@@ -405,9 +405,20 @@ renderPlayingState state =
         Just me ->
             Html.div [ class "h-full" ]
                 [ renderModals state me
-                , Html.div [ class "flex justify-end h-full flex-col md:flex-row" ]
-                    [ renderMap state
+                , Html.div
+                    [ class
+                        ("grid h-full justify-end "
+                            -- mobile layout: 3 rows (HUD, map, on-this-square)
+                            ++ "grid-rows-[100px_1fr_80px] grid-cols-1 "
+                            -- desktop layout: 2 rows (map takes up 2 rows), and a fixed sidebar
+                            ++ "md:grid-rows-2 md:grid-cols-[1fr_300px] "
+                            -- huge layout: columns are 3/4 and 1/4
+                            ++ "xl:grid-cols-[3fr_1fr]"
+                        )
+                    ]
+                    [ renderMap state me
                     , renderMyHUD state me
+                    , renderOnThisSquare state me
                     ]
                 ]
 
@@ -468,7 +479,6 @@ renderMyHUD : FrontendPlayingState -> PersonData -> Html.Html FrontendMsg
 renderMyHUD state me =
     Html.div [ class "flex flex-col items-center overflow-auto bg-base-100 mx-3 h-64 md:h-full" ]
         [ renderXP me
-        , renderOnThisSquare state me
         , renderExpProgress me
         , renderCleanStrength state me
         , renderXPMultiplier state me
@@ -503,13 +513,13 @@ debugDicts { gameState, myId } =
         )
 
 
-renderMap : FrontendPlayingState -> Html.Html FrontendMsg
-renderMap state =
+renderMap : FrontendPlayingState -> PersonData -> Html.Html FrontendMsg
+renderMap state me =
     renderPeople state
         ++ renderDirt state
         ++ renderFloorRelics state
-        ++ renderTooltipLayer state
-        |> Html.div [ class "bg-green-800 flex-grow relative overflow-hidden", id "main-map", tabindex 0 ]
+        ++ renderTooltipLayer state me
+        |> Html.div [ class "order-2 md:order-none md:row-span-2 bg-green-800 relative overflow-hidden", id "main-map", tabindex 0 ]
 
 
 renderDirt : FrontendPlayingState -> List (Html.Html FrontendMsg)
@@ -601,6 +611,7 @@ renderHeldRelics state me =
             (renderRelicList
                 myRelics
                 state
+                me
                 ++ renderRelicSlots me (List.length myRelics)
             )
         ]
@@ -608,19 +619,34 @@ renderHeldRelics state me =
 
 renderOnThisSquare : FrontendPlayingState -> PersonData -> Html.Html FrontendMsg
 renderOnThisSquare state me =
-    case GameObject.getDirtAtLocation me.position state.gameState.dirtDict of
-        Just dirt ->
-            Html.text ("Dirty dirty dirt! " ++  String.fromInt dirt.amount)
+    Html.div [ class "order-3 md:order-none" ]
+        [ case GameObject.getDirtAtLocation me.position state.gameState.dirtDict of
+            Just dirt ->
+                renderDirtOnThisSquare state me dirt
 
-        Nothing ->
-            GameObject.relicsAtLocation me.position state.gameState
-                |> List.map (heldRelicView state)
-                |> Html.div [ class "flex flex-col gap-2 flex-grow flex-wrap p-2" ]  
+            Nothing ->
+                GameObject.relicsAtLocation me.position state.gameState
+                    |> List.map (heldRelicView state me)
+                    |> Html.div [ class "flex flex-col gap-2 flex-grow flex-wrap p-2" ]
+        ]
 
 
-renderRelicList : List GameObjectTypes.RelicData -> FrontendPlayingState -> List (Html.Html FrontendMsg)
-renderRelicList list state =
-    List.map (heldRelicView state) list
+renderDirtOnThisSquare : FrontendPlayingState -> PersonData -> DirtData -> Html.Html FrontendMsg
+renderDirtOnThisSquare state me dirt =
+    Html.div [ class "prose" ]
+        [ Html.h2 [ class "text-center" ]
+            [ Html.text ("Dirty dirty dirt! " ++ String.fromInt dirt.amount) ]
+        , Html.button
+            [ class "btn btn-primary"
+            , Html.Events.onClick (PerformAction (Clean me.id dirt.id))
+            ]
+            [ text "Clean it!" ]
+        ]
+
+
+renderRelicList : List GameObjectTypes.RelicData -> FrontendPlayingState -> PersonData -> List (Html.Html FrontendMsg)
+renderRelicList list state me =
+    List.map (heldRelicView state me) list
 
 
 renderRelicSlots : PersonData -> Int -> List (Html.Html FrontendMsg)
@@ -691,18 +717,18 @@ renderFloorRelics state =
     List.map (floorRelicView state.cameraPosition) (rarestRelicAtPoints state)
 
 
-renderTooltipLayer : FrontendPlayingState -> List (Html.Html FrontendMsg)
-renderTooltipLayer state =
+renderTooltipLayer : FrontendPlayingState -> PersonData -> List (Html.Html FrontendMsg)
+renderTooltipLayer state me =
     relicsOnFloor state
-        |> List.map (renderRelicTooltip state)
+        |> List.map (renderRelicTooltip state me)
 
 
 tooltipClasses =
     "absolute invisible group-hover:visible opacity-0 group-hover:opacity-100 transition"
 
 
-renderRelicTooltip : FrontendPlayingState -> ( GameObjectTypes.Point, List GameObjectTypes.RelicData ) -> Html.Html FrontendMsg
-renderRelicTooltip state ( relicPileLocation, relics ) =
+renderRelicTooltip : FrontendPlayingState -> PersonData -> ( GameObjectTypes.Point, List GameObjectTypes.RelicData ) -> Html.Html FrontendMsg
+renderRelicTooltip state me ( relicPileLocation, relics ) =
     let
         ( offsetX, offsetY ) =
             renderedOffset relicPileLocation state.cameraPosition
@@ -724,13 +750,13 @@ renderRelicTooltip state ( relicPileLocation, relics ) =
                 , style "left" "50px"
                 , style "top" "0px"
                 ]
-                (List.map (renderRelicTooltipBody state) relics)
+                (List.map (renderRelicTooltipBody state me) relics)
             ]
         ]
 
 
-renderRelicTooltipBody : FrontendPlayingState -> GameObjectTypes.RelicData -> Html.Html FrontendMsg
-renderRelicTooltipBody state relicData =
+renderRelicTooltipBody : FrontendPlayingState -> PersonData -> GameObjectTypes.RelicData -> Html.Html FrontendMsg
+renderRelicTooltipBody state me relicData =
     let
         cardTitle =
             [ Html.div [ class "flex justify-between w-full" ]
@@ -742,7 +768,7 @@ renderRelicTooltipBody state relicData =
         [ relicRarityBadge relicData.rarity
         , Html.div
             [ class "flex flex-col justify-between" ]
-            (Relic.relicBody state relicData)
+            (Relic.relicBody state relicData me)
         ]
 
 
@@ -810,8 +836,8 @@ floorRelicView camera ( floorPosition, relicData ) =
         [ Html.text "" ]
 
 
-heldRelicView : FrontendPlayingState -> GameObjectTypes.RelicData -> Html.Html FrontendMsg
-heldRelicView state relicData =
+heldRelicView : FrontendPlayingState -> PersonData -> GameObjectTypes.RelicData -> Html.Html FrontendMsg
+heldRelicView state me relicData =
     let
         cardTitle =
             [ Html.div [ class "flex justify-between w-full" ]
@@ -825,7 +851,7 @@ heldRelicView state relicData =
             [ Html.text (Relic.relicRarityName relicData.rarity) ]
         , Html.div
             [ class "flex flex-col justify-between" ]
-            (Relic.relicBody state relicData)
+            (Relic.relicBody state relicData me)
         ]
 
 

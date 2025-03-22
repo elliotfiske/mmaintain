@@ -2570,8 +2570,16 @@ html {
   border-top-right-radius: var(--rounded-box, 1rem);
 }
 
+.visible {
+  visibility: visible;
+}
+
 .invisible {
   visibility: hidden;
+}
+
+.fixed {
+  position: fixed;
 }
 
 .absolute {
@@ -2592,6 +2600,18 @@ html {
 
 .z-50 {
   z-index: 50;
+}
+
+.order-1 {
+  order: 1;
+}
+
+.order-2 {
+  order: 2;
+}
+
+.order-3 {
+  order: 3;
 }
 
 .mx-3 {
@@ -2645,6 +2665,18 @@ html {
 
 .flex-grow {
   flex-grow: 1;
+}
+
+.grid-cols-1 {
+  grid-template-columns: repeat(1, minmax(0, 1fr));
+}
+
+.grid-rows-\[100px_1fr_80px\] {
+  grid-template-rows: 100px 1fr 80px;
+}
+
+.grid-rows-\[200px_1fr_80px\] {
+  grid-template-rows: 200px 1fr 80px;
 }
 
 .flex-col {
@@ -2890,12 +2922,52 @@ dialog::backdrop {
 }
 
 @media (min-width: 768px) {
+  .md\:order-none {
+    order: 0;
+  }
+
+  .md\:row-span-2 {
+    grid-row: span 2 / span 2;
+  }
+
   .md\:h-full {
     height: 100%;
   }
 
+  .md\:grid-cols-\[1fr_200px\] {
+    grid-template-columns: 1fr 200px;
+  }
+
+  .md\:grid-cols-\[1fr_300px\] {
+    grid-template-columns: 1fr 300px;
+  }
+
+  .md\:grid-cols-\[1fr_00px\] {
+    grid-template-columns: 1fr 00px;
+  }
+
+  .md\:grid-rows-2 {
+    grid-template-rows: repeat(2, minmax(0, 1fr));
+  }
+
   .md\:flex-row {
     flex-direction: row;
+  }
+}
+
+@media (min-width: 1024px) {
+  .lg\:grid-cols-\[2fr_1fr\] {
+    grid-template-columns: 2fr 1fr;
+  }
+}
+
+@media (min-width: 1280px) {
+  .xl\:grid-cols-\[2fr_1fr\] {
+    grid-template-columns: 2fr 1fr;
+  }
+
+  .xl\:grid-cols-\[3fr_1fr\] {
+    grid-template-columns: 3fr 1fr;
   }
 }
 
