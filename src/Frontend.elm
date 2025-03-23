@@ -299,6 +299,13 @@ updateStateWithAction who action prevState =
         |> updateCameraPosition
 
 
+mapSizeInTiles : { width : Float, height : Float } -> GameObjectTypes.Point
+mapSizeInTiles { width, height } =
+    { x = truncate (width / renderOffsetMultiplier)
+    , y = truncate (height / renderOffsetMultiplier)
+    }
+
+
 updateCameraPosition : FrontendPlayingState -> FrontendPlayingState
 updateCameraPosition state =
     let
@@ -310,14 +317,14 @@ updateCameraPosition state =
             let
                 prevCamera =
                     state.cameraPosition
-
-                mapSizeTiles : GameObjectTypes.Point
-                mapSizeTiles =
-                    { x = truncate (mapSizePixels.width / renderOffsetMultiplier)
-                    , y = truncate (mapSizePixels.height / renderOffsetMultiplier)
-                    }
             in
-            { state | cameraPosition = Util.calculateCameraPosition mapSizeTiles prevCamera me.position }
+            { state
+                | cameraPosition =
+                    Util.calculateCameraPosition
+                        (mapSizeInTiles mapSizePixels)
+                        prevCamera
+                        me.position
+            }
 
         _ ->
             state
@@ -518,6 +525,7 @@ renderMap state me =
     renderPeople state
         ++ renderDirt state
         ++ renderFloorRelics state
+        ++ renderClickableLayer state
         ++ renderTooltipLayer state me
         |> Html.div [ class "order-2 md:order-none md:row-span-2 bg-green-800 relative overflow-hidden", id "main-map", tabindex 0 ]
 
@@ -723,36 +731,85 @@ renderTooltipLayer state me =
         |> List.map (renderRelicTooltip state me)
 
 
-tooltipClasses =
-    "absolute invisible group-hover:visible opacity-0 group-hover:opacity-100 transition"
-
-
 renderRelicTooltip : FrontendPlayingState -> PersonData -> ( GameObjectTypes.Point, List GameObjectTypes.RelicData ) -> Html.Html FrontendMsg
 renderRelicTooltip state me ( relicPileLocation, relics ) =
     let
         ( offsetX, offsetY ) =
             renderedOffset relicPileLocation state.cameraPosition
+
+        tooltipClasses =
+            "absolute invisible group-hover:visible opacity-0 group-hover:opacity-100 transition"
     in
     Html.div [ class "absolute z-50", style "left" (offsetX ++ "px"), style "top" (offsetY ++ "px") ]
         [ Html.div [ class "relative group" ]
             [ -- Empty space 32px by 32px for mouse event
               Html.div
-                [ class "absolute"
-                , style "left" "0px"
-                , style "top" "0px"
+                [ class "absolute left-0 top-0"
                 , style "width" (String.fromInt renderOffsetMultiplier ++ "px")
                 , style "height" (String.fromInt renderOffsetMultiplier ++ "px")
                 , Html.Events.onClick (ClickTarget relicPileLocation)
                 ]
                 []
             , Html.div
-                [ class (tooltipClasses ++ " flex flex-col")
+                [ class (tooltipClasses ++ " w-64 flex flex-col")
                 , style "left" "50px"
                 , style "top" "0px"
                 ]
                 (List.map (renderRelicTooltipBody state me) relics)
             ]
         ]
+
+
+renderClickableLayer : FrontendPlayingState -> List (Html.Html FrontendMsg)
+renderClickableLayer state =
+    let
+        mapHeightInTiles : Int
+        mapHeightInTiles =
+            state.mapSize
+                |> Maybe.map (mapSizeInTiles >> .y)
+                |> Maybe.withDefault 0
+    in
+    List.range 0 mapHeightInTiles
+        |> List.concatMap (renderClickableTileRow state)
+
+
+renderClickableTileRow : FrontendPlayingState -> Int -> List (Html.Html FrontendMsg)
+renderClickableTileRow state row =
+    let
+        mapWidthInTiles : Int
+        mapWidthInTiles =
+            state.mapSize
+                |> Maybe.map (mapSizeInTiles >> .x)
+                |> Maybe.withDefault 0
+    in
+    List.range 0 mapWidthInTiles
+        |> List.map (renderClickableTile state row)
+
+
+renderClickableTile : FrontendPlayingState -> Int -> Int -> Html.Html FrontendMsg
+renderClickableTile state row col =
+    let
+        point =
+            { x = col, y = row }
+
+        offsetX =
+            col * renderOffsetMultiplier |> String.fromInt
+
+        offsetY =
+            row * renderOffsetMultiplier |> String.fromInt
+
+        worldPoint =
+            Util.addPoints state.cameraPosition point
+    in
+    Html.div
+        [ class "absolute"
+        , style "left" (offsetX ++ "px")
+        , style "top" (offsetY ++ "px")
+        , style "width" (String.fromInt renderOffsetMultiplier ++ "px")
+        , style "height" (String.fromInt renderOffsetMultiplier ++ "px")
+        , Html.Events.onClick (ClickTarget worldPoint)
+        ]
+        []
 
 
 renderRelicTooltipBody : FrontendPlayingState -> PersonData -> GameObjectTypes.RelicData -> Html.Html FrontendMsg
@@ -838,20 +895,28 @@ floorRelicView camera ( floorPosition, relicData ) =
 
 heldRelicView : FrontendPlayingState -> PersonData -> GameObjectTypes.RelicData -> Html.Html FrontendMsg
 heldRelicView state me relicData =
-    let
-        cardTitle =
-            [ Html.div [ class "flex justify-between w-full" ]
-                [ Html.text (Relic.relicName relicData.relicType), dropButton relicData.id state.myId ]
-            ]
-    in
     UI.card ""
-        cardTitle
-        [ Html.div
-            [ class ("badge dark:text-black " ++ Relic.relicBgColor relicData.rarity) ]
-            [ Html.text (Relic.relicRarityName relicData.rarity) ]
+        [ relicCardTitle state me relicData ]
+        [ relicRarityBadge relicData.rarity
         , Html.div
             [ class "flex flex-col justify-between" ]
             (Relic.relicBody state relicData me)
+        ]
+
+
+relicCardTitle : FrontendPlayingState -> PersonData -> GameObjectTypes.RelicData -> Html.Html FrontendMsg
+relicCardTitle state me relicData =
+    let
+        isHeldByMe =
+            Relic.isRelicHeldByPerson state.gameState relicData.id me.id
+    in
+    Html.div [ class "flex justify-between w-full" ]
+        [ Html.text (Relic.relicName relicData.relicType)
+        , if isHeldByMe then
+            dropButton relicData.id state.myId
+
+          else
+            pickUpButton relicData.id state.myId
         ]
 
 
@@ -863,6 +928,16 @@ dropButton relicId myId =
         , id "drop-button"
         ]
         [ Outlined.file_download 18 Coloring.Inherit ]
+
+
+pickUpButton : GameObjectTypes.RelicId -> PersonId -> Html FrontendMsg
+pickUpButton relicId myId =
+    Html.button
+        [ Html.Events.onClick (PerformAction (PickUpRelic relicId myId))
+        , class "btn btn-sm btn-outline btn-square"
+        , id "pickup-button"
+        ]
+        [ Outlined.file_upload 18 Coloring.Inherit ]
 
 
 tryCleaning : FrontendPlayingState -> ActionOnGamestate

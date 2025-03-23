@@ -132,6 +132,11 @@ groupWhile predicate list =
         |> List.map (\( a, rest ) -> a :: rest)
 
 
+addPoints : GameObjectTypes.Point -> GameObjectTypes.Point -> GameObjectTypes.Point
+addPoints point1 point2 =
+    { x = point1.x + point2.x, y = point1.y + point2.y }
+
+
 {-| Rules for camera movement:
 
 Must not go lower than 0,0
