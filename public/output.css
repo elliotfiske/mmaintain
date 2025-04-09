@@ -2805,6 +2805,16 @@ html {
   margin-right: 0.75rem;
 }
 
+.mx-auto {
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.mx-4 {
+  margin-left: 1rem;
+  margin-right: 1rem;
+}
+
 .mt-8 {
   margin-top: 2rem;
 }
@@ -2865,6 +2875,14 @@ html {
   grid-template-rows: 200px 1fr 120px;
 }
 
+.grid-rows-\[200px_1fr_1fr_120px\] {
+  grid-template-rows: 200px 1fr 1fr 120px;
+}
+
+.grid-rows-\[200px_100px_1fr_120px\] {
+  grid-template-rows: 200px 100px 1fr 120px;
+}
+
 .flex-col {
   flex-direction: column;
 }
@@ -2879,6 +2897,10 @@ html {
 
 .justify-end {
   justify-content: flex-end;
+}
+
+.justify-center {
+  justify-content: center;
 }
 
 .justify-between {
@@ -2972,6 +2994,11 @@ html {
 .py-4 {
   padding-top: 1rem;
   padding-bottom: 1rem;
+}
+
+.px-8 {
+  padding-left: 2rem;
+  padding-right: 2rem;
 }
 
 .pt-2 {

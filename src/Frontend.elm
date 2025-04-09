@@ -492,6 +492,7 @@ renderMyHUD state me =
         , renderExpProgress me
         , renderCleanStrength state me
         , renderXPMultiplier state me
+        , renderMobileHamburgerButton
         ]
 
 
@@ -663,9 +664,8 @@ renderDesktopRelicSidebar state me =
 
 renderHeldRelics : FrontendPlayingState -> PersonData -> Html.Html FrontendMsg
 renderHeldRelics state me =
-    Html.div []
-        [ renderMobileHamburgerButton
-        , renderMobileRelicDialog state me
+    Html.div [ class "order-4 md:order-none" ]
+        [ renderMobileRelicDialog state me
         , renderDesktopRelicSidebar state me
         ]
 
@@ -689,11 +689,13 @@ renderDirtOnThisSquare state me dirt =
     Html.div [ class "prose" ]
         [ Html.h2 [ class "text-center" ]
             [ Html.text ("Dirty dirty dirt! " ++ String.fromInt dirt.amount) ]
-        , Html.button
-            [ class "btn btn-primary"
-            , Html.Events.onClick (PerformAction (Clean me.id dirt.id))
+        , Html.div [ class "flex justify-center px-8" ]
+            [ Html.button
+                [ class "btn btn-primary w-full"
+                , Html.Events.onClick (PerformAction (Clean me.id dirt.id))
+                ]
+                [ text "Clean it!" ]
             ]
-            [ text "Clean it!" ]
         ]
 
 
