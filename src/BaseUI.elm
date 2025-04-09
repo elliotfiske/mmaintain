@@ -1,4 +1,4 @@
-module BaseUI exposing (card, dialog, simpleTitle)
+module BaseUI exposing (basicDialog, card, dialog, simpleTitle)
 
 import Html exposing (Html, div, h1, node, text)
 import Html.Attributes exposing (attribute, class)
@@ -35,6 +35,16 @@ dialog content =
         [ div
             [ class "modal-box prose" ]
             [ content.title, content.body, actionContent ]
+        ]
+
+
+basicDialog : Html msg -> Html msg
+basicDialog content =
+    node "modal-dialog"
+        [ class "modal", attribute "open" "true" ]
+        [ div
+            [ class "modal-box prose h-full" ]
+            [ content ]
         ]
 
 

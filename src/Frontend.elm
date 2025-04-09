@@ -188,6 +188,9 @@ update msg model =
         ToggleDebugStuff ->
             ( modelUpdateIfPlaying toggleDebugStuff model, Cmd.none )
 
+        ToggleMobileRelicMenu ->
+            ( modelUpdateIfPlaying toggleMobileRelicMenu model, Cmd.none )
+
         ReceivedMapSize size ->
             ( modelUpdateIfPlaying (\state -> { state | mapSize = Just size } |> updateCameraPosition) model, Cmd.none )
 
@@ -195,6 +198,11 @@ update msg model =
 toggleDebugStuff : FrontendPlayingState -> FrontendPlayingState
 toggleDebugStuff state =
     { state | showingDebugStuff = not state.showingDebugStuff }
+
+
+toggleMobileRelicMenu : FrontendPlayingState -> FrontendPlayingState
+toggleMobileRelicMenu state =
+    { state | mobileRelicMenuOpen = not state.mobileRelicMenuOpen }
 
 
 modelUpdateIfPlaying : (FrontendPlayingState -> FrontendPlayingState) -> Model -> Model
@@ -369,6 +377,7 @@ initFrontendPlayingState { gameState, myId } =
     , showingDebugStuff = False
     , mapSize = Nothing
     , cameraPosition = { x = 0, y = 0 }
+    , mobileRelicMenuOpen = False
     }
         |> updateCameraPosition
 
@@ -398,12 +407,7 @@ renderModel model =
 
 extractMyself : FrontendPlayingState -> Maybe PersonData
 extractMyself state =
-    case PersonDict.get state.myId state.gameState.personDict of
-        Just myself ->
-            Just myself
-
-        Nothing ->
-            Nothing
+    PersonDict.get state.myId state.gameState.personDict
 
 
 renderPlayingState : FrontendPlayingState -> Html.Html FrontendMsg
@@ -601,26 +605,68 @@ renderXPMultiplier state me =
             ]
 
 
-renderHeldRelics : FrontendPlayingState -> PersonData -> Html.Html FrontendMsg
-renderHeldRelics state me =
+renderRelicContent : FrontendPlayingState -> PersonData -> List (Html.Html FrontendMsg)
+renderRelicContent state me =
     let
         myRelics =
             Relic.getRelicsHeldByPlayer state.myId state.gameState
                 |> RelicDict.values
     in
-    -- TODO: Put this in a dialog and inside a hamburger when in mobile display
-    Html.div [ class "w-full flex flex-col overflow-scroll order-4 md:order-none hidden md:block md:row-span-2" ]
-        [ Html.div [ class "prose mt-8" ]
-            [ Html.h2 [ class "text-center" ]
-                [ Html.text "My Relics:" ]
-            ]
-        , Html.div [ class "flex flex-col gap-2 flex-grow flex-wrap p-2", id "relic-list" ]
-            (renderRelicList
-                myRelics
-                state
-                me
-                ++ renderRelicSlots me (List.length myRelics)
+    [ Html.div [ class "prose mt-8" ]
+        [ Html.h2 [ class "text-center" ]
+            [ Html.text "My Relics:" ]
+        ]
+    , Html.div [ class "flex flex-col gap-2 flex-grow flex-wrap p-2", id "relic-list" ]
+        (renderRelicList
+            myRelics
+            state
+            me
+            ++ renderRelicSlots me (List.length myRelics)
+        )
+    ]
+
+
+renderMobileHamburgerButton : Html.Html FrontendMsg
+renderMobileHamburgerButton =
+    Html.button
+        [ class "btn btn-square btn-ghost md:hidden fixed top-4 right-4 z-50"
+        , Html.Events.onClick ToggleMobileRelicMenu
+        ]
+        [ Outlined.menu 24 Coloring.Inherit ]
+
+
+renderMobileRelicDialog : FrontendPlayingState -> PersonData -> Html.Html FrontendMsg
+renderMobileRelicDialog state me =
+    if state.mobileRelicMenuOpen then
+        UI.basicDialog
+            (Html.div
+                [ class "flex flex-col h-full" ]
+                [ Html.div [ class "flex-grow overflow-y-auto" ]
+                    (renderRelicContent state me)
+                , button
+                    [ class "btn btn-primary w-full"
+                    , Html.Events.onClick ToggleMobileRelicMenu
+                    ]
+                    [ text "Close" ]
+                ]
             )
+
+    else
+        text ""
+
+
+renderDesktopRelicSidebar : FrontendPlayingState -> PersonData -> Html.Html FrontendMsg
+renderDesktopRelicSidebar state me =
+    Html.div [ class "w-full flex flex-col overflow-scroll order-4 md:order-none hidden md:block md:row-span-2" ]
+        (renderRelicContent state me)
+
+
+renderHeldRelics : FrontendPlayingState -> PersonData -> Html.Html FrontendMsg
+renderHeldRelics state me =
+    Html.div []
+        [ renderMobileHamburgerButton
+        , renderMobileRelicDialog state me
+        , renderDesktopRelicSidebar state me
         ]
 
 

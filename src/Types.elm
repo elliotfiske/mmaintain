@@ -60,6 +60,7 @@ type alias FrontendPlayingState =
     , showingDebugStuff : Bool
     , mapSize : Maybe { width : Float, height : Float }
     , cameraPosition : Point
+    , mobileRelicMenuOpen : Bool
     }
 
 
@@ -101,6 +102,7 @@ type FrontendMsg
     | Tick Posix
     | ToggleDebugStuff
     | ReceivedMapSize { width : Float, height : Float }
+    | ToggleMobileRelicMenu
     | NoOpFrontendMsg
 
 
