@@ -2130,6 +2130,12 @@ html {
   background-color: #0f0b25;
 }
 
+.mockup-phone .display {
+  overflow: hidden;
+  border-radius: 40px;
+  margin-top: -25px;
+}
+
 .mockup-browser .mockup-browser-toolbar .input {
   position: relative;
   margin-left: auto;
@@ -2614,6 +2620,14 @@ html {
   order: 3;
 }
 
+.order-4 {
+  order: 4;
+}
+
+.order-1 {
+  order: 1;
+}
+
 .mx-3 {
   margin-left: 0.75rem;
   margin-right: 0.75rem;
@@ -2629,6 +2643,10 @@ html {
 
 .grid {
   display: grid;
+}
+
+.hidden {
+  display: none;
 }
 
 .h-4 {
@@ -2667,6 +2685,18 @@ html {
   grid-template-rows: 100px 1fr 80px;
 }
 
+.grid-rows-\[100px_100px_1fr_80px\] {
+  grid-template-rows: 100px 100px 1fr 80px;
+}
+
+.grid-rows-\[200px_1fr_80px\] {
+  grid-template-rows: 200px 1fr 80px;
+}
+
+.grid-rows-\[200px_1fr_120px\] {
+  grid-template-rows: 200px 1fr 120px;
+}
+
 .flex-col {
   flex-direction: column;
 }
@@ -2697,6 +2727,10 @@ html {
 
 .overflow-hidden {
   overflow: hidden;
+}
+
+.overflow-scroll {
+  overflow: scroll;
 }
 
 .truncate {
@@ -2900,12 +2934,24 @@ dialog::backdrop {
 }
 
 @media (min-width: 768px) {
+  .md\:visible {
+    visibility: visible;
+  }
+
   .md\:order-none {
     order: 0;
   }
 
+  .md\:col-span-2 {
+    grid-column: span 2 / span 2;
+  }
+
   .md\:row-span-2 {
     grid-row: span 2 / span 2;
+  }
+
+  .md\:block {
+    display: block;
   }
 
   .md\:h-full {
@@ -2916,8 +2962,20 @@ dialog::backdrop {
     grid-template-columns: 1fr 300px;
   }
 
+  .md\:grid-cols-\[1fr_1fr_300px\] {
+    grid-template-columns: 1fr 1fr 300px;
+  }
+
   .md\:grid-rows-2 {
     grid-template-rows: repeat(2, minmax(0, 1fr));
+  }
+
+  .md\:grid-rows-\[1fr_100px\] {
+    grid-template-rows: 1fr 100px;
+  }
+
+  .md\:grid-rows-\[1fr_200px\] {
+    grid-template-rows: 1fr 200px;
   }
 }
 

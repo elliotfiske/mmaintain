@@ -416,14 +416,13 @@ renderPlayingState state =
                     [ class
                         ("grid h-full justify-end "
                             -- mobile layout: 3 rows (HUD, map, on-this-square)
-                            ++ "grid-rows-[100px_1fr_80px] grid-cols-1 "
+                            ++ "grid-rows-[200px_1fr_120px] grid-cols-1 "
                             -- desktop layout: 2 rows (map takes up 2 rows), and a fixed sidebar
-                            ++ "md:grid-rows-2 md:grid-cols-[1fr_300px] "
-                            -- huge layout: columns are 3/4 and 1/4
-                            ++ "xl:grid-cols-[3fr_1fr]"
+                            ++ "md:grid-rows-[1fr_200px] md:grid-cols-[1fr_1fr_300px] "
                         )
                     ]
                     [ renderMap state me
+                    , renderHeldRelics state me
                     , renderMyHUD state me
                     , renderOnThisSquare state me
                     ]
@@ -484,12 +483,11 @@ renderModals state me =
 
 renderMyHUD : FrontendPlayingState -> PersonData -> Html.Html FrontendMsg
 renderMyHUD state me =
-    Html.div [ class "flex flex-col items-center overflow-auto bg-base-100 mx-3 h-64 md:h-full" ]
+    Html.div [ class "flex flex-col items-center bg-base-100 mx-3 h-64 order-1 md:order-none md:h-full" ]
         [ renderXP me
         , renderExpProgress me
         , renderCleanStrength state me
         , renderXPMultiplier state me
-        , renderHeldRelics state me
         ]
 
 
@@ -497,16 +495,16 @@ debugStuff : FrontendPlayingState -> Html.Html FrontendMsg
 debugStuff state =
     if state.showingDebugStuff then
         Html.div [ class "flex flex-col" ]
-            ([ Html.button [ Html.Events.onClick ClickedPleaseMakeMeDirty, class "btn btn-primary" ] [ text "Add Dirt" ] ]
-                ++ debugDicts state
+            (Html.button [ Html.Events.onClick ClickedPleaseMakeMeDirty, class "btn btn-primary" ] [ text "Add Dirt" ]
+                :: debugDictsView state
             )
 
     else
         Html.text ""
 
 
-debugDicts : FrontendPlayingState -> List (Html.Html FrontendMsg)
-debugDicts { gameState, myId } =
+debugDictsView : FrontendPlayingState -> List (Html.Html FrontendMsg)
+debugDictsView { gameState, myId } =
     Markdown.toHtml
         Nothing
         ("PersonDict: "
@@ -527,7 +525,7 @@ renderMap state me =
         ++ renderFloorRelics state
         ++ renderClickableLayer state
         ++ renderTooltipLayer state me
-        |> Html.div [ class "order-2 md:order-none md:row-span-2 bg-green-800 relative overflow-hidden", id "main-map", tabindex 0 ]
+        |> Html.div [ class "order-2 md:order-none md:col-span-2 bg-green-800 relative overflow-hidden", id "main-map", tabindex 0 ]
 
 
 renderDirt : FrontendPlayingState -> List (Html.Html FrontendMsg)
@@ -610,7 +608,8 @@ renderHeldRelics state me =
             Relic.getRelicsHeldByPlayer state.myId state.gameState
                 |> RelicDict.values
     in
-    Html.div [ class "w-full flex flex-col flex-gro" ]
+    -- TODO: Put this in a dialog and inside a hamburger when in mobile display
+    Html.div [ class "w-full flex flex-col overflow-scroll order-4 md:order-none hidden md:block md:row-span-2" ]
         [ Html.div [ class "prose mt-8" ]
             [ Html.h2 [ class "text-center" ]
                 [ Html.text "My Relics:" ]
