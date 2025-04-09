@@ -17,6 +17,7 @@ import Lamdera
 import Markdown
 import Material.Icons.Outlined as Outlined
 import Material.Icons.Types as Coloring
+import Modals
 import PersonDict
 import Relic
 import RelicDict
@@ -428,7 +429,7 @@ renderPlayingState state =
 renderPlayingStateWithMe : FrontendPlayingState -> PersonData -> Html.Html FrontendMsg
 renderPlayingStateWithMe state me =
     Html.div [ class "h-full" ]
-        [ renderModals state me
+        [ Modals.render state me
         , Html.div
             [ class
                 ("grid h-full justify-end "
@@ -444,81 +445,6 @@ renderPlayingStateWithMe state me =
             , renderOnThisSquare state me
             ]
         ]
-
-
-renderModals : FrontendPlayingState -> PersonData -> Html.Html FrontendMsg
-renderModals state me =
-    if state.showingDebugStuff then
-        renderDebugModal state
-
-    else if DirtDict.size state.gameState.dirtDict == 0 then
-        renderVictoryModal me
-
-    else
-        text ""
-
-
-renderDebugModal : FrontendPlayingState -> Html.Html FrontendMsg
-renderDebugModal state =
-    Html.div []
-        [ UI.dialog
-            { title = UI.simpleTitle "Debug Stuff! :)"
-            , body = debugStuff state
-            , actions = renderDebugModalActions
-            }
-        ]
-
-
-renderDebugModalActions : Html.Html FrontendMsg
-renderDebugModalActions =
-    button
-        [ class "btn btn-primary"
-        , Html.Events.onClick ToggleDebugStuff
-        ]
-        [ text "Close" ]
-
-
-renderVictoryModal : PersonData -> Html.Html FrontendMsg
-renderVictoryModal me =
-    UI.dialog
-        { title = renderVictoryTitle
-        , body = renderVictoryBody me
-        , actions = renderVictoryActions
-        }
-
-
-renderVictoryTitle : Html.Html FrontendMsg
-renderVictoryTitle =
-    h3
-        [ class "text-lg font-bold" ]
-        [ text "THE PARK IS CLEAN!!!!" ]
-
-
-renderVictoryBody : PersonData -> Html.Html FrontendMsg
-renderVictoryBody me =
-    Html.div []
-        [ img [ src "yeah.gif", class "w-full" ] []
-        , p
-            [ class "py-4" ]
-            [ text (makeVictoryMessage me) ]
-        ]
-
-
-makeVictoryMessage : PersonData -> String
-makeVictoryMessage me =
-    "Congratulations, the park is clean! You did this many clean actions: "
-        ++ String.fromInt me.stats.cleanCount
-        ++ " and you finished off this many pollution patches: "
-        ++ String.fromInt me.stats.clearCount
-
-
-renderVictoryActions : Html.Html FrontendMsg
-renderVictoryActions =
-    button
-        [ class "btn btn-primary"
-        , Html.Events.onClick ClickedPleaseMakeMeDirty
-        ]
-        [ text "I'M NOT DONE, ADD MORE DIRT!" ]
 
 
 renderMyHUD : FrontendPlayingState -> PersonData -> Html.Html FrontendMsg
