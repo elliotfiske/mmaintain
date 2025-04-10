@@ -14,6 +14,7 @@ import Html.Attributes exposing (..)
 import Html.Events
 import Json.Decode as Decode
 import Lamdera
+import MapRenderer
 import Markdown
 import Material.Icons.Outlined as Outlined
 import Material.Icons.Types as Coloring
@@ -487,12 +488,7 @@ debugDictsView { gameState, myId } =
 
 renderMap : FrontendPlayingState -> PersonData -> Html.Html FrontendMsg
 renderMap state me =
-    renderPeople state
-        ++ renderDirt state
-        ++ renderFloorRelics state
-        ++ renderClickableLayer state
-        ++ renderTooltipLayer state me
-        |> Html.div [ class "order-2 md:order-none md:col-span-2 bg-green-800 relative overflow-hidden", id "main-map", tabindex 0 ]
+    MapRenderer.render state me
 
 
 renderDirt : FrontendPlayingState -> List (Html.Html FrontendMsg)
