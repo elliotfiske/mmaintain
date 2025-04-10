@@ -434,7 +434,7 @@ renderPlayingStateWithMe state me =
             [ class
                 ("grid h-full justify-end "
                     -- mobile layout: 3 rows (HUD, map, on-this-square)
-                    ++ "grid-rows-[200px_1fr_120px] grid-cols-1 "
+                    ++ "grid-rows-[200px_1fr_150px] grid-cols-1 "
                     -- desktop layout: 2 rows (map takes up 2 rows), and a fixed sidebar
                     ++ "md:grid-rows-[1fr_200px] md:grid-cols-[1fr_1fr_300px] "
                 )
@@ -626,7 +626,7 @@ renderDesktopRelicSidebar state me =
 
 renderHeldRelics : FrontendPlayingState -> PersonData -> Html.Html FrontendMsg
 renderHeldRelics state me =
-    Html.div [ class "order-4 md:order-none" ]
+    Html.div [ class "order-4 md:order-none md:row-span-2 md:overflow-y-auto" ]
         [ renderMobileRelicDialog state me
         , renderDesktopRelicSidebar state me
         ]

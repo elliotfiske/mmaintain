@@ -2883,6 +2883,10 @@ html {
   grid-template-rows: 200px 100px 1fr 120px;
 }
 
+.grid-rows-\[200px_1fr_150px\] {
+  grid-template-rows: 200px 1fr 150px;
+}
+
 .flex-col {
   flex-direction: column;
 }
@@ -3167,6 +3171,10 @@ dialog::backdrop {
 
   .md\:grid-rows-\[1fr_200px\] {
     grid-template-rows: 1fr 200px;
+  }
+
+  .md\:overflow-y-auto {
+    overflow-y: auto;
   }
 }
 
