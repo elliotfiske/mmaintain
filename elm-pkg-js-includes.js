@@ -6,5 +6,4 @@ const preventDoubleClick = require('./elm-pkg-js/prevent-doubleclick.js')
 exports.init = async function init(app) {
     await sizeObserver.init(app)
     await dialogHelper.init(app)
-    preventDoubleClick.init()
 }

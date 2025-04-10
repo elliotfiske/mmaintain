@@ -385,7 +385,6 @@ view model =
     , body =
         [ Html.node "link" [ rel "stylesheet", href "/output.css" ] []
         , Html.node "meta" [ name "viewport", attribute "content" "width=device-width" ] []
-        
         , renderModel model
         ]
     }
@@ -589,7 +588,7 @@ renderHeldRelics state me =
 
 renderOnThisSquare : FrontendPlayingState -> PersonData -> Html.Html FrontendMsg
 renderOnThisSquare state me =
-    Html.div [ class "order-3 md:order-none" ]
+    Html.div [ class "order-3 md:order-none touch-manipulation" ]
         [ case GameObject.getDirtAtLocation me.position state.gameState.dirtDict of
             Just dirt ->
                 renderDirtOnThisSquare state me dirt
