@@ -306,13 +306,6 @@ updateStateWithAction who action prevState =
         |> updateCameraPosition
 
 
-mapSizeInTiles : { width : Float, height : Float } -> GameObjectTypes.Point
-mapSizeInTiles { width, height } =
-    { x = truncate (width / Util.renderOffsetMultiplier)
-    , y = truncate (height / Util.renderOffsetMultiplier)
-    }
-
-
 updateCameraPosition : FrontendPlayingState -> FrontendPlayingState
 updateCameraPosition state =
     let
@@ -336,7 +329,7 @@ updateCameraPositionWithPlayer state me mapSizePixels =
     { state
         | cameraPosition =
             Util.calculateCameraPosition
-                (mapSizeInTiles mapSizePixels)
+                (Util.pixelsToTiles mapSizePixels)
                 prevCamera
                 me.position
     }
@@ -391,6 +384,7 @@ view model =
     { title = "mmaintain"
     , body =
         [ Html.node "link" [ rel "stylesheet", href "/output.css" ] []
+        , Html.node "meta" [ name "viewport", attribute "content" "width=device-width" ] []
         , renderModel model
         ]
     }

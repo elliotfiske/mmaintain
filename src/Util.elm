@@ -144,6 +144,13 @@ addPoints point1 point2 =
     { x = point1.x + point2.x, y = point1.y + point2.y }
 
 
+pixelsToTiles : { width : Float, height : Float } -> GameObjectTypes.Point
+pixelsToTiles { width, height } =
+    { x = truncate (width / renderOffsetMultiplier)
+    , y = truncate (height / renderOffsetMultiplier)
+    }
+
+
 {-| Rules for camera movement:
 
 Must not go lower than 0,0

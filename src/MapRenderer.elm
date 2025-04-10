@@ -31,38 +31,42 @@ renderPeople state =
         |> List.map (personView state.cameraPosition)
 
 
+isDirtVisible : Point -> Point -> Int -> Int -> Bool
+isDirtVisible cameraPosition position viewportWidth viewportHeight =
+    position.x
+        >= cameraPosition.x
+        && position.x
+        <= cameraPosition.x
+        + viewportWidth
+        && position.y
+        >= cameraPosition.y
+        && position.y
+        <= cameraPosition.y
+        + viewportHeight
+
+
+getVisibleDirt : FrontendPlayingState -> List DirtData
+getVisibleDirt state =
+    case state.mapSize of
+        Just mapSize ->
+            let
+                viewportSize =
+                    Util.pixelsToTiles mapSize
+
+                isVisible dirt =
+                    isDirtVisible state.cameraPosition dirt.position viewportSize.x viewportSize.y
+            in
+            DirtDict.values state.gameState.dirtDict
+                |> List.filter isVisible
+
+        Nothing ->
+            DirtDict.values state.gameState.dirtDict
+
+
 renderDirt : FrontendPlayingState -> List (Html.Html FrontendMsg)
 renderDirt state =
-    let
-        visibleDirt =
-            case state.mapSize of
-                Just mapSize ->
-                    let
-                        viewportWidthInTiles =
-                            truncate (mapSize.width / toFloat Util.renderOffsetMultiplier)
-
-                        viewportHeightInTiles =
-                            truncate (mapSize.height / toFloat Util.renderOffsetMultiplier)
-
-                        isVisible { position } =
-                            position.x
-                                >= state.cameraPosition.x
-                                && position.x
-                                <= state.cameraPosition.x
-                                + viewportWidthInTiles
-                                && position.y
-                                >= state.cameraPosition.y
-                                && position.y
-                                <= state.cameraPosition.y
-                                + viewportHeightInTiles
-                    in
-                    DirtDict.values state.gameState.dirtDict
-                        |> List.filter isVisible
-
-                Nothing ->
-                    DirtDict.values state.gameState.dirtDict
-    in
-    List.map (dirtView state.cameraPosition) visibleDirt
+    getVisibleDirt state
+        |> List.map (dirtView state.cameraPosition)
 
 
 renderFloorRelics : FrontendPlayingState -> List (Html FrontendMsg)
