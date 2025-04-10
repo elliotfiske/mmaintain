@@ -13,7 +13,7 @@ import Url exposing (Url)
 
 
 
--- TODO: could probably generate this with everything else
+-- TODO: could probably generate Real*Dict with other generated dictionary code
 
 
 type alias RealPersonDict =

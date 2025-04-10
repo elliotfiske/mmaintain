@@ -1,6 +1,6 @@
 module GameObjectTypes exposing (..)
 
-{-| This is the "topmost" (for now) Types module. It knows about all the types relating to the GameState and
+{-| This is the "topmost" Types module. It knows about all the types relating to the GameState and
 the objects within.
 
 It _doesn't_ know about things like a "frontend" vs a "backend".

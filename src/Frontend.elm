@@ -716,12 +716,9 @@ rarestRelicAtPoints state =
 
 rarestRelicAtPoint : ( GameObjectTypes.Point, List GameObjectTypes.RelicData ) -> Maybe ( GameObjectTypes.Point, GameObjectTypes.RelicData )
 rarestRelicAtPoint ( point, relics ) =
-    case List.sortBy GameObject.byRelicRarity relics |> List.head of
-        Just relic ->
-            Just ( point, relic )
-
-        Nothing ->
-            Nothing
+    List.sortBy GameObject.byRelicRarity relics
+        |> List.head
+        |> Maybe.map (\relic -> ( point, relic ))
 
 
 relicLocationAndDictToFloorRelics : ( Types.RelicLocation, RealRelicDict ) -> ( GameObjectTypes.Point, List GameObjectTypes.RelicData )

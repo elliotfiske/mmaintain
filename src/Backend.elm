@@ -2,9 +2,9 @@ module Backend exposing (app)
 
 import Dict
 import GameObject exposing (executeActionOnGameState)
-import GameObjectTypes exposing (ActionOnGamestate(..), PersonData, PersonId(..))
+import GameObjectTypes exposing (ActionOnGamestate(..), PersonId(..))
 import GameState
-import Lamdera as L
+import Lamdera
 import List
 import Relic
 import Types exposing (..)
@@ -16,7 +16,7 @@ type alias Model =
 
 
 app =
-    L.backend
+    Lamdera.backend
         { init = init
         , update = update
         , updateFromFrontend = updateFromFrontend
@@ -27,8 +27,8 @@ app =
 subscriptions : a -> Sub BackendMsg
 subscriptions _ =
     Sub.batch
-        [ L.onConnect ClientConnected
-        , L.onDisconnect ClientDisconnected
+        [ Lamdera.onConnect ClientConnected
+        , Lamdera.onDisconnect ClientDisconnected
         ]
 
 
@@ -57,7 +57,7 @@ update msg model =
             ( { model | connectedClients = List.filter (\c -> c /= clientId) model.connectedClients }, Cmd.none )
 
 
-handleClientConnected : L.SessionId -> L.ClientId -> Model -> ( Model, Cmd BackendMsg )
+handleClientConnected : Lamdera.SessionId -> Lamdera.ClientId -> Model -> ( Model, Cmd BackendMsg )
 handleClientConnected sessionId clientId model =
     let
         ( newModel, newPersonCmd, personId ) =
@@ -76,12 +76,12 @@ handleClientConnected sessionId clientId model =
             }
 
         dumpStateToNewClientCmd =
-            L.sendToFrontend clientId (UpdateFullState newState)
+            Lamdera.sendToFrontend clientId (UpdateFullState newState)
     in
     ( updatedModel, Cmd.batch [ newPersonCmd, dumpStateToNewClientCmd ] )
 
 
-createPersonIfNeeded : L.SessionId -> L.ClientId -> Model -> ( Model, Cmd BackendMsg, PersonId )
+createPersonIfNeeded : Lamdera.SessionId -> Lamdera.ClientId -> Model -> ( Model, Cmd BackendMsg, PersonId )
 createPersonIfNeeded sessionId clientId model =
     case Dict.get sessionId model.sessionIdToPersonId of
         Just existingPersonId ->
@@ -91,7 +91,7 @@ createPersonIfNeeded sessionId clientId model =
             createPerson clientId model
 
 
-createPerson : L.ClientId -> Model -> ( Model, Cmd BackendMsg, PersonId )
+createPerson : Lamdera.ClientId -> Model -> ( Model, Cmd BackendMsg, PersonId )
 createPerson clientId model =
     let
         ( newPersonId, incModel ) =
@@ -129,10 +129,10 @@ createDirt args model =
         ( finalModel, _ ) =
             executeActionOnModel Server incrementedModel (AddDirt newDirt)
     in
-    ( finalModel, L.broadcast (OtherClientPerformedAction Server (AddDirt newDirt)) )
+    ( finalModel, Lamdera.broadcast (OtherClientPerformedAction Server (AddDirt newDirt)) )
 
 
-handleClientPerformedAction : PersonId -> L.ClientId -> ActionOnGamestate -> Model -> ( Model, Cmd BackendMsg )
+handleClientPerformedAction : PersonId -> Lamdera.ClientId -> ActionOnGamestate -> Model -> ( Model, Cmd BackendMsg )
 handleClientPerformedAction personId clientId actionOnGamestate model =
     let
         ( newGameState, trigger ) =
@@ -153,12 +153,12 @@ handleClientPerformedAction personId clientId actionOnGamestate model =
           forwardToEveryoneButMe actionOnGamestate clientId model
 
         -- but even "I" need to know about the backend trigger fired by "my" action
-        , L.broadcast (OtherClientPerformedAction Server actionsFromTrigger)
+        , Lamdera.broadcast (OtherClientPerformedAction Server actionsFromTrigger)
         ]
     )
 
 
-updateFromFrontend : L.SessionId -> L.ClientId -> ToBackend -> Model -> ( Model, Cmd BackendMsg )
+updateFromFrontend : Lamdera.SessionId -> Lamdera.ClientId -> ToBackend -> Model -> ( Model, Cmd BackendMsg )
 updateFromFrontend sessionId clientId msg model =
     -- todo: currently we allow anybody to do anything. Need to check "legality" of action (a client could
     -- currently move other characters, for instance)
@@ -197,8 +197,8 @@ updateFromFrontend sessionId clientId msg model =
             in
             ( newModel2
             , Cmd.batch
-                [ L.broadcast (OtherClientPerformedAction Server actionsFromActivation)
-                , L.broadcast (OtherClientPerformedAction Server actionsFromTrigger)
+                [ Lamdera.broadcast (OtherClientPerformedAction Server actionsFromActivation)
+                , Lamdera.broadcast (OtherClientPerformedAction Server actionsFromTrigger)
                 ]
             )
 
@@ -298,7 +298,7 @@ debugAddRelic model =
         ( newModel, _ ) =
             executeActionOnModel Server incModel action
     in
-    ( newModel, L.broadcast (OtherClientPerformedAction Server action) )
+    ( newModel, Lamdera.broadcast (OtherClientPerformedAction Server action) )
 
 
 addSomeDirt : Model -> ( Model, Cmd BackendMsg )
@@ -339,11 +339,11 @@ getAndIncrementBiggestId model =
     ( model.biggestId, { model | biggestId = model.biggestId + 1 } )
 
 
-forwardToEveryoneButMe : ActionOnGamestate -> L.ClientId -> Model -> Cmd BackendMsg
+forwardToEveryoneButMe : ActionOnGamestate -> Lamdera.ClientId -> Model -> Cmd BackendMsg
 forwardToEveryoneButMe action myClientId model =
     model.connectedClients
         |> List.filter (\c -> c /= myClientId)
-        |> List.map (\id -> L.sendToFrontend id (OtherClientPerformedAction Server action))
+        |> List.map (\id -> Lamdera.sendToFrontend id (OtherClientPerformedAction Server action))
         |> Cmd.batch
 
 

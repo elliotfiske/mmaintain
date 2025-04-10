@@ -125,39 +125,44 @@ relicBody state relic me =
             simpleRelicBody ("x" ++ String.fromFloat (xpMultiplier relic.rarity relic.exp) ++ " to all XP earned.")
 
         DropAndDouble people ->
-            let
-                alreadyDropped =
-                    List.member state.myId people
+            dropAndDoubleRelicBody state relic me people heldByMe
 
-                baseExp =
-                    dropDoubleCurrentExperience relic.rarity (List.length people)
 
-                playerXpMultiplier =
-                    xpMultiplierForPlayer state.gameState me
+dropAndDoubleRelicBody : FrontendPlayingState -> RelicData -> PersonData -> List PersonId -> Bool -> List (Html.Html FrontendMsg)
+dropAndDoubleRelicBody state relic me people heldByMe =
+    let
+        alreadyDropped =
+            List.member state.myId people
 
-                finalExp =
-                    toFloat baseExp
-                        * playerXpMultiplier
-                        |> round
-            in
-            Markdown.toHtml Nothing
-                ("Gain **"
-                    ++ String.fromInt finalExp
-                    ++ "xp** now, or drop this and double it for somebody else."
-                    ++ (if alreadyDropped then
-                            " <br><br> You've already dropped this. Give it to somebody else!"
+        baseExp =
+            dropDoubleCurrentExperience relic.rarity (List.length people)
 
-                        else
-                            ""
-                       )
-                )
-                ++ (if heldByMe then
-                        [ dropAndDoubleActivationButton state.myId people relic.id
-                        ]
+        playerXpMultiplier =
+            xpMultiplierForPlayer state.gameState me
 
-                    else
-                        []
-                   )
+        finalExp =
+            toFloat baseExp
+                * playerXpMultiplier
+                |> round
+    in
+    Markdown.toHtml Nothing
+        ("Gain **"
+            ++ String.fromInt finalExp
+            ++ "xp** now, or drop this and double it for somebody else."
+            ++ (if alreadyDropped then
+                    " <br><br> You've already dropped this. Give it to somebody else!"
+
+                else
+                    ""
+               )
+        )
+        ++ (if heldByMe then
+                [ dropAndDoubleActivationButton state.myId people relic.id
+                ]
+
+            else
+                []
+           )
 
 
 dropAndDoubleActivationButton : PersonId -> List PersonId -> RelicId -> Html.Html FrontendMsg
