@@ -385,6 +385,7 @@ view model =
     , body =
         [ Html.node "link" [ rel "stylesheet", href "/output.css" ] []
         , Html.node "meta" [ name "viewport", attribute "content" "width=device-width" ] []
+        
         , renderModel model
         ]
     }

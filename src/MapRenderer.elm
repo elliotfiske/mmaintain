@@ -8,6 +8,7 @@ import GameObjectTypes exposing (..)
 import Html exposing (..)
 import Html.Attributes exposing (..)
 import Html.Events
+import Json.Decode as Decode
 import PersonDict
 import Relic
 import RelicDict
@@ -122,6 +123,7 @@ renderClickableTile state row col =
         , style "width" (String.fromInt Util.renderOffsetMultiplier ++ "px")
         , style "height" (String.fromInt Util.renderOffsetMultiplier ++ "px")
         , Html.Events.onClick (ClickTarget worldPoint)
+        , Html.Events.on "touchstart" (Decode.succeed (ClickTarget worldPoint))
         ]
         []
 
