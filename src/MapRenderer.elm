@@ -8,7 +8,6 @@ import GameObjectTypes exposing (..)
 import Html exposing (..)
 import Html.Attributes exposing (..)
 import Html.Events
-import Json.Decode as Decode
 import PersonDict
 import Relic
 import RelicDict
@@ -34,16 +33,14 @@ renderPeople state =
 
 isDirtVisible : Point -> Point -> Int -> Int -> Bool
 isDirtVisible cameraPosition position viewportWidth viewportHeight =
-    position.x
-        >= cameraPosition.x
-        && position.x
-        <= cameraPosition.x
-        + viewportWidth
-        && position.y
-        >= cameraPosition.y
-        && position.y
-        <= cameraPosition.y
-        + viewportHeight
+    let
+        isXVisible =
+            position.x >= cameraPosition.x && position.x <= cameraPosition.x + viewportWidth
+
+        isYVisible =
+            position.y >= cameraPosition.y && position.y <= cameraPosition.y + viewportHeight
+    in
+    isXVisible && isYVisible
 
 
 getVisibleDirt : FrontendPlayingState -> List DirtData
@@ -123,7 +120,6 @@ renderClickableTile state row col =
         , style "width" (String.fromInt Util.renderOffsetMultiplier ++ "px")
         , style "height" (String.fromInt Util.renderOffsetMultiplier ++ "px")
         , Html.Events.onClick (ClickTarget worldPoint)
-        , Html.Events.on "touchstart" (Decode.succeed (ClickTarget worldPoint))
         ]
         []
 

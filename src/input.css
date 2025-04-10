@@ -2,20 +2,27 @@
 @tailwind components;
 @tailwind utilities;
 
-body, html {
+body,
+html {
     height: 100%;
     margin: 0;
     padding: 0;
+
+    overscroll-behavior: none;
 }
 
 .sprite {
-    width: 50px;  /* Width of one frame */
-    height: 50px; /* Height of one frame */
+    width: 50px;
+    /* Width of one frame */
+    height: 50px;
+    /* Height of one frame */
     animation: play 300ms steps(3) infinite;
     background-position: 0 0;
 
-    image-rendering: pixelated;  /* Modern browsers */
-    image-rendering: crisp-edges;  /* Firefox */
+    image-rendering: pixelated;
+    /* Modern browsers */
+    image-rendering: crisp-edges;
+    /* Firefox */
 }
 
 .person {
@@ -47,8 +54,15 @@ body, html {
 }
 
 @keyframes play {
-    from { background-position: 0px; }
-    to { background-position: 150px; }  /* Total width of spritesheet */
+    from {
+        background-position: 0px;
+    }
+
+    to {
+        background-position: 150px;
+    }
+
+    /* Total width of spritesheet */
 }
 
 dialog::backdrop {
