@@ -1,0 +1,36 @@
+You are an expert in Elm. You always write correct and bug-free Elm code.
+
+Focus on small, simple, and correct functions. Focus on readability over being performant.
+
+Please prefer named functions over anonymous inline closures where possible for readability.
+
+# This project
+This project is a web game using the Lamdera framework. The Lamdera framework defines a "Frontend" (web  browser) and a "Backend" (server). They communicate with "Messages" created through functions like `Lamdera.sendToBackend` and `Lamdera.sendToFrontend`.
+
+It is a multiplayer game where players work together to clean up "dirt" from a shared park.
+
+Players can pick up "Relics" that may drop when dirt is cleared to improve their cleaning powers.
+
+# The code
+The code is organized into several modules:
+
+- `Frontend` - The module that renders the web UI.
+- `Backend` - The module that defines the backend logic.
+- `GameObjectTypes` 
+    - This is the "topmost" Types module. It knows about all the types relating to the GameState and
+the objects within.
+    - It _doesn't_ know about things like a "frontend" vs a "backend".
+    - Also note that it can't have the idea of a "PersonDict" or "RelicDict" because those are dependent on what a Person and Relic is.
+    - Overall dependency chain:
+        - GameObjectTypes => Types => GameObject and all other modules
+        - GameObjectTypes => RelicDict/PersonDict/DirtDict => Types
+- `Types` - The module that defines the types used in the project. It is a "base" module that is used by both `Frontend` and `Backend`.
+- `GameObject` - A module that defines the logic for modifying the different elements of the GameState.  The `GameState` is a collection of dictionaries containing the different objects in the game. These are the "objects" that are in the GameState:
+    - `Relic` - Items that the player can pick up to improve their cleaning abilities.
+    - `Person` - Represents a player in the game. The user controls 1 Person.
+    - `Dirt` - Dirt that the player can clean up. It has a position and an amount. When the player cleans the dirt, the amount is decreased. When the amount reaches 0, the dirt is removed from the GameState and a Relic may be created.
+- `BaseUI` - A module that defines reusable UI components.
+- `Modals` - A module that defines the logic for the modals that can appear in the UI.
+
+# Important notes
+Please note that files under the ./generated directory are auto-generated. Only edit the files under the ./src directory.
