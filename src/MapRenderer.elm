@@ -8,8 +8,6 @@ import GameObjectTypes exposing (..)
 import Html exposing (..)
 import Html.Attributes exposing (..)
 import Html.Events
-import Material.Icons.Outlined as Outlined
-import Material.Icons.Types as Coloring
 import PersonDict
 import Relic
 import RelicDict
@@ -35,8 +33,36 @@ renderPeople state =
 
 renderDirt : FrontendPlayingState -> List (Html.Html FrontendMsg)
 renderDirt state =
-    DirtDict.values state.gameState.dirtDict
-        |> List.map (dirtView state.cameraPosition)
+    let
+        visibleDirt =
+            case state.mapSize of
+                Just mapSize ->
+                    let
+                        viewportWidthInTiles =
+                            truncate (mapSize.width / toFloat Util.renderOffsetMultiplier)
+
+                        viewportHeightInTiles =
+                            truncate (mapSize.height / toFloat Util.renderOffsetMultiplier)
+
+                        isVisible { position } =
+                            position.x
+                                >= state.cameraPosition.x
+                                && position.x
+                                <= state.cameraPosition.x
+                                + viewportWidthInTiles
+                                && position.y
+                                >= state.cameraPosition.y
+                                && position.y
+                                <= state.cameraPosition.y
+                                + viewportHeightInTiles
+                    in
+                    DirtDict.values state.gameState.dirtDict
+                        |> List.filter isVisible
+
+                Nothing ->
+                    DirtDict.values state.gameState.dirtDict
+    in
+    List.map (dirtView state.cameraPosition) visibleDirt
 
 
 renderFloorRelics : FrontendPlayingState -> List (Html FrontendMsg)
@@ -77,10 +103,10 @@ renderClickableTile state row col =
             { x = col, y = row }
 
         offsetX =
-            col * renderOffsetMultiplier |> String.fromInt
+            col * Util.renderOffsetMultiplier |> String.fromInt
 
         offsetY =
-            row * renderOffsetMultiplier |> String.fromInt
+            row * Util.renderOffsetMultiplier |> String.fromInt
 
         worldPoint =
             Util.addPoints state.cameraPosition point
@@ -89,8 +115,8 @@ renderClickableTile state row col =
         [ class "absolute"
         , style "left" (offsetX ++ "px")
         , style "top" (offsetY ++ "px")
-        , style "width" (String.fromInt renderOffsetMultiplier ++ "px")
-        , style "height" (String.fromInt renderOffsetMultiplier ++ "px")
+        , style "width" (String.fromInt Util.renderOffsetMultiplier ++ "px")
+        , style "height" (String.fromInt Util.renderOffsetMultiplier ++ "px")
         , Html.Events.onClick (ClickTarget worldPoint)
         ]
         []
@@ -116,8 +142,8 @@ renderRelicTooltip state me ( relicPileLocation, relics ) =
             [ -- Empty space 32px by 32px for mouse event
               Html.div
                 [ class "absolute left-0 top-0"
-                , style "width" (String.fromInt renderOffsetMultiplier ++ "px")
-                , style "height" (String.fromInt renderOffsetMultiplier ++ "px")
+                , style "width" (String.fromInt Util.renderOffsetMultiplier ++ "px")
+                , style "height" (String.fromInt Util.renderOffsetMultiplier ++ "px")
                 , Html.Events.onClick (ClickTarget relicPileLocation)
                 ]
                 []
@@ -214,26 +240,19 @@ relicLocationAndDictToFloorRelics ( position, relicDict ) =
     ( Relic.floorRelicLocationToFloorPoint position, RelicDict.values relicDict )
 
 
-{-| The width in pixels of a game tile
--}
-renderOffsetMultiplier : Int
-renderOffsetMultiplier =
-    50
-
-
 renderedOffset : GameObjectTypes.Point -> GameObjectTypes.Point -> ( String, String )
 renderedOffset objectPosition cameraOffset =
     ( (objectPosition.x - cameraOffset.x)
-        * renderOffsetMultiplier
+        * Util.renderOffsetMultiplier
         |> String.fromInt
     , (objectPosition.y - cameraOffset.y)
-        * renderOffsetMultiplier
+        * Util.renderOffsetMultiplier
         |> String.fromInt
     )
 
 
 mapSizeInTiles : { width : Float, height : Float } -> GameObjectTypes.Point
 mapSizeInTiles { width, height } =
-    { x = truncate (width / toFloat renderOffsetMultiplier)
-    , y = truncate (height / toFloat renderOffsetMultiplier)
+    { x = truncate (width / toFloat Util.renderOffsetMultiplier)
+    , y = truncate (height / toFloat Util.renderOffsetMultiplier)
     }

@@ -25,6 +25,13 @@ mapYMax =
     50
 
 
+{-| The width in pixels of a game tile
+-}
+renderOffsetMultiplier : number
+renderOffsetMultiplier =
+    50
+
+
 expForLevel : Int -> Int
 expForLevel level =
     case Dict.get level levelTable of
