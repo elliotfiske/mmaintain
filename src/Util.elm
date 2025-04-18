@@ -74,6 +74,11 @@ levelList =
     , ( 13, 3000 )
     , ( 14, 3500 )
     , ( 15, 4000 )
+    , ( 16, 4500 )
+    , ( 17, 5000 )
+    , ( 18, 5500 )
+    , ( 19, 6000 )
+    , ( 20, 6500 )
     ]
 
 
@@ -154,7 +159,7 @@ pixelsToTiles { width, height } =
 {-| Rules for camera movement:
 
 Must not go lower than 0,0
-Must not go lower than the map size - window size
+Must not go higher than the map size - window size
 
 Should be as close as possible to the previous camera position
 

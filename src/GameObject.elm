@@ -1,7 +1,7 @@
 module GameObject exposing (..)
 
-import Dict exposing (Dict)
-import DirtDict exposing (DirtDict)
+import Dict
+import DirtDict
 import GameObjectTypes exposing (..)
 import PersonDict exposing (PersonDict)
 import Relic exposing (..)
@@ -320,6 +320,7 @@ getRarestRelicAtLocation point state =
     relicsAtLocation point state
         |> List.sortBy byRelicRarity
         |> List.head
+
 
 relicsAtLocation : GameObjectTypes.Point -> GameState -> List RelicData
 relicsAtLocation point state =

@@ -323,6 +323,7 @@ updateCameraPosition state =
 updateCameraPositionWithPlayer : FrontendPlayingState -> PersonData -> { width : Float, height : Float } -> FrontendPlayingState
 updateCameraPositionWithPlayer state me mapSizePixels =
     let
+        prevCamera : GameObjectTypes.Point
         prevCamera =
             state.cameraPosition
     in
@@ -591,7 +592,7 @@ renderOnThisSquare state me =
     Html.div [ class "order-3 md:order-none touch-manipulation" ]
         [ case GameObject.getDirtAtLocation me.position state.gameState.dirtDict of
             Just dirt ->
-                renderDirtOnThisSquare state me dirt
+                renderDirtOnThisSquare me dirt
 
             Nothing ->
                 GameObject.relicsAtLocation me.position state.gameState
@@ -600,8 +601,8 @@ renderOnThisSquare state me =
         ]
 
 
-renderDirtOnThisSquare : FrontendPlayingState -> PersonData -> DirtData -> Html.Html FrontendMsg
-renderDirtOnThisSquare state me dirt =
+renderDirtOnThisSquare : PersonData -> DirtData -> Html.Html FrontendMsg
+renderDirtOnThisSquare me dirt =
     Html.div [ class "prose" ]
         [ Html.h2 [ class "text-center" ]
             [ Html.text ("Dirty dirty dirt! " ++ String.fromInt dirt.amount) ]
