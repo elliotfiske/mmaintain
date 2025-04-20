@@ -705,7 +705,6 @@ relicCardTitle state me relicData =
     Html.div [ class "flex justify-between items-center w-full" ]
         [ Html.span []
             [ Html.text (Relic.relicName relicData.relicType)
-            , Html.text (" (Level " ++ String.fromInt relicLevel ++ ")")
             ]
         , if isHeldByMe then
             dropButton relicData.id state.myId

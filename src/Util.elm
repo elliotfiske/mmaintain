@@ -25,6 +25,18 @@ mapYMax =
     50
 
 
+readableStringFromFloat : Float -> String
+readableStringFromFloat floatValue =
+    let
+        truncated =
+            Basics.round (floatValue * 10) |> toFloat
+
+        result =
+            truncated / 10.0
+    in
+    String.fromFloat result
+
+
 {-| The width in pixels of a game tile
 -}
 renderOffsetMultiplier : number

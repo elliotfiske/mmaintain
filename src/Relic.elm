@@ -10,6 +10,7 @@ import Markdown
 import PersonDict
 import RelicDict
 import Types exposing (..)
+import Util
 
 
 relicName : RelicType -> String
@@ -119,10 +120,10 @@ relicBody state relic me =
     in
     case relic.relicType of
         CleanFast ->
-            simpleRelicBody ("x" ++ String.fromFloat (cleanFastStrengthMultiplier relic.rarity relic.exp) ++ " to Cleaning Strength.")
+            simpleRelicBody ("x" ++ Util.readableStringFromFloat (cleanFastStrengthMultiplier relic.rarity relic.exp) ++ " to Cleaning Strength.")
 
         MoreXP ->
-            simpleRelicBody ("x" ++ String.fromFloat (xpMultiplier relic.rarity relic.exp) ++ " to all XP earned.")
+            simpleRelicBody ("x" ++ Util.readableStringFromFloat (xpMultiplier relic.rarity relic.exp) ++ " to all XP earned.")
 
         DropAndDouble people ->
             dropAndDoubleRelicBody state relic me people heldByMe
@@ -224,23 +225,23 @@ xpMultiplier rarity xp =
         baseMultiplier =
             case rarity of
                 Common ->
-                    2.0
+                    1.5
 
                 Uncommon ->
-                    3.0
+                    2.0
 
                 Rare ->
-                    5.0
+                    2.5
 
                 Epic ->
-                    8.0
+                    4.0
 
                 Legendary ->
-                    15.0
+                    10.0
 
-        -- Scale linearly such that level 5 is 3x base
+        -- Scale linearly such that level 5 is 2x base
         level5Multiplier =
-            baseMultiplier * 3.0
+            baseMultiplier * 2.0
 
         increasePerLevel =
             (level5Multiplier - baseMultiplier) / 4.0
@@ -519,19 +520,19 @@ relicLevelThresholds : RelicRarity -> List Int
 relicLevelThresholds rarity =
     case rarity of
         Common ->
-            [ 10, 50, 100, 200 ]
+            [ 50, 100, 200, 400 ]
 
         Uncommon ->
-            [ 25, 125, 325, 650 ]
+            [ 100, 300, 600, 1200 ]
 
         Rare ->
-            [ 50, 250, 550, 1100 ]
+            [ 250, 550, 1100, 2200 ]
 
         Epic ->
-            [ 75, 375, 775, 1550 ]
+            [ 375, 775, 1550, 3100 ]
 
         Legendary ->
-            [ 100, 500, 1000, 2000 ]
+            [ 500, 1000, 2000, 4000 ]
 
 
 {-| Calculate the relic's level based on its rarity and experience.
