@@ -1,7 +1,7 @@
 module GameState exposing (..)
 
-import Dict exposing (Dict)
 import DirtDict exposing (DirtDict)
+import Dict exposing (Dict)
 import GameObjectTypes
 import PersonDict exposing (PersonDict)
 import Types exposing (GameState)
@@ -17,14 +17,14 @@ updateGameStateRelicDict newRelicDict state =
     { state | relicsByPosition = newRelicDict }
 
 
-updateGameStateDirtDict : DirtDict GameObjectTypes.DirtData -> GameState -> GameState
+updateGameStateDirtDict : Dict Types.DirtLocation GameObjectTypes.DirtData -> GameState -> GameState
 updateGameStateDirtDict newDirtDict state =
-    { state | dirtDict = newDirtDict }
+    { state | dirtByLocation = newDirtDict }
 
 
 empty : GameState
 empty =
     { personDict = PersonDict.empty
-    , dirtDict = DirtDict.empty
+    , dirtByLocation = Dict.empty
     , relicsByPosition = Dict.empty
     }

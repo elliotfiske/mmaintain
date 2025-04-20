@@ -2849,6 +2849,10 @@ html {
   order: 4;
 }
 
+.row-span-2 {
+  grid-row: span 2 / span 2;
+}
+
 .mx-3 {
   margin-left: 0.75rem;
   margin-right: 0.75rem;

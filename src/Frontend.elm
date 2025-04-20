@@ -5,6 +5,7 @@ import Browser exposing (UrlRequest(..))
 import Browser.Dom
 import Browser.Events exposing (onKeyDown)
 import Browser.Navigation as Nav
+import Dict
 import GameObject
 import GameObjectTypes exposing (ActionOnGamestate(..), Direction(..), DirtData, PersonData, PersonId)
 import Html exposing (..)
@@ -428,7 +429,7 @@ renderPlayingStateWithMe state me =
                 ("grid h-full justify-end "
                     -- mobile layout: 3 rows (HUD, map, on-this-square)
                     ++ "grid-rows-[200px_1fr_150px] grid-cols-1 "
-                    -- desktop layout: 2 rows (map takes up 2 rows), and a fixed sidebar
+                    -- desktop layout: 2 rows (map takes up 2 columns), and a fixed Relics sidebar (takes up 2 rows)
                     ++ "md:grid-rows-[1fr_200px] md:grid-cols-[1fr_1fr_300px] "
                 )
             ]
@@ -532,7 +533,7 @@ renderRelicContent state me =
         [ Html.h2 [ class "text-center" ]
             [ Html.text "My Relics:" ]
         ]
-    , Html.div [ class "flex flex-col gap-2 flex-grow flex-wrap p-2", id "relic-list" ]
+    , Html.div [ class "flex flex-col gap-2 flex-grow flex-wrap p-2 not-prose", id "relic-list" ]
         (renderRelicList
             myRelics
             state
@@ -573,7 +574,7 @@ renderMobileRelicDialog state me =
 
 renderDesktopRelicSidebar : FrontendPlayingState -> PersonData -> Html.Html FrontendMsg
 renderDesktopRelicSidebar state me =
-    Html.div [ class "w-full flex flex-col overflow-scroll order-4 md:order-none hidden md:block md:row-span-2" ]
+    Html.div [ class "w-full flex flex-col overflow-scroll order-4 md:order-none hidden md:block row-span-2" ]
         (renderRelicContent state me)
 
 
@@ -588,7 +589,7 @@ renderHeldRelics state me =
 renderOnThisSquare : FrontendPlayingState -> PersonData -> Html.Html FrontendMsg
 renderOnThisSquare state me =
     Html.div [ class "order-3 md:order-none touch-manipulation" ]
-        [ case GameObject.getDirtAtLocation me.position state.gameState.dirtDict of
+        [ case GameObject.getDirtAtLocation me.position state.gameState.dirtByLocation of
             Just dirt ->
                 renderDirtOnThisSquare me dirt
 
@@ -607,7 +608,7 @@ renderDirtOnThisSquare me dirt =
         , Html.div [ class "flex justify-center px-8" ]
             [ Html.button
                 [ class "btn btn-primary w-full"
-                , Html.Events.onClick (PerformAction (Clean me.id dirt.id))
+                , Html.Events.onClick (PerformAction (Clean me.id dirt.position))
                 ]
                 [ text "Clean it!" ]
             ]
@@ -698,9 +699,6 @@ relicCardTitle state me relicData =
     let
         isHeldByMe =
             Relic.isRelicHeldByPerson state.gameState relicData.id me.id
-
-        relicLevel =
-            Relic.relicLevelForExp relicData.rarity relicData.exp
     in
     Html.div [ class "flex justify-between items-center w-full" ]
         [ Html.span []
@@ -755,7 +753,7 @@ performClean me state =
         myRelicCount =
             RelicDict.size (Relic.getRelicsHeldByPlayer state.myId state.gameState)
     in
-    case GameObject.getDirtAtLocation me.position state.gameState.dirtDict of
+    case GameObject.getDirtAtLocation me.position state.gameState.dirtByLocation of
         Nothing ->
             case GameObject.getRarestRelicAtLocation me.position state.gameState of
                 Nothing ->
@@ -769,4 +767,4 @@ performClean me state =
                         GameStateNoOp
 
         Just dirt ->
-            Clean me.id dirt.id
+            Clean me.id dirt.position

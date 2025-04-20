@@ -87,6 +87,7 @@ type RelicType
     = CleanFast
     | MoreXP
     | DropAndDouble (List PersonId)
+    | SplashBucket
 
 
 type RelicRarity
@@ -114,7 +115,7 @@ type Direction
 
 type ActionOnGamestate
     = MovePerson PersonId Direction
-    | Clean PersonId DirtId
+    | Clean PersonId Point
     | AddDirt DirtData
     | AddRelic RelicData Point
     | AddPerson PersonData

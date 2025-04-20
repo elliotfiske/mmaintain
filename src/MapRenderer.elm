@@ -2,7 +2,6 @@ module MapRenderer exposing (render)
 
 import BaseUI as UI
 import Dict
-import DirtDict
 import GameObject
 import GameObjectTypes exposing (..)
 import Html exposing (..)
@@ -54,11 +53,11 @@ getVisibleDirt state =
                 isVisible dirt =
                     isDirtVisible state.cameraPosition dirt.position viewportSize.x viewportSize.y
             in
-            DirtDict.values state.gameState.dirtDict
+            Dict.values state.gameState.dirtByLocation
                 |> List.filter isVisible
 
         Nothing ->
-            DirtDict.values state.gameState.dirtDict
+            Dict.values state.gameState.dirtByLocation
 
 
 renderDirt : FrontendPlayingState -> List (Html.Html FrontendMsg)

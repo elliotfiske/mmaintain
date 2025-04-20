@@ -276,9 +276,9 @@ doIncrementClearCount person =
     { person | stats = newStats }
 
 
-changeDirtAmount : DirtId -> Int -> RealDirtDict -> RealDirtDict
-changeDirtAmount id amount dict =
-    DirtDict.update id (Maybe.map (setDirtAmount amount)) dict
+changeDirtAmount : Types.DirtLocation -> Int -> Types.DirtByLocation -> Types.DirtByLocation
+changeDirtAmount location amount dict =
+    Dict.update location (Maybe.map (setDirtAmount amount)) dict
 
 
 dirtIsAtLocation : GameObjectTypes.Point -> GameObjectTypes.DirtData -> Bool
@@ -286,33 +286,33 @@ dirtIsAtLocation pos dirtData =
     pos == dirtData.position
 
 
-getDirtAtLocation : GameObjectTypes.Point -> RealDirtDict -> Maybe DirtData
-getDirtAtLocation point dict =
-    dict
-        |> DirtDict.values
-        |> List.filter (dirtIsAtLocation point)
-        |> List.head
+pointToDirtLocation : GameObjectTypes.Point -> Types.DirtLocation
+pointToDirtLocation point =
+    ( point.x, point.y )
+
+
+getDirtAtLocation : GameObjectTypes.Point -> Types.DirtByLocation -> Maybe DirtData
+getDirtAtLocation point dirtByLocation =
+    Dict.get (pointToDirtLocation point) dirtByLocation
+        |> Maybe.map (\dirt -> dirt)
 
 
 addOrModifyDirt : DirtData -> GameState -> ( GameState, Types.BackendTrigger )
 addOrModifyDirt dirtData state =
     let
-        dirtId =
-            dirtData.id
-
         maybeExistingDirt =
-            getDirtAtLocation dirtData.position state.dirtDict
+            getDirtAtLocation dirtData.position state.dirtByLocation
     in
     case maybeExistingDirt of
         Nothing ->
-            ( { state | dirtDict = DirtDict.insert dirtId dirtData state.dirtDict }, NoOpBackendTrigger )
+            ( { state | dirtByLocation = Dict.insert (pointToDirtLocation dirtData.position) dirtData state.dirtByLocation }, NoOpBackendTrigger )
 
         Just existingDirt ->
             let
                 newDirtDict =
-                    changeDirtAmount existingDirt.id dirtData.amount state.dirtDict
+                    changeDirtAmount (pointToDirtLocation existingDirt.position) dirtData.amount state.dirtByLocation
             in
-            ( { state | dirtDict = newDirtDict }, NoOpBackendTrigger )
+            ( { state | dirtByLocation = newDirtDict }, NoOpBackendTrigger )
 
 
 getRarestRelicAtLocation : GameObjectTypes.Point -> GameState -> Maybe RelicData
@@ -385,9 +385,9 @@ lockedRelicSlots level =
         |> List.filter (\x -> level < x)
 
 
-doClean : PersonId -> DirtId -> Int -> GameState -> ( GameState, Types.BackendTrigger )
-doClean personId dirtId strength state =
-    case DirtDict.get dirtId state.dirtDict of
+doClean : PersonId -> Point -> Int -> GameState -> ( GameState, Types.BackendTrigger )
+doClean personId location strength state =
+    case Dict.get (pointToDirtLocation location) state.dirtByLocation of
         Nothing ->
             -- This might happen if the user is lagging and someone else cleared the dirt
             ( state, NoOpBackendTrigger )
@@ -406,12 +406,12 @@ doClean personId dirtId strength state =
 
                 newDict =
                     if newDirt.amount <= 0 then
-                        DirtDict.remove dirtId state.dirtDict
+                        Dict.remove (pointToDirtLocation dirtData.position) state.dirtByLocation
 
                     else
-                        DirtDict.insert dirtId newDirt state.dirtDict
+                        Dict.insert (pointToDirtLocation dirtData.position) newDirt state.dirtByLocation
             in
-            ( { state | dirtDict = newDict }
+            ( { state | dirtByLocation = newDict }
             , backendTrigger
             )
 
@@ -534,7 +534,7 @@ withNoOp state =
 internalExecuteActionOnGameState : ActionOnGamestate -> GameState -> ( GameState, Types.BackendTrigger )
 internalExecuteActionOnGameState action state =
     case action of
-        Clean personId dirtId ->
+        Clean personId location ->
             let
                 maybePlayer =
                     PersonDict.get personId state.personDict
@@ -549,7 +549,7 @@ internalExecuteActionOnGameState action state =
             in
             state
                 |> addCleanStats personId
-                |> doClean personId dirtId strength
+                |> doClean personId location strength
                 |> addClearStats personId
                 |> earnExperienceFromClean personId
 

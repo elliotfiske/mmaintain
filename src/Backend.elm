@@ -287,7 +287,7 @@ debugAddRelic model =
         newRelic : GameObjectTypes.RelicData
         newRelic =
             { id = GameObjectTypes.RelicId newId
-            , relicType = GameObjectTypes.DropAndDouble []
+            , relicType = GameObjectTypes.SplashBucket
             , rarity = GameObjectTypes.Legendary
             , exp = 0
             }

@@ -25,6 +25,9 @@ relicName relicType =
         DropAndDouble _ ->
             "Generosity"
 
+        SplashBucket ->
+            "Splash Bucket"
+
 
 relicTextColor : RelicRarity -> String
 relicTextColor rarity =
@@ -127,6 +130,9 @@ relicBody state relic me =
 
         DropAndDouble people ->
             dropAndDoubleRelicBody state relic me people heldByMe
+
+        SplashBucket ->
+            simpleRelicBody "Also clean the dirt on adjacent squares at xxx strength."
 
 
 dropAndDoubleRelicBody : FrontendPlayingState -> RelicData -> PersonData -> List PersonId -> Bool -> List (Html.Html FrontendMsg)
@@ -330,6 +336,10 @@ relicMiddleware action relic state =
 
                 _ ->
                     state
+
+        SplashBucket ->
+            -- todo: handle splash bucket behavior
+            state
 
 
 handleDroppingDoubler : RelicId -> RelicData -> PersonId -> List PersonId -> GameState -> GameState

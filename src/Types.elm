@@ -40,10 +40,18 @@ type alias RelicsByLocation =
     Dict RelicLocation RealRelicDict
 
 
+type alias DirtLocation =
+    ( Int, Int )
+
+
+type alias DirtByLocation =
+    Dict DirtLocation DirtData
+
+
 type alias GameState =
     { personDict : PersonDict PersonData
-    , dirtDict : RealDirtDict
     , relicsByPosition : RelicsByLocation
+    , dirtByLocation : DirtByLocation
     }
 
 
