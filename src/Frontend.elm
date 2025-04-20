@@ -469,13 +469,11 @@ renderXP myself =
 
 levelProgressBar : PersonData -> Html.Html FrontendMsg
 levelProgressBar person =
-    Html.div [ class "bg-cyan-600 h-4 w-64 rounded" ]
-        [ Html.div
-            [ class "bg-cyan-100 h-4 rounded"
-            , style "width" (String.fromInt (round (Util.levelProgress person.experience)) ++ "%")
-            ]
-            []
-        ]
+    let
+        progress =
+            round (Util.levelProgress person.experience)
+    in
+    UI.progressBar progress
 
 
 renderCleanStrength : FrontendPlayingState -> PersonData -> Html.Html FrontendMsg
@@ -663,11 +661,32 @@ relicRarityBadge rarity =
         [ Html.text (Relic.relicRarityName rarity) ]
 
 
+relicLevelProgressBar : GameObjectTypes.RelicData -> Html.Html msg
+relicLevelProgressBar relic =
+    let
+        progressPercent =
+            Relic.relicLevelProgress relic.rarity relic.exp
+
+        currentLevel =
+            Relic.relicLevelForExp relic.rarity relic.exp
+    in
+    if currentLevel >= 5 then
+        -- No progress bar if max level
+        Html.text "Max Level"
+
+    else
+        Html.div [ class "w-full flex flex-col items-center" ]
+            [ Html.text ("Level " ++ String.fromInt currentLevel ++ "/5")
+            , UI.progressBar (round progressPercent)
+            ]
+
+
 heldRelicView : FrontendPlayingState -> PersonData -> GameObjectTypes.RelicData -> Html.Html FrontendMsg
 heldRelicView state me relicData =
     UI.card ""
         [ relicCardTitle state me relicData ]
         [ relicRarityBadge relicData.rarity
+        , relicLevelProgressBar relicData
         , Html.div
             [ class "flex flex-col justify-between" ]
             (Relic.relicBody state relicData me)
@@ -679,9 +698,15 @@ relicCardTitle state me relicData =
     let
         isHeldByMe =
             Relic.isRelicHeldByPerson state.gameState relicData.id me.id
+
+        relicLevel =
+            Relic.relicLevelForExp relicData.rarity relicData.exp
     in
-    Html.div [ class "flex justify-between w-full" ]
-        [ Html.text (Relic.relicName relicData.relicType)
+    Html.div [ class "flex justify-between items-center w-full" ]
+        [ Html.span []
+            [ Html.text (Relic.relicName relicData.relicType)
+            , Html.text (" (Level " ++ String.fromInt relicLevel ++ ")")
+            ]
         , if isHeldByMe then
             dropButton relicData.id state.myId
 

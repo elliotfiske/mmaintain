@@ -1,4 +1,4 @@
-module BaseUI exposing (basicDialog, card, dialog, simpleTitle)
+module BaseUI exposing (basicDialog, card, dialog, progressBar, simpleTitle)
 
 import Html exposing (Html, div, h1, node, text)
 import Html.Attributes exposing (attribute, class)
@@ -51,3 +51,14 @@ basicDialog content =
 simpleTitle : String -> Html msg
 simpleTitle title =
     h1 [] [ text title ]
+
+
+progressBar : Int -> Html msg
+progressBar progressPercent =
+    Html.div [ class "bg-cyan-600 h-4 w-64 rounded" ]
+        [ Html.div
+            [ class "bg-cyan-100 h-4 rounded"
+            , Html.Attributes.style "width" (String.fromInt progressPercent ++ "%")
+            ]
+            []
+        ]

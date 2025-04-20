@@ -447,7 +447,7 @@ cleanStrengthForPlayer state person =
             (\relic acc ->
                 case relic.relicType of
                     CleanFast ->
-                        acc * cleanFastStrengthMultiplier relic.rarity -37
+                        acc * cleanFastStrengthMultiplier relic.rarity relic.exp
 
                     _ ->
                         acc
@@ -470,6 +470,36 @@ earnExperienceFromClean personId ( state, trigger ) =
     ( playerEarnsExperience personId baseXpEarned state, trigger )
 
 
+updatePersonDictWithExperience : PersonId -> Int -> PersonDict PersonData -> PersonDict PersonData
+updatePersonDictWithExperience personId totalXpEarned dict =
+    PersonDict.update personId
+        (Maybe.map
+            (\player ->
+                { player
+                    | experience = player.experience + totalXpEarned
+                }
+            )
+        )
+        dict
+
+
+updateRelicsByPositionWithExperience : PersonId -> Int -> Dict.Dict Types.RelicLocation RealRelicDict -> Dict.Dict Types.RelicLocation RealRelicDict
+updateRelicsByPositionWithExperience personId totalXpEarned relicsByPosition =
+    let
+        heldRelics =
+            Dict.get (Relic.playerHolderToLocation personId) relicsByPosition
+                |> Maybe.withDefault RelicDict.empty
+
+        newHeldRelics =
+            heldRelics
+                |> RelicDict.map
+                    (\_ relic ->
+                        { relic | exp = relic.exp + totalXpEarned }
+                    )
+    in
+    Dict.insert (Relic.playerHolderToLocation personId) newHeldRelics relicsByPosition
+
+
 playerEarnsExperience : PersonId -> Int -> GameState -> GameState
 playerEarnsExperience personId xpEarned state =
     case PersonDict.get personId state.personDict of
@@ -478,18 +508,22 @@ playerEarnsExperience personId xpEarned state =
 
         Just player ->
             let
-                xpAfterMultiplier =
-                    toFloat xpEarned
-                        * Relic.xpMultiplierForPlayer state player
-                        |> round
+                xpMultiplier =
+                    Relic.xpMultiplierForPlayer state player
 
-                newPlayer =
-                    { player | experience = player.experience + xpAfterMultiplier }
+                totalXpEarned =
+                    round (xpMultiplier * toFloat xpEarned)
 
                 newPersonDict =
-                    PersonDict.insert personId newPlayer state.personDict
+                    updatePersonDictWithExperience personId totalXpEarned state.personDict
+
+                newRelicsByPosition =
+                    updateRelicsByPositionWithExperience personId totalXpEarned state.relicsByPosition
             in
-            { state | personDict = newPersonDict }
+            { state
+                | personDict = newPersonDict
+                , relicsByPosition = newRelicsByPosition
+            }
 
 
 withNoOp : GameState -> ( GameState, Types.BackendTrigger )
@@ -595,7 +629,7 @@ activateGenerosityTrap relicData personData numDoubles state =
                 |> Dict.insert (Relic.playerHolderToLocation personData.id) newRelicDict
 
         xpEarned =
-            Relic.dropDoubleCurrentExperience relicData.rarity numDoubles
+            Relic.dropDoubleCurrentExperience relicData.rarity relicData.exp numDoubles
 
         newState =
             playerEarnsExperience personData.id xpEarned state
