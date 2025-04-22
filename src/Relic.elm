@@ -338,8 +338,26 @@ relicMiddleware action relic state =
                     state
 
         SplashBucket ->
-            -- todo: handle splash bucket behavior
-            state
+            case action of
+                Clean _ location ->
+                    let
+                        neighborDirtLocations =
+                            [ ( location.x + 1, location.y )
+                            , ( location.x - 1, location.y )
+                            , ( location.x, location.y + 1 )
+                            , ( location.x, location.y - 1 )
+                            ]
+
+                        neighborDirtData : List DirtData
+                        neighborDirtData =
+                            List.filterMap (\neighborLocations -> Dict.get neighborLocations state.dirtByLocation) neighborDirtLocations
+
+                        -- todo: for each dirt data, run the same "clean" action on it
+                    in
+                    state
+
+                _ ->
+                    state
 
 
 handleDroppingDoubler : RelicId -> RelicData -> PersonId -> List PersonId -> GameState -> GameState

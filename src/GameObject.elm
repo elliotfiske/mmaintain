@@ -1,12 +1,11 @@
 module GameObject exposing (..)
 
 import Dict
-import DirtDict
 import GameObjectTypes exposing (..)
 import PersonDict exposing (PersonDict)
 import Relic exposing (..)
 import RelicDict
-import Types exposing (BackendTrigger(..), GameState, RealDirtDict, RealRelicDict)
+import Types exposing (BackendTrigger(..), GameState, RealRelicDict)
 import Util
 
 
@@ -294,9 +293,18 @@ pointToDirtLocation point =
 getDirtAtLocation : GameObjectTypes.Point -> Types.DirtByLocation -> Maybe DirtData
 getDirtAtLocation point dirtByLocation =
     Dict.get (pointToDirtLocation point) dirtByLocation
-        |> Maybe.map (\dirt -> dirt)
 
 
+updateDirtAtLocation : GameObjectTypes.Point -> DirtData -> Types.DirtByLocation -> Types.DirtByLocation
+updateDirtAtLocation point dirtData dirtByLocation =
+    Dict.insert (pointToDirtLocation point) dirtData dirtByLocation
+
+
+{-| Add a new dirt or modify an existing dirt's "amount".
+
+Currently used to spawn dirt as a "debug action", not for normal gameplay.
+
+-}
 addOrModifyDirt : DirtData -> GameState -> ( GameState, Types.BackendTrigger )
 addOrModifyDirt dirtData state =
     let
@@ -305,7 +313,7 @@ addOrModifyDirt dirtData state =
     in
     case maybeExistingDirt of
         Nothing ->
-            ( { state | dirtByLocation = Dict.insert (pointToDirtLocation dirtData.position) dirtData state.dirtByLocation }, NoOpBackendTrigger )
+            ( { state | dirtByLocation = updateDirtAtLocation dirtData.position dirtData state.dirtByLocation }, NoOpBackendTrigger )
 
         Just existingDirt ->
             let
@@ -531,6 +539,31 @@ withNoOp state =
     ( state, NoOpBackendTrigger )
 
 
+handleActivateGenerosityTrap : PersonId -> RelicId -> Int -> GameState -> ( GameState, Types.BackendTrigger )
+handleActivateGenerosityTrap personId relicId numDoubles state =
+    let
+        maybeRelic =
+            Dict.get (Relic.playerHolderToLocation personId) state.relicsByPosition
+                |> Maybe.withDefault RelicDict.empty
+                |> RelicDict.get relicId
+
+        maybeFella =
+            PersonDict.get personId state.personDict
+    in
+    case ( maybeRelic, maybeFella ) of
+        ( Just relicData, Just fella ) ->
+            case relicData.relicType of
+                DropAndDouble _ ->
+                    withNoOp (activateGenerosityTrap relicData fella numDoubles state)
+
+                _ ->
+                    -- User tried to activate Generosity on a relic that wasn't Generosity. Cheating???
+                    ( state, NuhUh personId )
+
+        _ ->
+            ( state, NuhUh personId )
+
+
 internalExecuteActionOnGameState : ActionOnGamestate -> GameState -> ( GameState, Types.BackendTrigger )
 internalExecuteActionOnGameState action state =
     case action of
@@ -544,6 +577,7 @@ internalExecuteActionOnGameState action state =
                         Nothing ->
                             1
 
+                        -- todo: should return `state` if player is not found
                         Just player ->
                             cleanStrengthForPlayer state player
             in
@@ -583,27 +617,7 @@ internalExecuteActionOnGameState action state =
             withNoOp state
 
         ActivateGenerosityTrap personId relicId numDoubles ->
-            let
-                maybeRelic =
-                    Dict.get (Relic.playerHolderToLocation personId) state.relicsByPosition
-                        |> Maybe.withDefault RelicDict.empty
-                        |> RelicDict.get relicId
-
-                maybeFella =
-                    PersonDict.get personId state.personDict
-            in
-            case ( maybeRelic, maybeFella ) of
-                ( Just relicData, Just fella ) ->
-                    case relicData.relicType of
-                        DropAndDouble _ ->
-                            withNoOp (activateGenerosityTrap relicData fella numDoubles state)
-
-                        _ ->
-                            -- User tried to activate Generosity on a relic that wasn't Generosity. Cheating???
-                            ( state, NuhUh personId )
-
-                _ ->
-                    ( state, NuhUh personId )
+            handleActivateGenerosityTrap personId relicId numDoubles state
 
 
 executeActionOnGameState : Types.ActionPerformer -> ActionOnGamestate -> GameState -> ( GameState, Types.BackendTrigger )
