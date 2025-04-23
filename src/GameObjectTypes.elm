@@ -123,4 +123,5 @@ type ActionOnGamestate
     | DropRelic RelicId PersonId
       -- todo: now that I decided to have this be backend-authoritative, this can be PersonData and RelicData for convenience
     | ActivateGenerosityTrap PersonId RelicId Int
+    | BatchAction (List ActionOnGamestate)
     | GameStateNoOp

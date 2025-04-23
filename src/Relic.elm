@@ -1,5 +1,6 @@
 module Relic exposing (..)
 
+import CleanOperations
 import Dict
 import GameObjectTypes exposing (..)
 import Html
@@ -132,7 +133,7 @@ relicBody state relic me =
             dropAndDoubleRelicBody state relic me people heldByMe
 
         SplashBucket ->
-            simpleRelicBody "Also clean the dirt on adjacent squares at xxx strength."
+            simpleRelicBody ("Also clean the dirt on adjacent squares at " ++ String.fromInt (splashBucketStrength relic.rarity relic.exp) ++ " strength.")
 
 
 dropAndDoubleRelicBody : FrontendPlayingState -> RelicData -> PersonData -> List PersonId -> Bool -> List (Html.Html FrontendMsg)
@@ -339,22 +340,28 @@ relicMiddleware action relic state =
 
         SplashBucket ->
             case action of
-                Clean _ location ->
+                Clean personId location ->
                     let
-                        neighborDirtLocations =
-                            [ ( location.x + 1, location.y )
-                            , ( location.x - 1, location.y )
-                            , ( location.x, location.y + 1 )
-                            , ( location.x, location.y - 1 )
+                        adjacentPoints =
+                            [ { x = location.x + 1, y = location.y }
+                            , { x = location.x - 1, y = location.y }
+                            , { x = location.x, y = location.y + 1 }
+                            , { x = location.x, y = location.y - 1 }
                             ]
 
-                        neighborDirtData : List DirtData
-                        neighborDirtData =
-                            List.filterMap (\neighborLocations -> Dict.get neighborLocations state.dirtByLocation) neighborDirtLocations
-
-                        -- todo: for each dirt data, run the same "clean" action on it
+                        splashStrength =
+                            splashBucketStrength relic.rarity relic.exp
                     in
-                    state
+                    List.foldl
+                        (\point accState ->
+                            let
+                                ( newState, _ ) =
+                                    CleanOperations.doClean personId point splashStrength accState
+                            in
+                            newState
+                        )
+                        state
+                        adjacentPoints
 
                 _ ->
                     state
@@ -630,3 +637,40 @@ relicLevelProgress rarity xp =
         _ ->
             -- If current or next level XP threshold is not found (e.g., max level)
             100
+
+
+
+-- Calculate the splash bucket cleaning strength based on rarity and experience
+
+
+splashBucketStrength : RelicRarity -> Int -> Int
+splashBucketStrength rarity exp =
+    let
+        baseStrength =
+            case rarity of
+                Common ->
+                    5
+
+                Uncommon ->
+                    10
+
+                Rare ->
+                    20
+
+                Epic ->
+                    40
+
+                Legendary ->
+                    80
+
+        level =
+            toFloat (relicLevelForExp rarity exp)
+
+        -- Scale linearly such that level 5 is 2x base
+        level5Strength =
+            toFloat baseStrength * 2.0
+
+        increasePerLevel =
+            (level5Strength - toFloat baseStrength) / 4.0
+    in
+    round (toFloat baseStrength + (level - 1.0) * increasePerLevel)

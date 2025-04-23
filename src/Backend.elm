@@ -143,7 +143,7 @@ handleClientPerformedAction personId clientId actionOnGamestate model =
             { model | gameState = newGameState }
 
         -- Updates model with the triggered "Backend Triggers" and potentially send a new action to send back to the client.
-        ( newerModel, actionsFromTrigger ) =
+        ( newerModel, actionFromTrigger ) =
             -- todo: "Server" is incorrect here (placeholder)
             executeBackendTrigger Server trigger newModel
     in
@@ -153,7 +153,7 @@ handleClientPerformedAction personId clientId actionOnGamestate model =
           forwardToEveryoneButMe actionOnGamestate clientId model
 
         -- but even "I" need to know about the backend trigger fired by "my" action
-        , Lamdera.broadcast (OtherClientPerformedAction Server actionsFromTrigger)
+        , Lamdera.broadcast (OtherClientPerformedAction Server actionFromTrigger)
         ]
     )
 
@@ -208,15 +208,14 @@ updateFromFrontend sessionId clientId msg model =
 (so far the "update model" is just incrementing our random number and ID generators)
 
 -}
-updateModelFromTrigger : BackendTrigger -> Model -> ( Model, ActionOnGamestate )
-updateModelFromTrigger trigger model =
+updateModelFromTrigger : ActionPerformer -> BackendTrigger -> Model -> ( Model, ActionOnGamestate )
+updateModelFromTrigger performer trigger model =
     case trigger of
         NoOpBackendTrigger ->
             ( model, GameStateNoOp )
 
-        -- TODO: unimplemented
-        BatchTrigger _ ->
-            ( model, GameStateNoOp )
+        BatchTrigger triggers ->
+            handleBatchedTriggers performer triggers model
 
         ClearedPollution personId dirtData ->
             doRelicRoll personId dirtData model
@@ -224,6 +223,47 @@ updateModelFromTrigger trigger model =
         NuhUh personId ->
             -- TODO: Unimplemented
             ( model, GameStateNoOp )
+
+
+{-| Process a list of triggers, updating the model and collecting the resulting actions.
+Returns the final model and a single action (either GameStateNoOp, the single resulting action, or a BatchAction).
+-}
+handleBatchedTriggers : ActionPerformer -> List BackendTrigger -> Model -> ( Model, ActionOnGamestate )
+handleBatchedTriggers performer triggers model =
+    let
+        ( finalModel, actions ) =
+            List.foldl
+                (processSingleTrigger performer)
+                ( model, [] )
+                triggers
+    in
+    case actions of
+        [] ->
+            ( finalModel, GameStateNoOp )
+
+        [ singleAction ] ->
+            ( finalModel, singleAction )
+
+        multipleActions ->
+            ( finalModel, BatchAction multipleActions )
+
+
+{-| Process a single trigger and collect its resulting action.
+If the action is GameStateNoOp, it won't be added to the collection.
+-}
+processSingleTrigger : ActionPerformer -> BackendTrigger -> ( Model, List ActionOnGamestate ) -> ( Model, List ActionOnGamestate )
+processSingleTrigger performer batchedTrigger ( accModel, accActions ) =
+    let
+        ( newModel, newAction ) =
+            updateModelFromTrigger performer batchedTrigger accModel
+    in
+    ( newModel
+    , if newAction == GameStateNoOp then
+        accActions
+
+      else
+        newAction :: accActions
+    )
 
 
 getRandomRelicRarityAndType : Model -> ( Maybe GameObjectTypes.RelicRarity, GameObjectTypes.RelicType, Model )
@@ -351,7 +391,7 @@ executeBackendTrigger : ActionPerformer -> BackendTrigger -> Model -> ( Model, A
 executeBackendTrigger performer trigger model =
     let
         ( newModel, newAction ) =
-            updateModelFromTrigger trigger model
+            updateModelFromTrigger performer trigger model
 
         -- todo: currently we ignore recursive triggers, but they may
         -- be useful in the future

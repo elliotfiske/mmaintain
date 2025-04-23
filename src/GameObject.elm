@@ -1,5 +1,6 @@
 module GameObject exposing (..)
 
+import CleanOperations
 import Dict
 import GameObjectTypes exposing (..)
 import PersonDict exposing (PersonDict)
@@ -233,7 +234,7 @@ movePersonWithId id direction dict =
 
 cleanDirt : Int -> DirtData -> DirtData
 cleanDirt cleanStrength dirt =
-    { dirt | amount = dirt.amount - cleanStrength }
+    CleanOperations.cleanDirt cleanStrength dirt
 
 
 setDirtAmount : Int -> DirtData -> DirtData
@@ -395,33 +396,7 @@ lockedRelicSlots level =
 
 doClean : PersonId -> Point -> Int -> GameState -> ( GameState, Types.BackendTrigger )
 doClean personId location strength state =
-    case Dict.get (pointToDirtLocation location) state.dirtByLocation of
-        Nothing ->
-            -- This might happen if the user is lagging and someone else cleared the dirt
-            ( state, NoOpBackendTrigger )
-
-        Just dirtData ->
-            let
-                newDirt =
-                    cleanDirt strength dirtData
-
-                backendTrigger =
-                    if newDirt.amount <= 0 then
-                        ClearedPollution personId dirtData
-
-                    else
-                        NoOpBackendTrigger
-
-                newDict =
-                    if newDirt.amount <= 0 then
-                        Dict.remove (pointToDirtLocation dirtData.position) state.dirtByLocation
-
-                    else
-                        Dict.insert (pointToDirtLocation dirtData.position) newDirt state.dirtByLocation
-            in
-            ( { state | dirtByLocation = newDict }
-            , backendTrigger
-            )
+    CleanOperations.doClean personId location strength state
 
 
 addCleanStats : PersonId -> GameState -> GameState
@@ -618,6 +593,26 @@ internalExecuteActionOnGameState action state =
 
         ActivateGenerosityTrap personId relicId numDoubles ->
             handleActivateGenerosityTrap personId relicId numDoubles state
+
+        BatchAction actions ->
+            List.foldl
+                (\batchAction ( currentState, currentTrigger ) ->
+                    let
+                        ( newState, newTrigger ) =
+                            internalExecuteActionOnGameState batchAction currentState
+                    in
+                    case ( currentTrigger, newTrigger ) of
+                        ( NoOpBackendTrigger, _ ) ->
+                            ( newState, newTrigger )
+
+                        ( _, NoOpBackendTrigger ) ->
+                            ( newState, currentTrigger )
+
+                        ( _, _ ) ->
+                            ( newState, Types.BatchTrigger [ currentTrigger, newTrigger ] )
+                )
+                ( state, Types.NoOpBackendTrigger )
+                actions
 
 
 executeActionOnGameState : Types.ActionPerformer -> ActionOnGamestate -> GameState -> ( GameState, Types.BackendTrigger )
