@@ -1,5 +1,6 @@
 module GameObject exposing (..)
 
+import BackendTriggerUtil
 import CleanOperations
 import Dict
 import GameObjectTypes exposing (..)
@@ -232,58 +233,14 @@ movePersonWithId id direction dict =
     PersonDict.update id (Maybe.map (movePerson direction)) dict
 
 
-cleanDirt : Int -> DirtData -> DirtData
-cleanDirt cleanStrength dirt =
-    CleanOperations.cleanDirt cleanStrength dirt
-
-
 setDirtAmount : Int -> DirtData -> DirtData
 setDirtAmount amount dirt =
     { dirt | amount = amount }
 
 
-incrementCleanCount : PersonId -> PersonDict PersonData -> PersonDict PersonData
-incrementCleanCount personId dict =
-    PersonDict.update personId (Maybe.map doIncrementCleanCount) dict
-
-
-doIncrementCleanCount : PersonData -> PersonData
-doIncrementCleanCount person =
-    let
-        stats =
-            person.stats
-
-        newStats =
-            { stats | cleanCount = stats.cleanCount + 1 }
-    in
-    { person | stats = newStats }
-
-
-incrementClearCount : PersonId -> PersonDict PersonData -> PersonDict PersonData
-incrementClearCount personId dict =
-    PersonDict.update personId (Maybe.map doIncrementClearCount) dict
-
-
-doIncrementClearCount : PersonData -> PersonData
-doIncrementClearCount person =
-    let
-        stats =
-            person.stats
-
-        newStats =
-            { stats | clearCount = stats.clearCount + 1 }
-    in
-    { person | stats = newStats }
-
-
 changeDirtAmount : Types.DirtLocation -> Int -> Types.DirtByLocation -> Types.DirtByLocation
 changeDirtAmount location amount dict =
     Dict.update location (Maybe.map (setDirtAmount amount)) dict
-
-
-dirtIsAtLocation : GameObjectTypes.Point -> GameObjectTypes.DirtData -> Bool
-dirtIsAtLocation pos dirtData =
-    pos == dirtData.position
 
 
 pointToDirtLocation : GameObjectTypes.Point -> Types.DirtLocation
@@ -357,19 +314,30 @@ byRelicRarity relic =
             -4
 
 
-updateWithRelics : Types.ActionPerformer -> ActionOnGamestate -> GameState -> GameState
+updateWithRelics : Types.ActionPerformer -> ActionOnGamestate -> GameState -> ( GameState, Types.BackendTrigger )
 updateWithRelics actorId action state =
     case actorId of
         Types.Server ->
             -- Don't apply relic middleware for server actions
-            state
+            BackendTriggerUtil.withNoOp state
 
         Types.Client personId ->
             Dict.get (Relic.playerHolderToLocation personId) state.relicsByPosition
                 |> Maybe.withDefault RelicDict.empty
                 |> RelicDict.values
-                |> List.foldl (Relic.relicMiddleware action)
-                    state
+                |> List.foldl
+                    (applyRelicMiddleware action)
+                    ( state, [] )
+                |> Tuple.mapSecond BatchTrigger
+
+
+applyRelicMiddleware : ActionOnGamestate -> RelicData -> ( GameState, List Types.BackendTrigger ) -> ( GameState, List Types.BackendTrigger )
+applyRelicMiddleware action relic ( accState, accTriggers ) =
+    let
+        ( newState, newTrigger ) =
+            Relic.relicMiddleware action relic accState
+    in
+    ( newState, newTrigger :: accTriggers )
 
 
 relicSlotThreshholds : List Int
@@ -394,24 +362,26 @@ lockedRelicSlots level =
         |> List.filter (\x -> level < x)
 
 
-doClean : PersonId -> Point -> Int -> GameState -> ( GameState, Types.BackendTrigger )
-doClean personId location strength state =
-    CleanOperations.doClean personId location strength state
+incrementCleanCount : PersonId -> PersonDict PersonData -> PersonDict PersonData
+incrementCleanCount personId dict =
+    PersonDict.update personId (Maybe.map doIncrementCleanCount) dict
+
+
+doIncrementCleanCount : PersonData -> PersonData
+doIncrementCleanCount person =
+    let
+        stats =
+            person.stats
+
+        newStats =
+            { stats | cleanCount = stats.cleanCount + 1 }
+    in
+    { person | stats = newStats }
 
 
 addCleanStats : PersonId -> GameState -> GameState
 addCleanStats personId state =
     { state | personDict = incrementCleanCount personId state.personDict }
-
-
-addClearStats : PersonId -> ( GameState, Types.BackendTrigger ) -> ( GameState, Types.BackendTrigger )
-addClearStats personId ( state, trigger ) =
-    case trigger of
-        ClearedPollution _ _ ->
-            ( { state | personDict = incrementClearCount personId state.personDict }, trigger )
-
-        _ ->
-            ( state, trigger )
 
 
 cleanStrengthForPlayer : GameState -> PersonData -> Int
@@ -509,11 +479,6 @@ playerEarnsExperience personId xpEarned state =
             }
 
 
-withNoOp : GameState -> ( GameState, Types.BackendTrigger )
-withNoOp state =
-    ( state, NoOpBackendTrigger )
-
-
 handleActivateGenerosityTrap : PersonId -> RelicId -> Int -> GameState -> ( GameState, Types.BackendTrigger )
 handleActivateGenerosityTrap personId relicId numDoubles state =
     let
@@ -529,7 +494,7 @@ handleActivateGenerosityTrap personId relicId numDoubles state =
         ( Just relicData, Just fella ) ->
             case relicData.relicType of
                 DropAndDouble _ ->
-                    withNoOp (activateGenerosityTrap relicData fella numDoubles state)
+                    BackendTriggerUtil.withNoOp (activateGenerosityTrap relicData fella numDoubles state)
 
                 _ ->
                     -- User tried to activate Generosity on a relic that wasn't Generosity. Cheating???
@@ -558,15 +523,13 @@ internalExecuteActionOnGameState action state =
             in
             state
                 |> addCleanStats personId
-                |> doClean personId location strength
-                |> addClearStats personId
-                |> earnExperienceFromClean personId
+                |> CleanOperations.doClean personId location strength
 
         MovePerson personId direction ->
-            withNoOp { state | personDict = movePersonWithId personId direction state.personDict }
+            BackendTriggerUtil.withNoOp { state | personDict = movePersonWithId personId direction state.personDict }
 
         AddPerson personData ->
-            withNoOp { state | personDict = PersonDict.insert personData.id personData state.personDict }
+            BackendTriggerUtil.withNoOp { state | personDict = PersonDict.insert personData.id personData state.personDict }
 
         PickUpRelic relicId personId ->
             pickUpRelic personId relicId state
@@ -586,10 +549,10 @@ internalExecuteActionOnGameState action state =
                 newRelicDict =
                     RelicDict.insert relicData.id relicData existingRelicDict
             in
-            withNoOp { state | relicsByPosition = Dict.insert (Relic.floorPointToLocation floorPoint) newRelicDict state.relicsByPosition }
+            BackendTriggerUtil.withNoOp { state | relicsByPosition = Dict.insert (Relic.floorPointToLocation floorPoint) newRelicDict state.relicsByPosition }
 
         GameStateNoOp ->
-            withNoOp state
+            BackendTriggerUtil.withNoOp state
 
         ActivateGenerosityTrap personId relicId numDoubles ->
             handleActivateGenerosityTrap personId relicId numDoubles state
@@ -618,10 +581,13 @@ internalExecuteActionOnGameState action state =
 executeActionOnGameState : Types.ActionPerformer -> ActionOnGamestate -> GameState -> ( GameState, Types.BackendTrigger )
 executeActionOnGameState who actionOnGamestate state =
     let
-        stateAfterRelicMiddleware =
+        ( stateAfterRelicMiddleware, relicTrigger ) =
             updateWithRelics who actionOnGamestate state
+
+        ( newState, actionTrigger ) =
+            internalExecuteActionOnGameState actionOnGamestate stateAfterRelicMiddleware
     in
-    internalExecuteActionOnGameState actionOnGamestate stateAfterRelicMiddleware
+    ( newState, BatchTrigger [ relicTrigger, actionTrigger ] )
 
 
 activateGenerosityTrap : RelicData -> PersonData -> Int -> GameState -> GameState

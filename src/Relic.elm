@@ -1,5 +1,6 @@
 module Relic exposing (..)
 
+import BackendTriggerUtil
 import CleanOperations
 import Dict
 import GameObjectTypes exposing (..)
@@ -320,51 +321,60 @@ xpMultiplierForPlayer state person =
 {-| Some relics are interested in actions against the GameState. This function
 lets relics modify the GameState in response to actions.
 -}
-relicMiddleware : ActionOnGamestate -> RelicData -> GameState -> GameState
+relicMiddleware : ActionOnGamestate -> RelicData -> GameState -> ( GameState, BackendTrigger )
 relicMiddleware action relic state =
     case relic.relicType of
         CleanFast ->
-            state
+            BackendTriggerUtil.withNoOp state
 
         MoreXP ->
             -- Handled in earnExperienceFromClean
-            state
+            BackendTriggerUtil.withNoOp state
 
         DropAndDouble people ->
             case action of
                 DropRelic relicId personId ->
                     handleDroppingDoubler relicId relic personId people state
+                        |> BackendTriggerUtil.withNoOp
 
                 _ ->
-                    state
+                    BackendTriggerUtil.withNoOp state
 
         SplashBucket ->
             case action of
                 Clean personId location ->
-                    let
-                        adjacentPoints =
-                            [ { x = location.x + 1, y = location.y }
-                            , { x = location.x - 1, y = location.y }
-                            , { x = location.x, y = location.y + 1 }
-                            , { x = location.x, y = location.y - 1 }
-                            ]
-
-                        splashStrength =
-                            splashBucketStrength relic.rarity relic.exp
-                    in
-                    List.foldl
-                        (\point accState ->
-                            let
-                                ( newState, _ ) =
-                                    CleanOperations.doClean personId point splashStrength accState
-                            in
-                            newState
-                        )
-                        state
-                        adjacentPoints
+                    handleSplashBucket location relic personId state
 
                 _ ->
-                    state
+                    BackendTriggerUtil.withNoOp state
+
+
+handleSplashBucket : Point -> RelicData -> PersonId -> GameState -> ( GameState, BackendTrigger )
+handleSplashBucket location relic personId state =
+    let
+        adjacentPoints =
+            [ { x = location.x + 1, y = location.y }
+            , { x = location.x - 1, y = location.y }
+            , { x = location.x, y = location.y + 1 }
+            , { x = location.x, y = location.y - 1 }
+            ]
+
+        splashStrength =
+            splashBucketStrength relic.rarity relic.exp
+    in
+    List.foldl
+        (applyClean personId splashStrength)
+        ( state, NoOpBackendTrigger )
+        adjacentPoints
+
+
+applyClean : PersonId -> Int -> Point -> ( GameState, BackendTrigger ) -> ( GameState, BackendTrigger )
+applyClean personId splashStrength point ( accState, accTrigger ) =
+    let
+        ( newState, backendTrigger ) =
+            CleanOperations.doClean personId point splashStrength accState
+    in
+    ( newState, BatchTrigger [ accTrigger, backendTrigger ] )
 
 
 handleDroppingDoubler : RelicId -> RelicData -> PersonId -> List PersonId -> GameState -> GameState
@@ -524,6 +534,7 @@ relicWeights =
     [ ( 60, GameObjectTypes.CleanFast )
     , ( 5, GameObjectTypes.DropAndDouble [] )
     , ( 30, GameObjectTypes.MoreXP )
+    , ( 5, GameObjectTypes.SplashBucket )
     ]
 
 
