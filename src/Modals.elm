@@ -92,6 +92,7 @@ debugStuff state =
         Html.div [ class "flex flex-col" ]
             (Html.button [ Html.Events.onClick ClickedPleaseMakeMeDirty, class "btn btn-primary" ] [ text "Add Dirt" ]
                 :: debugDictsView state
+                ++ [ renderDirtDict state.gameState.dirtByLocation ]
             )
 
     else
@@ -111,3 +112,11 @@ debugDictsView { gameState, myId } =
             ++ "<br>MyId: "
             ++ GameObjectTypes.personIdToString myId
         )
+
+
+renderDirtDict : DirtByLocation -> Html FrontendMsg
+renderDirtDict dirtDict =
+    Html.div []
+        [ text "Dirt Dict: "
+        , Html.pre [ class "whitespace-pre-wrap" ] [ Html.text (Debug.toString dirtDict) ]
+        ]

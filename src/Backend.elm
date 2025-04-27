@@ -107,7 +107,7 @@ createPerson clientId model =
             executeActionOnModel (Client (PersonId newPersonId)) incModel createPersonAction
     in
     ( finalModel
-    , forwardToEveryoneButMe createPersonAction clientId model
+    , forwardToEveryoneButMe createPersonAction Server clientId model
     , newPerson.id
     )
 
@@ -145,12 +145,12 @@ handleClientPerformedAction personId clientId actionOnGamestate model =
         -- Updates model with the triggered "Backend Triggers" and potentially send a new action to send back to the client.
         ( newerModel, actionFromTrigger ) =
             -- todo: "Server" is incorrect here (placeholder)
-            executeBackendTrigger Server trigger newModel
+            executeBackendTrigger (Client personId) trigger newModel
     in
     ( newerModel
     , Cmd.batch
         [ -- "everyone but me" needs to know about the action "I" performed
-          forwardToEveryoneButMe actionOnGamestate clientId model
+          forwardToEveryoneButMe actionOnGamestate (Client personId) clientId model
 
         -- but even "I" need to know about the backend trigger fired by "my" action
         , Lamdera.broadcast (OtherClientPerformedAction Server actionFromTrigger)
@@ -347,9 +347,9 @@ addSomeDirt model =
         ( model, Cmd.none )
         (Util.generateGridOfPoints
             { minX = 5
-            , maxX = 45
+            , maxX = 6
             , minY = 5
-            , maxY = 45
+            , maxY = 6
             }
         )
 
@@ -379,11 +379,11 @@ getAndIncrementBiggestId model =
     ( model.biggestId, { model | biggestId = model.biggestId + 1 } )
 
 
-forwardToEveryoneButMe : ActionOnGamestate -> Lamdera.ClientId -> Model -> Cmd BackendMsg
-forwardToEveryoneButMe action myClientId model =
+forwardToEveryoneButMe : ActionOnGamestate -> ActionPerformer -> Lamdera.ClientId -> Model -> Cmd BackendMsg
+forwardToEveryoneButMe action performer myClientId model =
     model.connectedClients
         |> List.filter (\c -> c /= myClientId)
-        |> List.map (\id -> Lamdera.sendToFrontend id (OtherClientPerformedAction Server action))
+        |> List.map (\id -> Lamdera.sendToFrontend id (OtherClientPerformedAction performer action))
         |> Cmd.batch
 
 

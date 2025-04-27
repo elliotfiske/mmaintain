@@ -1,7 +1,6 @@
 module Relic exposing (..)
 
 import BackendTriggerUtil
-import CleanOperations
 import Dict
 import GameObjectTypes exposing (..)
 import Html
