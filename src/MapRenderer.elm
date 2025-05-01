@@ -2,14 +2,14 @@ module MapRenderer exposing (render)
 
 import BaseUI as UI
 import Dict
-import GameObject
 import GameObjectTypes exposing (..)
+import GameStateManipulation
 import Html exposing (..)
 import Html.Attributes exposing (..)
 import Html.Events
 import PersonDict
-import Relic
 import RelicDict
+import RelicUtil
 import Types exposing (..)
 import Util
 
@@ -163,7 +163,7 @@ renderRelicTooltipBody state me relicData =
     let
         cardTitle =
             [ Html.div [ class "flex justify-between w-full" ]
-                [ Html.text (Relic.relicName relicData.relicType) ]
+                [ Html.text (RelicUtil.relicName relicData.relicType) ]
             ]
     in
     UI.card "h-auto"
@@ -171,15 +171,15 @@ renderRelicTooltipBody state me relicData =
         [ relicRarityBadge relicData.rarity
         , Html.div
             [ class "flex flex-col justify-between" ]
-            (Relic.relicBody state relicData me)
+            (GameStateManipulation.relicBody state relicData me)
         ]
 
 
 relicRarityBadge : GameObjectTypes.RelicRarity -> Html msg
 relicRarityBadge rarity =
     Html.div
-        [ class ("badge dark:text-black " ++ Relic.relicBgColor rarity) ]
-        [ Html.text (Relic.relicRarityName rarity) ]
+        [ class ("badge dark:text-black " ++ RelicUtil.relicBgColor rarity) ]
+        [ Html.text (RelicUtil.relicRarityName rarity) ]
 
 
 personView : GameObjectTypes.Point -> PersonData -> Html.Html FrontendMsg
@@ -209,7 +209,7 @@ floorRelicView camera ( floorPosition, relicData ) =
             renderedOffset floorPosition camera
     in
     Html.div
-        [ class ("absolute sprite relic z-10 " ++ Relic.relicRarityToCssClass relicData.rarity)
+        [ class ("absolute sprite relic z-10 " ++ RelicUtil.relicRarityToCssClass relicData.rarity)
         , style "left" (offsetX ++ "px")
         , style "top" (offsetY ++ "px")
         ]
@@ -219,7 +219,7 @@ floorRelicView camera ( floorPosition, relicData ) =
 relicsOnFloor : FrontendPlayingState -> List ( GameObjectTypes.Point, List GameObjectTypes.RelicData )
 relicsOnFloor state =
     Dict.toList state.gameState.relicsByPosition
-        |> List.filter (\( position, _ ) -> Relic.relicLocationIsOnFloor position)
+        |> List.filter (\( position, _ ) -> RelicUtil.relicLocationIsOnFloor position)
         |> List.map relicLocationAndDictToFloorRelics
 
 
@@ -231,14 +231,14 @@ rarestRelicAtPoints state =
 
 rarestRelicAtPoint : ( GameObjectTypes.Point, List GameObjectTypes.RelicData ) -> Maybe ( GameObjectTypes.Point, GameObjectTypes.RelicData )
 rarestRelicAtPoint ( point, relics ) =
-    List.sortBy GameObject.byRelicRarity relics
+    List.sortBy GameStateManipulation.byRelicRarity relics
         |> List.head
         |> Maybe.map (\relic -> ( point, relic ))
 
 
 relicLocationAndDictToFloorRelics : ( Types.RelicLocation, RealRelicDict ) -> ( GameObjectTypes.Point, List GameObjectTypes.RelicData )
 relicLocationAndDictToFloorRelics ( position, relicDict ) =
-    ( Relic.floorRelicLocationToFloorPoint position, RelicDict.values relicDict )
+    ( RelicUtil.floorRelicLocationToFloorPoint position, RelicDict.values relicDict )
 
 
 renderedOffset : GameObjectTypes.Point -> GameObjectTypes.Point -> ( String, String )

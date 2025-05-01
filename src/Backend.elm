@@ -1,12 +1,12 @@
 module Backend exposing (app)
 
 import Dict
-import GameObject exposing (executeActionOnGameState)
 import GameObjectTypes exposing (ActionOnGamestate(..), PersonId(..))
 import GameState
+import GameStateManipulation exposing (executeActionOnGameState)
 import Lamdera
 import List
-import Relic
+import RelicUtil
 import Types exposing (..)
 import Util
 
@@ -98,7 +98,7 @@ createPerson clientId model =
             getAndIncrementBiggestId model
 
         newPerson =
-            GameObject.createPerson (PersonId newPersonId) "Person"
+            GameStateManipulation.createPerson (PersonId newPersonId) "Person"
 
         createPersonAction =
             AddPerson newPerson
@@ -187,7 +187,7 @@ updateFromFrontend sessionId clientId msg model =
         PleaseActivateRelic personId relicId ->
             let
                 actionsFromActivation =
-                    Relic.createActionOnGameStateFromRelicActivation personId relicId model.gameState
+                    GameStateManipulation.createActionOnGameStateFromRelicActivation personId relicId model.gameState
 
                 ( newModel, relicBackendTriggers ) =
                     executeActionOnModel (Client personId) model actionsFromActivation
@@ -276,10 +276,10 @@ getRandomRelicRarityAndType model =
             getRandomValue newModel
 
         randomType =
-            Relic.relicTypeRoll randomTypeValue
+            RelicUtil.relicTypeRoll randomTypeValue
 
         maybeRarity =
-            Relic.rarityRoll randomRarity
+            RelicUtil.rarityRoll randomRarity
     in
     ( maybeRarity, randomType, newModel2 )
 

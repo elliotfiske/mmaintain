@@ -1,4 +1,4 @@
-module Relic exposing (..)
+module RelicUtil exposing (..)
 
 import BackendTriggerUtil
 import Dict
@@ -109,68 +109,6 @@ relicRarityName rarity =
 simpleRelicBody : String -> List (Html.Html FrontendMsg)
 simpleRelicBody text =
     [ Html.text text ]
-
-
-isRelicHeldByPerson : GameState -> RelicId -> PersonId -> Bool
-isRelicHeldByPerson state relicId personId =
-    RelicDict.member relicId (getRelicsHeldByPlayer personId state)
-
-
-relicBody : FrontendPlayingState -> RelicData -> PersonData -> List (Html.Html FrontendMsg)
-relicBody state relic me =
-    let
-        heldByMe =
-            isRelicHeldByPerson state.gameState relic.id state.myId
-    in
-    case relic.relicType of
-        CleanFast ->
-            simpleRelicBody ("x" ++ Util.readableStringFromFloat (cleanFastStrengthMultiplier relic.rarity relic.exp) ++ " to Cleaning Strength.")
-
-        MoreXP ->
-            simpleRelicBody ("x" ++ Util.readableStringFromFloat (xpMultiplier relic.rarity relic.exp) ++ " to all XP earned.")
-
-        DropAndDouble people ->
-            dropAndDoubleRelicBody state relic me people heldByMe
-
-        SplashBucket ->
-            simpleRelicBody ("Also clean the dirt on adjacent squares at " ++ String.fromInt (splashBucketStrength relic.rarity relic.exp) ++ " strength.")
-
-
-dropAndDoubleRelicBody : FrontendPlayingState -> RelicData -> PersonData -> List PersonId -> Bool -> List (Html.Html FrontendMsg)
-dropAndDoubleRelicBody state relic me people heldByMe =
-    let
-        alreadyDropped =
-            List.member state.myId people
-
-        baseExp =
-            dropDoubleCurrentExperience relic.rarity relic.exp (List.length people)
-
-        playerXpMultiplier =
-            xpMultiplierForPlayer state.gameState me
-
-        finalExp =
-            toFloat baseExp
-                * playerXpMultiplier
-                |> round
-    in
-    Markdown.toHtml Nothing
-        ("Gain **"
-            ++ String.fromInt finalExp
-            ++ "xp** now, or drop this and double it for somebody else."
-            ++ (if alreadyDropped then
-                    " <br><br> You've already dropped this. Give it to somebody else!"
-
-                else
-                    ""
-               )
-        )
-        ++ (if heldByMe then
-                [ dropAndDoubleActivationButton state.myId people relic.id
-                ]
-
-            else
-                []
-           )
 
 
 dropAndDoubleActivationButton : PersonId -> List PersonId -> RelicId -> Html.Html FrontendMsg
@@ -296,122 +234,9 @@ dropDoubleCurrentExperience rarity xp droppedPeople =
     dropDoubleBaseExperience rarity xp * 2 ^ droppedPeople
 
 
-xpMultiplierForPlayer : GameState -> PersonData -> Float
-xpMultiplierForPlayer state person =
-    let
-        heldRelics =
-            Dict.get (playerHolderToLocation person.id) state.relicsByPosition
-                |> Maybe.withDefault RelicDict.empty
-                |> RelicDict.values
-    in
-    heldRelics
-        |> List.foldl
-            (\relic acc ->
-                case relic.relicType of
-                    MoreXP ->
-                        acc * xpMultiplier relic.rarity relic.exp
-
-                    _ ->
-                        acc
-            )
-            1
-
-
-{-| Some relics are interested in actions against the GameState. This function
-lets relics modify the GameState in response to actions.
--}
-relicMiddleware : ActionOnGamestate -> RelicData -> GameState -> ( GameState, BackendTrigger )
-relicMiddleware action relic state =
-    case relic.relicType of
-        CleanFast ->
-            BackendTriggerUtil.withNoOp state
-
-        MoreXP ->
-            -- Handled in earnExperienceFromClean
-            BackendTriggerUtil.withNoOp state
-
-        DropAndDouble people ->
-            case action of
-                DropRelic relicId personId ->
-                    handleDroppingDoubler relicId relic personId people state
-                        |> BackendTriggerUtil.withNoOp
-
-                _ ->
-                    BackendTriggerUtil.withNoOp state
-
-        SplashBucket ->
-            case action of
-                Clean personId location ->
-                    handleSplashBucket location relic personId state
-
-                _ ->
-                    BackendTriggerUtil.withNoOp state
-
-
-handleSplashBucket : Point -> RelicData -> PersonId -> GameState -> ( GameState, BackendTrigger )
-handleSplashBucket location relic personId state =
-    let
-        adjacentPoints =
-            [ { x = location.x + 1, y = location.y }
-            , { x = location.x - 1, y = location.y }
-            , { x = location.x, y = location.y + 1 }
-            , { x = location.x, y = location.y - 1 }
-            ]
-
-        splashStrength =
-            splashBucketStrength relic.rarity relic.exp
-    in
-    List.foldl
-        (applyClean personId splashStrength)
-        ( state, NoOpBackendTrigger )
-        adjacentPoints
-
-
-applyClean : PersonId -> Int -> Point -> ( GameState, BackendTrigger ) -> ( GameState, BackendTrigger )
-applyClean personId splashStrength point ( accState, accTrigger ) =
-    let
-        ( newState, backendTrigger ) =
-            CleanOperations.doClean personId point splashStrength accState
-    in
-    ( newState, BatchTrigger [ accTrigger, backendTrigger ] )
-
-
-handleDroppingDoubler : RelicId -> RelicData -> PersonId -> List PersonId -> GameState -> GameState
-handleDroppingDoubler relicId relic personId people state =
-    if relicId == relic.id then
-        let
-            newPersonList =
-                List.Extra.uniqueBy personIdToString (personId :: people)
-
-            newRelic =
-                { relic | relicType = DropAndDouble newPersonList }
-        in
-        updateRelicAtLocation (playerHolderToLocation personId) newRelic state
-
-    else
-        state
-
-
-playerHolderToLocation : PersonId -> RelicLocation
-playerHolderToLocation (PersonId rawId) =
-    ( -1, rawId, 0 )
-
-
 floorPointToLocation : Point -> RelicLocation
 floorPointToLocation { x, y } =
     ( 0, x, y )
-
-
-getRelicsAtFloorPoint : Point -> GameState -> RealRelicDict
-getRelicsAtFloorPoint point state =
-    Dict.get (floorPointToLocation point) state.relicsByPosition
-        |> Maybe.withDefault RelicDict.empty
-
-
-getRelicsHeldByPlayer : PersonId -> GameState -> RealRelicDict
-getRelicsHeldByPlayer personId state =
-    Dict.get (playerHolderToLocation personId) state.relicsByPosition
-        |> Maybe.withDefault RelicDict.empty
 
 
 getRelicAtLocation : RelicLocation -> RelicId -> GameState -> Maybe RelicData
@@ -445,59 +270,6 @@ relicLocationIsOnFloor ( floor, _, _ ) =
 floorRelicLocationToFloorPoint : RelicLocation -> Point
 floorRelicLocationToFloorPoint ( _, x, y ) =
     { x = x, y = y }
-
-
-createActionOnGameStateFromRelicActivation : PersonId -> RelicId -> GameState -> ActionOnGamestate
-createActionOnGameStateFromRelicActivation activatorId relicId state =
-    let
-        maybeRelic =
-            getRelicAtLocation (playerHolderToLocation activatorId) relicId state
-
-        maybePerson =
-            PersonDict.get activatorId state.personDict
-    in
-    case ( maybeRelic, maybePerson ) of
-        ( Just relic, Just person ) ->
-            case relic.relicType of
-                DropAndDouble people ->
-                    ActivateGenerosityTrap activatorId relicId (List.length people)
-
-                _ ->
-                    GameStateNoOp
-
-        _ ->
-            GameStateNoOp
-
-
-maybeActivateRelic : PersonId -> RelicId -> GameState -> ( GameState, Types.BackendTrigger )
-maybeActivateRelic activatorId relicId state =
-    let
-        maybeRelic =
-            getRelicAtLocation (playerHolderToLocation activatorId) relicId state
-
-        maybePerson =
-            PersonDict.get activatorId state.personDict
-    in
-    case ( maybeRelic, maybePerson ) of
-        ( Just relic, Just person ) ->
-            activateRelicWithPersonData state person relic
-
-        _ ->
-            ( state, NoOpBackendTrigger )
-
-
-activateRelicWithPersonData : GameState -> PersonData -> RelicData -> ( GameState, Types.BackendTrigger )
-activateRelicWithPersonData state person relic =
-    case relic.relicType of
-        DropAndDouble people ->
-            let
-                newPersonState =
-                    { person | experience = person.experience + dropDoubleCurrentExperience relic.rarity relic.exp (List.length people) }
-            in
-            ( { state | personDict = PersonDict.insert person.id newPersonState state.personDict }, NoOpBackendTrigger )
-
-        _ ->
-            ( state, NoOpBackendTrigger )
 
 
 {-| Roll for the rarity of a relic.

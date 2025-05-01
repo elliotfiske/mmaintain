@@ -5,9 +5,8 @@ import Browser exposing (UrlRequest(..))
 import Browser.Dom
 import Browser.Events exposing (onKeyDown)
 import Browser.Navigation as Nav
-import Dict
-import GameObject
 import GameObjectTypes exposing (ActionOnGamestate(..), Direction(..), DirtData, PersonData, PersonId)
+import GameStateManipulation
 import Html exposing (..)
 import Html.Attributes exposing (..)
 import Html.Events
@@ -18,8 +17,8 @@ import Material.Icons.Outlined as Outlined
 import Material.Icons.Types as Coloring
 import Modals
 import PersonDict
-import Relic
 import RelicDict
+import RelicUtil
 import Task
 import Time
 import Types exposing (..)
@@ -250,7 +249,7 @@ moveMeTowardsTargetPoint state =
         ( Just target, Just me ) ->
             let
                 direction =
-                    GameObject.directionToMoveFrom me.position target
+                    GameStateManipulation.directionToMoveFrom me.position target
             in
             case direction of
                 Just dir ->
@@ -301,7 +300,7 @@ updateStateWithAction : ActionPerformer -> ActionOnGamestate -> FrontendPlayingS
 updateStateWithAction who action prevState =
     let
         ( newState, _ ) =
-            GameObject.executeActionOnGameState who action prevState.gameState
+            GameStateManipulation.executeActionOnGameState who action prevState.gameState
     in
     { prevState | gameState = newState }
         |> updateCameraPosition
@@ -481,7 +480,7 @@ renderCleanStrength : FrontendPlayingState -> PersonData -> Html.Html FrontendMs
 renderCleanStrength state me =
     let
         strength =
-            GameObject.cleanStrengthForPlayer state.gameState me
+            GameStateManipulation.cleanStrengthForPlayer state.gameState me
     in
     Html.div [ class "w-full prose" ]
         [ Html.h3 [ class "text-center" ]
@@ -510,7 +509,7 @@ renderXPMultiplier : FrontendPlayingState -> PersonData -> Html.Html FrontendMsg
 renderXPMultiplier state me =
     let
         xpMultiplier =
-            Relic.xpMultiplierForPlayer state.gameState me
+            GameStateManipulation.xpMultiplierForPlayer state.gameState me
     in
     if xpMultiplier == 1 then
         Html.text ""
@@ -526,7 +525,7 @@ renderRelicContent : FrontendPlayingState -> PersonData -> List (Html.Html Front
 renderRelicContent state me =
     let
         myRelics =
-            Relic.getRelicsHeldByPlayer state.myId state.gameState
+            GameStateManipulation.getRelicsHeldByPlayer state.myId state.gameState
                 |> RelicDict.values
     in
     [ Html.div [ class "prose mt-8" ]
@@ -589,12 +588,12 @@ renderHeldRelics state me =
 renderOnThisSquare : FrontendPlayingState -> PersonData -> Html.Html FrontendMsg
 renderOnThisSquare state me =
     Html.div [ class "order-3 md:order-none touch-manipulation" ]
-        [ case GameObject.getDirtAtLocation me.position state.gameState.dirtByLocation of
+        [ case GameStateManipulation.getDirtAtLocation me.position state.gameState.dirtByLocation of
             Just dirt ->
                 renderDirtOnThisSquare me dirt
 
             Nothing ->
-                GameObject.relicsAtLocation me.position state.gameState
+                GameStateManipulation.relicsAtLocation me.position state.gameState
                     |> List.map (heldRelicView state me)
                     |> Html.div [ class "flex flex-col gap-2 flex-grow flex-wrap p-2" ]
         ]
@@ -627,13 +626,13 @@ renderRelicSlots person currentNumRelics =
             Util.levelForExp person.experience
 
         totalUnlockedSlots =
-            GameObject.relicSlotsForLevel myLevel
+            GameStateManipulation.relicSlotsForLevel myLevel
 
         numAvailableSlots =
             totalUnlockedSlots - currentNumRelics
 
         lockedSlots =
-            GameObject.lockedRelicSlots myLevel
+            GameStateManipulation.lockedRelicSlots myLevel
     in
     List.repeat numAvailableSlots availableRelicView ++ List.map lockedSlotView lockedSlots
 
@@ -658,18 +657,18 @@ lockedSlotView lockedUntil =
 relicRarityBadge : GameObjectTypes.RelicRarity -> Html msg
 relicRarityBadge rarity =
     Html.div
-        [ class ("badge dark:text-black " ++ Relic.relicBgColor rarity) ]
-        [ Html.text (Relic.relicRarityName rarity) ]
+        [ class ("badge dark:text-black " ++ RelicUtil.relicBgColor rarity) ]
+        [ Html.text (RelicUtil.relicRarityName rarity) ]
 
 
 relicLevelProgressBar : GameObjectTypes.RelicData -> Html.Html msg
 relicLevelProgressBar relic =
     let
         progressPercent =
-            Relic.relicLevelProgress relic.rarity relic.exp
+            RelicUtil.relicLevelProgress relic.rarity relic.exp
 
         currentLevel =
-            Relic.relicLevelForExp relic.rarity relic.exp
+            RelicUtil.relicLevelForExp relic.rarity relic.exp
     in
     if currentLevel >= 5 then
         -- No progress bar if max level
@@ -690,7 +689,7 @@ heldRelicView state me relicData =
         , relicLevelProgressBar relicData
         , Html.div
             [ class "flex flex-col justify-between" ]
-            (Relic.relicBody state relicData me)
+            (GameStateManipulation.relicBody state relicData me)
         ]
 
 
@@ -698,11 +697,11 @@ relicCardTitle : FrontendPlayingState -> PersonData -> GameObjectTypes.RelicData
 relicCardTitle state me relicData =
     let
         isHeldByMe =
-            Relic.isRelicHeldByPerson state.gameState relicData.id me.id
+            GameStateManipulation.isRelicHeldByPerson state.gameState relicData.id me.id
     in
     Html.div [ class "flex justify-between items-center w-full" ]
         [ Html.span []
-            [ Html.text (Relic.relicName relicData.relicType)
+            [ Html.text (RelicUtil.relicName relicData.relicType)
             ]
         , if isHeldByMe then
             dropButton relicData.id state.myId
@@ -751,16 +750,17 @@ performClean me state =
     -- TODO: You'll be back here when we implement "no dropping relics on dirt". Hello future me!
     let
         myRelicCount =
-            RelicDict.size (Relic.getRelicsHeldByPlayer state.myId state.gameState)
+            GameStateManipulation.getRelicsHeldByPlayer state.myId state.gameState
+                |> RelicDict.size
     in
-    case GameObject.getDirtAtLocation me.position state.gameState.dirtByLocation of
+    case GameStateManipulation.getDirtAtLocation me.position state.gameState.dirtByLocation of
         Nothing ->
-            case GameObject.getRarestRelicAtLocation me.position state.gameState of
+            case GameStateManipulation.getRarestRelicAtLocation me.position state.gameState of
                 Nothing ->
                     GameStateNoOp
 
                 Just relic ->
-                    if myRelicCount < GameObject.relicSlotsForLevel (Util.levelForExp me.experience) then
+                    if myRelicCount < GameStateManipulation.relicSlotsForLevel (Util.levelForExp me.experience) then
                         PickUpRelic relic.id me.id
 
                     else
