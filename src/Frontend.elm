@@ -627,13 +627,13 @@ renderRelicSlots person currentNumRelics =
             Util.levelForExp person.experience
 
         totalUnlockedSlots =
-            GameStateManipulation.relicSlotsForLevel myLevel
+            RelicUtil.relicSlotsForLevel myLevel
 
         numAvailableSlots =
             totalUnlockedSlots - currentNumRelics
 
         lockedSlots =
-            GameStateManipulation.lockedRelicSlots myLevel
+            RelicUtil.lockedRelicSlots myLevel
     in
     List.repeat numAvailableSlots availableRelicView ++ List.map lockedSlotView lockedSlots
 
@@ -761,7 +761,7 @@ performClean me state =
                     GameStateNoOp
 
                 Just relic ->
-                    if myRelicCount < GameStateManipulation.relicSlotsForLevel (Util.levelForExp me.experience) then
+                    if myRelicCount < RelicUtil.relicSlotsForLevel (Util.levelForExp me.experience) then
                         PickUpRelic relic.id me.id
 
                     else

@@ -1,17 +1,12 @@
 module RelicUtil exposing (..)
 
-import BackendTriggerUtil
 import Dict
 import GameObjectTypes exposing (..)
 import Html
 import Html.Attributes
 import Html.Events
-import List.Extra
-import Markdown
-import PersonDict
 import RelicDict
 import Types exposing (..)
-import Util
 
 
 relicName : RelicType -> String
@@ -456,3 +451,49 @@ splashBucketStrength rarity exp =
             (level5Strength - toFloat baseStrength) / 4.0
     in
     round (toFloat baseStrength + (level - 1.0) * increasePerLevel)
+
+
+playerHolderToLocation : PersonId -> Types.RelicLocation
+playerHolderToLocation (PersonId rawId) =
+    ( -1, rawId, 0 )
+
+
+byRelicRarity : RelicData -> Int
+byRelicRarity relic =
+    case relic.rarity of
+        Common ->
+            0
+
+        Uncommon ->
+            -1
+
+        Rare ->
+            -2
+
+        Epic ->
+            -3
+
+        Legendary ->
+            -4
+
+
+relicSlotThreshholds : List Int
+relicSlotThreshholds =
+    [ 3, 5, 10 ]
+
+
+relicSlotsForLevel : Int -> Int
+relicSlotsForLevel level =
+    3
+        + (relicSlotThreshholds
+            |> List.filter (\x -> level >= x)
+            |> List.length
+          )
+
+
+{-| Given a level, return a list where each member is a level at which you'll unlock a new relic slot
+-}
+lockedRelicSlots : Int -> List Int
+lockedRelicSlots level =
+    relicSlotThreshholds
+        |> List.filter (\x -> level < x)
