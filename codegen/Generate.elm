@@ -2,7 +2,7 @@ module Generate exposing (main)
 
 import Elm
 import Gen.CodeGen.Generate as Generate
-import Gen.GameObjectTypes
+import Gen.GameObjectIds
 import GenericDict
 
 
@@ -18,9 +18,9 @@ main =
 personDictFile : Elm.File
 personDictFile =
     GenericDict.init
-        { keyType = Gen.GameObjectTypes.annotation_.personId
+        { keyType = Gen.GameObjectIds.annotation_.personId
         , namespace = []
-        , toComparable = Gen.GameObjectTypes.personIdToInt
+        , toComparable = Gen.GameObjectIds.personIdToInt
         }
         |> GenericDict.withTypeName "PersonDict"
         |> GenericDict.generateFile
@@ -29,9 +29,9 @@ personDictFile =
 dirtDictFile : Elm.File
 dirtDictFile =
     GenericDict.init
-        { keyType = Gen.GameObjectTypes.annotation_.dirtId
+        { keyType = Gen.GameObjectIds.annotation_.dirtId
         , namespace = []
-        , toComparable = Gen.GameObjectTypes.dirtIdToInt
+        , toComparable = Gen.GameObjectIds.dirtIdToInt
         }
         |> GenericDict.withTypeName "DirtDict"
         |> GenericDict.generateFile
@@ -40,9 +40,9 @@ dirtDictFile =
 relicDictFile : Elm.File
 relicDictFile =
     GenericDict.init
-        { keyType = Gen.GameObjectTypes.annotation_.relicId
+        { keyType = Gen.GameObjectIds.annotation_.relicId
         , namespace = []
-        , toComparable = Gen.GameObjectTypes.relicIdToInt
+        , toComparable = Gen.GameObjectIds.relicIdToInt
         }
         |> GenericDict.withTypeName "RelicDict"
         |> GenericDict.generateFile

@@ -24,6 +24,9 @@ relicName relicType =
         SplashBucket ->
             "Splash Bucket"
 
+        GuestBook _ ->
+            "Guest Book"
+
 
 relicTextColor : RelicRarity -> String
 relicTextColor rarity =
@@ -451,6 +454,15 @@ splashBucketStrength rarity exp =
             (level5Strength - toFloat baseStrength) / 4.0
     in
     round (toFloat baseStrength + (level - 1.0) * increasePerLevel)
+
+
+guestBookStrength : RelicRarity -> Int -> Int -> Int
+guestBookStrength rarity exp peopleWhoHaveHeldIt =
+    let
+        level =
+            relicLevelForExp rarity exp
+    in
+    level * peopleWhoHaveHeldIt
 
 
 playerHolderToLocation : PersonId -> Types.RelicLocation

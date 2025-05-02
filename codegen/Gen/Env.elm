@@ -1,6 +1,8 @@
-module Gen.Env exposing (moduleName_)
+module Gen.Env exposing ( moduleName_ )
 
-{-| 
+{-|
+# Generated bindings for Env
+
 @docs moduleName_
 -}
 

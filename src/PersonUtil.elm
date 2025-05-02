@@ -1,5 +1,6 @@
 module PersonUtil exposing (createPerson, doIncrementCleanCount, doIncrementClearCount, movePerson, movePersonWithId)
 
+import GameObjectIds exposing (PersonId)
 import GameObjectTypes exposing (..)
 import PersonDict exposing (PersonDict)
 import PointUtil

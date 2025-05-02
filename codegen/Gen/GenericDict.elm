@@ -1,7 +1,13 @@
-module Gen.GenericDict exposing (annotation_, call_, generateDeclarations, generateFile, init, moduleName_, useElmFastDict, values_, withTypeName)
+module Gen.GenericDict exposing
+    ( moduleName_, init, withTypeName, useElmFastDict, generateFile, generateDeclarations
+    , annotation_, call_, values_
+    )
 
-{-| 
-@docs moduleName_, init, withTypeName, useElmFastDict, generateFile, generateDeclarations, annotation_, call_, values_
+{-|
+# Generated bindings for GenericDict
+
+@docs moduleName_, init, withTypeName, useElmFastDict, generateFile, generateDeclarations
+@docs annotation_, call_, values_
 -}
 
 
@@ -32,7 +38,7 @@ init :
     , toComparable : Elm.Expression -> Elm.Expression
     }
     -> Elm.Expression
-init initArg =
+init initArg_ =
     Elm.apply
         (Elm.value
              { importFrom = [ "GenericDict" ]
@@ -60,13 +66,13 @@ init initArg =
              }
         )
         [ Elm.record
-            [ Tuple.pair "keyType" initArg.keyType
+            [ Tuple.pair "keyType" initArg_.keyType
             , Tuple.pair
                   "namespace"
-                  (Elm.list (List.map Elm.string initArg.namespace))
+                  (Elm.list (List.map Elm.string initArg_.namespace))
             , Tuple.pair
                   "toComparable"
-                  (Elm.functionReduced "initUnpack" initArg.toComparable)
+                  (Elm.functionReduced "initUnpack" initArg_.toComparable)
             ]
         ]
 
@@ -76,7 +82,7 @@ init initArg =
 withTypeName: String -> GenericDict.Config -> GenericDict.Config
 -}
 withTypeName : String -> Elm.Expression -> Elm.Expression
-withTypeName withTypeNameArg withTypeNameArg0 =
+withTypeName withTypeNameArg_ withTypeNameArg_0 =
     Elm.apply
         (Elm.value
              { importFrom = [ "GenericDict" ]
@@ -91,7 +97,7 @@ withTypeName withTypeNameArg withTypeNameArg0 =
                      )
              }
         )
-        [ Elm.string withTypeNameArg, withTypeNameArg0 ]
+        [ Elm.string withTypeNameArg_, withTypeNameArg_0 ]
 
 
 {-| Use `miniBill/elm-fast-dict` as the backing container.
@@ -100,7 +106,7 @@ This means that generated code will depend on that package but gives the advanta
 useElmFastDict: GenericDict.Config -> GenericDict.Config
 -}
 useElmFastDict : Elm.Expression -> Elm.Expression
-useElmFastDict useElmFastDictArg =
+useElmFastDict useElmFastDictArg_ =
     Elm.apply
         (Elm.value
              { importFrom = [ "GenericDict" ]
@@ -113,7 +119,7 @@ useElmFastDict useElmFastDictArg =
                      )
              }
         )
-        [ useElmFastDictArg ]
+        [ useElmFastDictArg_ ]
 
 
 {-| Generates a file from the given configuration.
@@ -121,7 +127,7 @@ useElmFastDict useElmFastDictArg =
 generateFile: GenericDict.Config -> Elm.File
 -}
 generateFile : Elm.Expression -> Elm.Expression
-generateFile generateFileArg =
+generateFile generateFileArg_ =
     Elm.apply
         (Elm.value
              { importFrom = [ "GenericDict" ]
@@ -134,7 +140,7 @@ generateFile generateFileArg =
                      )
              }
         )
-        [ generateFileArg ]
+        [ generateFileArg_ ]
 
 
 {-| Generates declarations from the given configuration.
@@ -144,7 +150,7 @@ This can be useful if you want to add your own custom declarations to the file.
 generateDeclarations: GenericDict.Config -> List Elm.Declaration
 -}
 generateDeclarations : Elm.Expression -> Elm.Expression
-generateDeclarations generateDeclarationsArg =
+generateDeclarations generateDeclarationsArg_ =
     Elm.apply
         (Elm.value
              { importFrom = [ "GenericDict" ]
@@ -158,7 +164,7 @@ generateDeclarations generateDeclarationsArg =
                      )
              }
         )
-        [ generateDeclarationsArg ]
+        [ generateDeclarationsArg_ ]
 
 
 annotation_ : { config : Type.Annotation }
@@ -175,7 +181,7 @@ call_ :
     }
 call_ =
     { init =
-        \initArg ->
+        \initArg_ ->
             Elm.apply
                 (Elm.value
                      { importFrom = [ "GenericDict" ]
@@ -210,9 +216,9 @@ call_ =
                              )
                      }
                 )
-                [ initArg ]
+                [ initArg_ ]
     , withTypeName =
-        \withTypeNameArg withTypeNameArg0 ->
+        \withTypeNameArg_ withTypeNameArg_0 ->
             Elm.apply
                 (Elm.value
                      { importFrom = [ "GenericDict" ]
@@ -227,9 +233,9 @@ call_ =
                              )
                      }
                 )
-                [ withTypeNameArg, withTypeNameArg0 ]
+                [ withTypeNameArg_, withTypeNameArg_0 ]
     , useElmFastDict =
-        \useElmFastDictArg ->
+        \useElmFastDictArg_ ->
             Elm.apply
                 (Elm.value
                      { importFrom = [ "GenericDict" ]
@@ -243,9 +249,9 @@ call_ =
                              )
                      }
                 )
-                [ useElmFastDictArg ]
+                [ useElmFastDictArg_ ]
     , generateFile =
-        \generateFileArg ->
+        \generateFileArg_ ->
             Elm.apply
                 (Elm.value
                      { importFrom = [ "GenericDict" ]
@@ -259,9 +265,9 @@ call_ =
                              )
                      }
                 )
-                [ generateFileArg ]
+                [ generateFileArg_ ]
     , generateDeclarations =
-        \generateDeclarationsArg ->
+        \generateDeclarationsArg_ ->
             Elm.apply
                 (Elm.value
                      { importFrom = [ "GenericDict" ]
@@ -281,7 +287,7 @@ call_ =
                              )
                      }
                 )
-                [ generateDeclarationsArg ]
+                [ generateDeclarationsArg_ ]
     }
 
 

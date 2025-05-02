@@ -1,12 +1,15 @@
-module Gen.GameObjectTypes exposing (annotation_, call_, caseOf_, dirtIdToInt, make_, moduleName_, personIdToInt, relicIdToInt, values_)
+module Gen.GameObjectTypes exposing ( moduleName_, annotation_, make_, caseOf_ )
 
-{-| 
-@docs moduleName_, relicIdToInt, dirtIdToInt, personIdToInt, annotation_, make_, caseOf_, call_, values_
+{-|
+# Generated bindings for GameObjectTypes
+
+@docs moduleName_, annotation_, make_, caseOf_
 -}
 
 
 import Elm
 import Elm.Annotation as Type
+import Elm.Arg
 import Elm.Case
 
 
@@ -16,72 +19,17 @@ moduleName_ =
     [ "GameObjectTypes" ]
 
 
-{-| relicIdToInt: GameObjectTypes.RelicId -> Int -}
-relicIdToInt : Elm.Expression -> Elm.Expression
-relicIdToInt relicIdToIntArg =
-    Elm.apply
-        (Elm.value
-             { importFrom = [ "GameObjectTypes" ]
-             , name = "relicIdToInt"
-             , annotation =
-                 Just
-                     (Type.function
-                          [ Type.namedWith [ "GameObjectTypes" ] "RelicId" [] ]
-                          Type.int
-                     )
-             }
-        )
-        [ relicIdToIntArg ]
-
-
-{-| dirtIdToInt: GameObjectTypes.DirtId -> Int -}
-dirtIdToInt : Elm.Expression -> Elm.Expression
-dirtIdToInt dirtIdToIntArg =
-    Elm.apply
-        (Elm.value
-             { importFrom = [ "GameObjectTypes" ]
-             , name = "dirtIdToInt"
-             , annotation =
-                 Just
-                     (Type.function
-                          [ Type.namedWith [ "GameObjectTypes" ] "DirtId" [] ]
-                          Type.int
-                     )
-             }
-        )
-        [ dirtIdToIntArg ]
-
-
-{-| personIdToInt: GameObjectTypes.PersonId -> Int -}
-personIdToInt : Elm.Expression -> Elm.Expression
-personIdToInt personIdToIntArg =
-    Elm.apply
-        (Elm.value
-             { importFrom = [ "GameObjectTypes" ]
-             , name = "personIdToInt"
-             , annotation =
-                 Just
-                     (Type.function
-                          [ Type.namedWith [ "GameObjectTypes" ] "PersonId" [] ]
-                          Type.int
-                     )
-             }
-        )
-        [ personIdToIntArg ]
-
-
 annotation_ :
     { relicData : Type.Annotation
     , dirtData : Type.Annotation
     , personData : Type.Annotation
+    , personStats : Type.Annotation
+    , point : Type.Annotation
     , actionOnGamestate : Type.Annotation
     , direction : Type.Annotation
+    , relicRarity : Type.Annotation
     , relicType : Type.Annotation
     , relicPosition : Type.Annotation
-    , gameObject : Type.Annotation
-    , relicId : Type.Annotation
-    , dirtId : Type.Annotation
-    , personId : Type.Annotation
     }
 annotation_ =
     { relicData =
@@ -90,13 +38,14 @@ annotation_ =
             "RelicData"
             []
             (Type.record
-                 [ ( "id", Type.namedWith [ "GameObjectTypes" ] "RelicId" [] )
+                 [ ( "id", Type.namedWith [ "GameObjectIds" ] "RelicId" [] )
                  , ( "relicType"
                    , Type.namedWith [ "GameObjectTypes" ] "RelicType" []
                    )
-                 , ( "position"
-                   , Type.namedWith [ "GameObjectTypes" ] "RelicPosition" []
+                 , ( "rarity"
+                   , Type.namedWith [ "GameObjectTypes" ] "RelicRarity" []
                    )
+                 , ( "exp", Type.int )
                  ]
             )
     , dirtData =
@@ -105,10 +54,11 @@ annotation_ =
             "DirtData"
             []
             (Type.record
-                 [ ( "id", Type.namedWith [ "GameObjectTypes" ] "DirtId" [] )
+                 [ ( "id", Type.namedWith [ "GameObjectIds" ] "DirtId" [] )
                  , ( "amount", Type.int )
-                 , ( "x", Type.int )
-                 , ( "y", Type.int )
+                 , ( "position"
+                   , Type.namedWith [ "GameObjectTypes" ] "Point" []
+                   )
                  ]
             )
     , personData =
@@ -117,22 +67,37 @@ annotation_ =
             "PersonData"
             []
             (Type.record
-                 [ ( "id", Type.namedWith [ "GameObjectTypes" ] "PersonId" [] )
+                 [ ( "id", Type.namedWith [ "GameObjectIds" ] "PersonId" [] )
                  , ( "name", Type.string )
                  , ( "experience", Type.int )
-                 , ( "x", Type.int )
-                 , ( "y", Type.int )
+                 , ( "position"
+                   , Type.namedWith [ "GameObjectTypes" ] "Point" []
+                   )
+                 , ( "stats"
+                   , Type.namedWith [ "GameObjectTypes" ] "PersonStats" []
+                   )
                  ]
             )
+    , personStats =
+        Type.alias
+            moduleName_
+            "PersonStats"
+            []
+            (Type.record
+                 [ ( "cleanCount", Type.int ), ( "clearCount", Type.int ) ]
+            )
+    , point =
+        Type.alias
+            moduleName_
+            "Point"
+            []
+            (Type.record [ ( "x", Type.int ), ( "y", Type.int ) ])
     , actionOnGamestate =
         Type.namedWith [ "GameObjectTypes" ] "ActionOnGamestate" []
     , direction = Type.namedWith [ "GameObjectTypes" ] "Direction" []
+    , relicRarity = Type.namedWith [ "GameObjectTypes" ] "RelicRarity" []
     , relicType = Type.namedWith [ "GameObjectTypes" ] "RelicType" []
     , relicPosition = Type.namedWith [ "GameObjectTypes" ] "RelicPosition" []
-    , gameObject = Type.namedWith [ "GameObjectTypes" ] "GameObject" []
-    , relicId = Type.namedWith [ "GameObjectTypes" ] "RelicId" []
-    , dirtId = Type.namedWith [ "GameObjectTypes" ] "DirtId" []
-    , personId = Type.namedWith [ "GameObjectTypes" ] "PersonId" []
     }
 
 
@@ -140,40 +105,59 @@ make_ :
     { relicData :
         { id : Elm.Expression
         , relicType : Elm.Expression
-        , position : Elm.Expression
+        , rarity : Elm.Expression
+        , exp : Elm.Expression
         }
         -> Elm.Expression
     , dirtData :
         { id : Elm.Expression
         , amount : Elm.Expression
-        , x : Elm.Expression
-        , y : Elm.Expression
+        , position : Elm.Expression
         }
         -> Elm.Expression
     , personData :
         { id : Elm.Expression
         , name : Elm.Expression
         , experience : Elm.Expression
-        , x : Elm.Expression
-        , y : Elm.Expression
+        , position : Elm.Expression
+        , stats : Elm.Expression
         }
         -> Elm.Expression
+    , personStats :
+        { cleanCount : Elm.Expression, clearCount : Elm.Expression }
+        -> Elm.Expression
+    , point : { x : Elm.Expression, y : Elm.Expression } -> Elm.Expression
     , movePerson : Elm.Expression -> Elm.Expression -> Elm.Expression
-    , clean : Elm.Expression -> Elm.Expression
+    , clean : Elm.Expression -> Elm.Expression -> Elm.Expression
+    , addDirt : Elm.Expression -> Elm.Expression
+    , addRelic : Elm.Expression -> Elm.Expression -> Elm.Expression
+    , addPerson : Elm.Expression -> Elm.Expression
+    , pickUpRelic : Elm.Expression -> Elm.Expression -> Elm.Expression
+    , dropRelic : Elm.Expression -> Elm.Expression -> Elm.Expression
+    , activateGenerosityTrap :
+        Elm.Expression -> Elm.Expression -> Elm.Expression -> Elm.Expression
+    , batchAction : Elm.Expression -> Elm.Expression
+    , gameStateNoOp : Elm.Expression
     , up : Elm.Expression
     , down : Elm.Expression
     , left : Elm.Expression
     , right : Elm.Expression
+    , upLeft : Elm.Expression
+    , upRight : Elm.Expression
+    , downLeft : Elm.Expression
+    , downRight : Elm.Expression
+    , common : Elm.Expression
+    , uncommon : Elm.Expression
+    , rare : Elm.Expression
+    , epic : Elm.Expression
+    , legendary : Elm.Expression
     , cleanFast : Elm.Expression
     , moreXP : Elm.Expression
+    , dropAndDouble : Elm.Expression -> Elm.Expression
+    , splashBucket : Elm.Expression
+    , guestBook : Elm.Expression -> Elm.Expression
     , heldBy : Elm.Expression -> Elm.Expression
-    , onFloor : Elm.Expression -> Elm.Expression -> Elm.Expression
-    , person : Elm.Expression -> Elm.Expression
-    , dirt : Elm.Expression -> Elm.Expression
-    , relic : Elm.Expression -> Elm.Expression
-    , relicId : Elm.Expression -> Elm.Expression
-    , dirtId : Elm.Expression -> Elm.Expression
-    , personId : Elm.Expression -> Elm.Expression
+    , onFloor : Elm.Expression -> Elm.Expression
     }
 make_ =
     { relicData =
@@ -185,7 +169,7 @@ make_ =
                      []
                      (Type.record
                           [ ( "id"
-                            , Type.namedWith [ "GameObjectTypes" ] "RelicId" []
+                            , Type.namedWith [ "GameObjectIds" ] "RelicId" []
                             )
                           , ( "relicType"
                             , Type.namedWith
@@ -193,19 +177,21 @@ make_ =
                                   "RelicType"
                                   []
                             )
-                          , ( "position"
+                          , ( "rarity"
                             , Type.namedWith
                                   [ "GameObjectTypes" ]
-                                  "RelicPosition"
+                                  "RelicRarity"
                                   []
                             )
+                          , ( "exp", Type.int )
                           ]
                      )
                 )
                 (Elm.record
                      [ Tuple.pair "id" relicData_args.id
                      , Tuple.pair "relicType" relicData_args.relicType
-                     , Tuple.pair "position" relicData_args.position
+                     , Tuple.pair "rarity" relicData_args.rarity
+                     , Tuple.pair "exp" relicData_args.exp
                      ]
                 )
     , dirtData =
@@ -217,19 +203,19 @@ make_ =
                      []
                      (Type.record
                           [ ( "id"
-                            , Type.namedWith [ "GameObjectTypes" ] "DirtId" []
+                            , Type.namedWith [ "GameObjectIds" ] "DirtId" []
                             )
                           , ( "amount", Type.int )
-                          , ( "x", Type.int )
-                          , ( "y", Type.int )
+                          , ( "position"
+                            , Type.namedWith [ "GameObjectTypes" ] "Point" []
+                            )
                           ]
                      )
                 )
                 (Elm.record
                      [ Tuple.pair "id" dirtData_args.id
                      , Tuple.pair "amount" dirtData_args.amount
-                     , Tuple.pair "x" dirtData_args.x
-                     , Tuple.pair "y" dirtData_args.y
+                     , Tuple.pair "position" dirtData_args.position
                      ]
                 )
     , personData =
@@ -241,12 +227,19 @@ make_ =
                      []
                      (Type.record
                           [ ( "id"
-                            , Type.namedWith [ "GameObjectTypes" ] "PersonId" []
+                            , Type.namedWith [ "GameObjectIds" ] "PersonId" []
                             )
                           , ( "name", Type.string )
                           , ( "experience", Type.int )
-                          , ( "x", Type.int )
-                          , ( "y", Type.int )
+                          , ( "position"
+                            , Type.namedWith [ "GameObjectTypes" ] "Point" []
+                            )
+                          , ( "stats"
+                            , Type.namedWith
+                                  [ "GameObjectTypes" ]
+                                  "PersonStats"
+                                  []
+                            )
                           ]
                      )
                 )
@@ -254,8 +247,40 @@ make_ =
                      [ Tuple.pair "id" personData_args.id
                      , Tuple.pair "name" personData_args.name
                      , Tuple.pair "experience" personData_args.experience
-                     , Tuple.pair "x" personData_args.x
-                     , Tuple.pair "y" personData_args.y
+                     , Tuple.pair "position" personData_args.position
+                     , Tuple.pair "stats" personData_args.stats
+                     ]
+                )
+    , personStats =
+        \personStats_args ->
+            Elm.withType
+                (Type.alias
+                     [ "GameObjectTypes" ]
+                     "PersonStats"
+                     []
+                     (Type.record
+                          [ ( "cleanCount", Type.int )
+                          , ( "clearCount", Type.int )
+                          ]
+                     )
+                )
+                (Elm.record
+                     [ Tuple.pair "cleanCount" personStats_args.cleanCount
+                     , Tuple.pair "clearCount" personStats_args.clearCount
+                     ]
+                )
+    , point =
+        \point_args ->
+            Elm.withType
+                (Type.alias
+                     [ "GameObjectTypes" ]
+                     "Point"
+                     []
+                     (Type.record [ ( "x", Type.int ), ( "y", Type.int ) ])
+                )
+                (Elm.record
+                     [ Tuple.pair "x" point_args.x
+                     , Tuple.pair "y" point_args.y
                      ]
                 )
     , movePerson =
@@ -270,7 +295,7 @@ make_ =
                 )
                 [ ar0, ar1 ]
     , clean =
-        \ar0 ->
+        \ar0 ar1 ->
             Elm.apply
                 (Elm.value
                      { importFrom = [ "GameObjectTypes" ]
@@ -279,7 +304,90 @@ make_ =
                          Just (Type.namedWith [] "ActionOnGamestate" [])
                      }
                 )
+                [ ar0, ar1 ]
+    , addDirt =
+        \ar0 ->
+            Elm.apply
+                (Elm.value
+                     { importFrom = [ "GameObjectTypes" ]
+                     , name = "AddDirt"
+                     , annotation =
+                         Just (Type.namedWith [] "ActionOnGamestate" [])
+                     }
+                )
                 [ ar0 ]
+    , addRelic =
+        \ar0 ar1 ->
+            Elm.apply
+                (Elm.value
+                     { importFrom = [ "GameObjectTypes" ]
+                     , name = "AddRelic"
+                     , annotation =
+                         Just (Type.namedWith [] "ActionOnGamestate" [])
+                     }
+                )
+                [ ar0, ar1 ]
+    , addPerson =
+        \ar0 ->
+            Elm.apply
+                (Elm.value
+                     { importFrom = [ "GameObjectTypes" ]
+                     , name = "AddPerson"
+                     , annotation =
+                         Just (Type.namedWith [] "ActionOnGamestate" [])
+                     }
+                )
+                [ ar0 ]
+    , pickUpRelic =
+        \ar0 ar1 ->
+            Elm.apply
+                (Elm.value
+                     { importFrom = [ "GameObjectTypes" ]
+                     , name = "PickUpRelic"
+                     , annotation =
+                         Just (Type.namedWith [] "ActionOnGamestate" [])
+                     }
+                )
+                [ ar0, ar1 ]
+    , dropRelic =
+        \ar0 ar1 ->
+            Elm.apply
+                (Elm.value
+                     { importFrom = [ "GameObjectTypes" ]
+                     , name = "DropRelic"
+                     , annotation =
+                         Just (Type.namedWith [] "ActionOnGamestate" [])
+                     }
+                )
+                [ ar0, ar1 ]
+    , activateGenerosityTrap =
+        \ar0 ar1 ar2 ->
+            Elm.apply
+                (Elm.value
+                     { importFrom = [ "GameObjectTypes" ]
+                     , name = "ActivateGenerosityTrap"
+                     , annotation =
+                         Just (Type.namedWith [] "ActionOnGamestate" [])
+                     }
+                )
+                [ ar0, ar1, ar2 ]
+    , batchAction =
+        \ar0 ->
+            Elm.apply
+                (Elm.value
+                     { importFrom = [ "GameObjectTypes" ]
+                     , name = "BatchAction"
+                     , annotation =
+                         Just (Type.namedWith [] "ActionOnGamestate" [])
+                     }
+                )
+                [ ar0 ]
+    , gameStateNoOp =
+        Elm.value
+            { importFrom = [ "GameObjectTypes" ]
+            , name = "GameStateNoOp"
+            , annotation = Just (Type.namedWith [] "ActionOnGamestate" [])
+            }
     , up =
         Elm.value
             { importFrom = [ "GameObjectTypes" ]
@@ -304,6 +412,60 @@ make_ =
             , name = "Right"
             , annotation = Just (Type.namedWith [] "Direction" [])
             }
+    , upLeft =
+        Elm.value
+            { importFrom = [ "GameObjectTypes" ]
+            , name = "UpLeft"
+            , annotation = Just (Type.namedWith [] "Direction" [])
+            }
+    , upRight =
+        Elm.value
+            { importFrom = [ "GameObjectTypes" ]
+            , name = "UpRight"
+            , annotation = Just (Type.namedWith [] "Direction" [])
+            }
+    , downLeft =
+        Elm.value
+            { importFrom = [ "GameObjectTypes" ]
+            , name = "DownLeft"
+            , annotation = Just (Type.namedWith [] "Direction" [])
+            }
+    , downRight =
+        Elm.value
+            { importFrom = [ "GameObjectTypes" ]
+            , name = "DownRight"
+            , annotation = Just (Type.namedWith [] "Direction" [])
+            }
+    , common =
+        Elm.value
+            { importFrom = [ "GameObjectTypes" ]
+            , name = "Common"
+            , annotation = Just (Type.namedWith [] "RelicRarity" [])
+            }
+    , uncommon =
+        Elm.value
+            { importFrom = [ "GameObjectTypes" ]
+            , name = "Uncommon"
+            , annotation = Just (Type.namedWith [] "RelicRarity" [])
+            }
+    , rare =
+        Elm.value
+            { importFrom = [ "GameObjectTypes" ]
+            , name = "Rare"
+            , annotation = Just (Type.namedWith [] "RelicRarity" [])
+            }
+    , epic =
+        Elm.value
+            { importFrom = [ "GameObjectTypes" ]
+            , name = "Epic"
+            , annotation = Just (Type.namedWith [] "RelicRarity" [])
+            }
+    , legendary =
+        Elm.value
+            { importFrom = [ "GameObjectTypes" ]
+            , name = "Legendary"
+            , annotation = Just (Type.namedWith [] "RelicRarity" [])
+            }
     , cleanFast =
         Elm.value
             { importFrom = [ "GameObjectTypes" ]
@@ -316,6 +478,32 @@ make_ =
             , name = "MoreXP"
             , annotation = Just (Type.namedWith [] "RelicType" [])
             }
+    , dropAndDouble =
+        \ar0 ->
+            Elm.apply
+                (Elm.value
+                     { importFrom = [ "GameObjectTypes" ]
+                     , name = "DropAndDouble"
+                     , annotation = Just (Type.namedWith [] "RelicType" [])
+                     }
+                )
+                [ ar0 ]
+    , splashBucket =
+        Elm.value
+            { importFrom = [ "GameObjectTypes" ]
+            , name = "SplashBucket"
+            , annotation = Just (Type.namedWith [] "RelicType" [])
+            }
+    , guestBook =
+        \ar0 ->
+            Elm.apply
+                (Elm.value
+                     { importFrom = [ "GameObjectTypes" ]
+                     , name = "GuestBook"
+                     , annotation = Just (Type.namedWith [] "RelicType" [])
+                     }
+                )
+                [ ar0 ]
     , heldBy =
         \ar0 ->
             Elm.apply
@@ -327,7 +515,7 @@ make_ =
                 )
                 [ ar0 ]
     , onFloor =
-        \ar0 ar1 ->
+        \ar0 ->
             Elm.apply
                 (Elm.value
                      { importFrom = [ "GameObjectTypes" ]
@@ -335,339 +523,353 @@ make_ =
                      , annotation = Just (Type.namedWith [] "RelicPosition" [])
                      }
                 )
-                [ ar0, ar1 ]
-    , person =
-        \ar0 ->
-            Elm.apply
-                (Elm.value
-                     { importFrom = [ "GameObjectTypes" ]
-                     , name = "Person"
-                     , annotation = Just (Type.namedWith [] "GameObject" [])
-                     }
-                )
-                [ ar0 ]
-    , dirt =
-        \ar0 ->
-            Elm.apply
-                (Elm.value
-                     { importFrom = [ "GameObjectTypes" ]
-                     , name = "Dirt"
-                     , annotation = Just (Type.namedWith [] "GameObject" [])
-                     }
-                )
-                [ ar0 ]
-    , relic =
-        \ar0 ->
-            Elm.apply
-                (Elm.value
-                     { importFrom = [ "GameObjectTypes" ]
-                     , name = "Relic"
-                     , annotation = Just (Type.namedWith [] "GameObject" [])
-                     }
-                )
-                [ ar0 ]
-    , relicId =
-        \ar0 ->
-            Elm.apply
-                (Elm.value
-                     { importFrom = [ "GameObjectTypes" ]
-                     , name = "RelicId"
-                     , annotation = Just (Type.namedWith [] "RelicId" [])
-                     }
-                )
-                [ ar0 ]
-    , dirtId =
-        \ar0 ->
-            Elm.apply
-                (Elm.value
-                     { importFrom = [ "GameObjectTypes" ]
-                     , name = "DirtId"
-                     , annotation = Just (Type.namedWith [] "DirtId" [])
-                     }
-                )
-                [ ar0 ]
-    , personId =
-        \ar0 ->
-            Elm.apply
-                (Elm.value
-                     { importFrom = [ "GameObjectTypes" ]
-                     , name = "PersonId"
-                     , annotation = Just (Type.namedWith [] "PersonId" [])
-                     }
-                )
                 [ ar0 ]
     }
 
 
-caseOf_ :
-    { actionOnGamestate :
-        Elm.Expression
-        -> { actionOnGamestateTags_0_0
-            | movePerson : Elm.Expression -> Elm.Expression -> Elm.Expression
-            , clean : Elm.Expression -> Elm.Expression
-        }
-        -> Elm.Expression
-    , direction :
-        Elm.Expression
-        -> { directionTags_1_0
-            | up : Elm.Expression
-            , down : Elm.Expression
-            , left : Elm.Expression
-            , right : Elm.Expression
-        }
-        -> Elm.Expression
-    , relicType :
-        Elm.Expression
-        -> { relicTypeTags_2_0
-            | cleanFast : Elm.Expression
-            , moreXP : Elm.Expression
-        }
-        -> Elm.Expression
-    , relicPosition :
-        Elm.Expression
-        -> { relicPositionTags_3_0
-            | heldBy : Elm.Expression -> Elm.Expression
-            , onFloor : Elm.Expression -> Elm.Expression -> Elm.Expression
-        }
-        -> Elm.Expression
-    , gameObject :
-        Elm.Expression
-        -> { gameObjectTags_4_0
-            | person : Elm.Expression -> Elm.Expression
-            , dirt : Elm.Expression -> Elm.Expression
-            , relic : Elm.Expression -> Elm.Expression
-        }
-        -> Elm.Expression
-    , relicId :
-        Elm.Expression
-        -> { relicIdTags_5_0 | relicId : Elm.Expression -> Elm.Expression }
-        -> Elm.Expression
-    , dirtId :
-        Elm.Expression
-        -> { dirtIdTags_6_0 | dirtId : Elm.Expression -> Elm.Expression }
-        -> Elm.Expression
-    , personId :
-        Elm.Expression
-        -> { personIdTags_7_0 | personId : Elm.Expression -> Elm.Expression }
-        -> Elm.Expression
-    }
 caseOf_ =
     { actionOnGamestate =
         \actionOnGamestateExpression actionOnGamestateTags ->
             Elm.Case.custom
                 actionOnGamestateExpression
                 (Type.namedWith [ "GameObjectTypes" ] "ActionOnGamestate" [])
-                [ Elm.Case.branch2
-                    "MovePerson"
-                    ( "gameObjectTypesPersonId"
-                    , Type.namedWith [ "GameObjectTypes" ] "PersonId" []
+                [ Elm.Case.branch
+                    (Elm.Arg.customType
+                       "MovePerson"
+                       actionOnGamestateTags.movePerson |> Elm.Arg.item
+                                                                 (Elm.Arg.varWith
+                                                                        "gameObjectIdsPersonId"
+                                                                        (Type.namedWith
+                                                                               [ "GameObjectIds"
+                                                                               ]
+                                                                               "PersonId"
+                                                                               []
+                                                                        )
+                                                                 ) |> Elm.Arg.item
+                                                                            (Elm.Arg.varWith
+                                                                                   "gameObjectTypesDirection"
+                                                                                   (Type.namedWith
+                                                                                          [ "GameObjectTypes"
+                                                                                          ]
+                                                                                          "Direction"
+                                                                                          []
+                                                                                   )
+                                                                            )
                     )
-                    ( "gameObjectTypesDirection"
-                    , Type.namedWith [ "GameObjectTypes" ] "Direction" []
+                    Basics.identity
+                , Elm.Case.branch
+                    (Elm.Arg.customType
+                       "Clean"
+                       actionOnGamestateTags.clean |> Elm.Arg.item
+                                                            (Elm.Arg.varWith
+                                                                   "gameObjectIdsPersonId"
+                                                                   (Type.namedWith
+                                                                          [ "GameObjectIds"
+                                                                          ]
+                                                                          "PersonId"
+                                                                          []
+                                                                   )
+                                                            ) |> Elm.Arg.item
+                                                                       (Elm.Arg.varWith
+                                                                              "gameObjectTypesPoint"
+                                                                              (Type.namedWith
+                                                                                     [ "GameObjectTypes"
+                                                                                     ]
+                                                                                     "Point"
+                                                                                     []
+                                                                              )
+                                                                       )
                     )
-                    actionOnGamestateTags.movePerson
-                , Elm.Case.branch1
-                    "Clean"
-                    ( "gameObjectTypesDirtId"
-                    , Type.namedWith [ "GameObjectTypes" ] "DirtId" []
+                    Basics.identity
+                , Elm.Case.branch
+                    (Elm.Arg.customType
+                       "AddDirt"
+                       actionOnGamestateTags.addDirt |> Elm.Arg.item
+                                                              (Elm.Arg.varWith
+                                                                     "gameObjectTypesDirtData"
+                                                                     (Type.namedWith
+                                                                            [ "GameObjectTypes"
+                                                                            ]
+                                                                            "DirtData"
+                                                                            []
+                                                                     )
+                                                              )
                     )
-                    actionOnGamestateTags.clean
+                    Basics.identity
+                , Elm.Case.branch
+                    (Elm.Arg.customType
+                       "AddRelic"
+                       actionOnGamestateTags.addRelic |> Elm.Arg.item
+                                                               (Elm.Arg.varWith
+                                                                      "gameObjectTypesRelicData"
+                                                                      (Type.namedWith
+                                                                             [ "GameObjectTypes"
+                                                                             ]
+                                                                             "RelicData"
+                                                                             []
+                                                                      )
+                                                               ) |> Elm.Arg.item
+                                                                          (Elm.Arg.varWith
+                                                                                 "gameObjectTypesPoint"
+                                                                                 (Type.namedWith
+                                                                                        [ "GameObjectTypes"
+                                                                                        ]
+                                                                                        "Point"
+                                                                                        []
+                                                                                 )
+                                                                          )
+                    )
+                    Basics.identity
+                , Elm.Case.branch
+                    (Elm.Arg.customType
+                       "AddPerson"
+                       actionOnGamestateTags.addPerson |> Elm.Arg.item
+                                                                (Elm.Arg.varWith
+                                                                       "gameObjectTypesPersonData"
+                                                                       (Type.namedWith
+                                                                              [ "GameObjectTypes"
+                                                                              ]
+                                                                              "PersonData"
+                                                                              []
+                                                                       )
+                                                                )
+                    )
+                    Basics.identity
+                , Elm.Case.branch
+                    (Elm.Arg.customType
+                       "PickUpRelic"
+                       actionOnGamestateTags.pickUpRelic |> Elm.Arg.item
+                                                                  (Elm.Arg.varWith
+                                                                         "gameObjectIdsRelicId"
+                                                                         (Type.namedWith
+                                                                                [ "GameObjectIds"
+                                                                                ]
+                                                                                "RelicId"
+                                                                                []
+                                                                         )
+                                                                  ) |> Elm.Arg.item
+                                                                             (Elm.Arg.varWith
+                                                                                    "gameObjectIdsPersonId"
+                                                                                    (Type.namedWith
+                                                                                           [ "GameObjectIds"
+                                                                                           ]
+                                                                                           "PersonId"
+                                                                                           []
+                                                                                    )
+                                                                             )
+                    )
+                    Basics.identity
+                , Elm.Case.branch
+                    (Elm.Arg.customType
+                       "DropRelic"
+                       actionOnGamestateTags.dropRelic |> Elm.Arg.item
+                                                                (Elm.Arg.varWith
+                                                                       "gameObjectIdsRelicId"
+                                                                       (Type.namedWith
+                                                                              [ "GameObjectIds"
+                                                                              ]
+                                                                              "RelicId"
+                                                                              []
+                                                                       )
+                                                                ) |> Elm.Arg.item
+                                                                           (Elm.Arg.varWith
+                                                                                  "gameObjectIdsPersonId"
+                                                                                  (Type.namedWith
+                                                                                         [ "GameObjectIds"
+                                                                                         ]
+                                                                                         "PersonId"
+                                                                                         []
+                                                                                  )
+                                                                           )
+                    )
+                    Basics.identity
+                , Elm.Case.branch
+                    (Elm.Arg.customType
+                       "ActivateGenerosityTrap"
+                       actionOnGamestateTags.activateGenerosityTrap |> Elm.Arg.item
+                                                                             (Elm.Arg.varWith
+                                                                                    "gameObjectIdsPersonId"
+                                                                                    (Type.namedWith
+                                                                                           [ "GameObjectIds"
+                                                                                           ]
+                                                                                           "PersonId"
+                                                                                           []
+                                                                                    )
+                                                                             ) |> Elm.Arg.item
+                                                                                        (Elm.Arg.varWith
+                                                                                               "gameObjectIdsRelicId"
+                                                                                               (Type.namedWith
+                                                                                                      [ "GameObjectIds"
+                                                                                                      ]
+                                                                                                      "RelicId"
+                                                                                                      []
+                                                                                               )
+                                                                                        ) |> Elm.Arg.item
+                                                                                                   (Elm.Arg.varWith
+                                                                                                          "arg_2"
+                                                                                                          Type.int
+                                                                                                   )
+                    )
+                    Basics.identity
+                , Elm.Case.branch
+                    (Elm.Arg.customType
+                       "BatchAction"
+                       actionOnGamestateTags.batchAction |> Elm.Arg.item
+                                                                  (Elm.Arg.varWith
+                                                                         "arg_0"
+                                                                         (Type.list
+                                                                                (Type.namedWith
+                                                                                       [ "GameObjectTypes"
+                                                                                       ]
+                                                                                       "ActionOnGamestate"
+                                                                                       []
+                                                                                )
+                                                                         )
+                                                                  )
+                    )
+                    Basics.identity
+                , Elm.Case.branch
+                    (Elm.Arg.customType
+                       "GameStateNoOp"
+                       actionOnGamestateTags.gameStateNoOp
+                    )
+                    Basics.identity
                 ]
     , direction =
         \directionExpression directionTags ->
             Elm.Case.custom
                 directionExpression
                 (Type.namedWith [ "GameObjectTypes" ] "Direction" [])
-                [ Elm.Case.branch0 "Up" directionTags.up
-                , Elm.Case.branch0 "Down" directionTags.down
-                , Elm.Case.branch0 "Left" directionTags.left
-                , Elm.Case.branch0 "Right" directionTags.right
+                [ Elm.Case.branch
+                    (Elm.Arg.customType "Up" directionTags.up)
+                    Basics.identity
+                , Elm.Case.branch
+                    (Elm.Arg.customType "Down" directionTags.down)
+                    Basics.identity
+                , Elm.Case.branch
+                    (Elm.Arg.customType "Left" directionTags.left)
+                    Basics.identity
+                , Elm.Case.branch
+                    (Elm.Arg.customType "Right" directionTags.right)
+                    Basics.identity
+                , Elm.Case.branch
+                    (Elm.Arg.customType "UpLeft" directionTags.upLeft)
+                    Basics.identity
+                , Elm.Case.branch
+                    (Elm.Arg.customType "UpRight" directionTags.upRight)
+                    Basics.identity
+                , Elm.Case.branch
+                    (Elm.Arg.customType "DownLeft" directionTags.downLeft)
+                    Basics.identity
+                , Elm.Case.branch
+                    (Elm.Arg.customType "DownRight" directionTags.downRight)
+                    Basics.identity
+                ]
+    , relicRarity =
+        \relicRarityExpression relicRarityTags ->
+            Elm.Case.custom
+                relicRarityExpression
+                (Type.namedWith [ "GameObjectTypes" ] "RelicRarity" [])
+                [ Elm.Case.branch
+                    (Elm.Arg.customType "Common" relicRarityTags.common)
+                    Basics.identity
+                , Elm.Case.branch
+                    (Elm.Arg.customType "Uncommon" relicRarityTags.uncommon)
+                    Basics.identity
+                , Elm.Case.branch
+                    (Elm.Arg.customType "Rare" relicRarityTags.rare)
+                    Basics.identity
+                , Elm.Case.branch
+                    (Elm.Arg.customType "Epic" relicRarityTags.epic)
+                    Basics.identity
+                , Elm.Case.branch
+                    (Elm.Arg.customType "Legendary" relicRarityTags.legendary)
+                    Basics.identity
                 ]
     , relicType =
         \relicTypeExpression relicTypeTags ->
             Elm.Case.custom
                 relicTypeExpression
                 (Type.namedWith [ "GameObjectTypes" ] "RelicType" [])
-                [ Elm.Case.branch0 "CleanFast" relicTypeTags.cleanFast
-                , Elm.Case.branch0 "MoreXP" relicTypeTags.moreXP
+                [ Elm.Case.branch
+                    (Elm.Arg.customType "CleanFast" relicTypeTags.cleanFast)
+                    Basics.identity
+                , Elm.Case.branch
+                    (Elm.Arg.customType "MoreXP" relicTypeTags.moreXP)
+                    Basics.identity
+                , Elm.Case.branch
+                    (Elm.Arg.customType
+                       "DropAndDouble"
+                       relicTypeTags.dropAndDouble |> Elm.Arg.item
+                                                            (Elm.Arg.varWith
+                                                                   "arg_0"
+                                                                   (Type.list
+                                                                          (Type.namedWith
+                                                                                 [ "GameObjectIds"
+                                                                                 ]
+                                                                                 "PersonId"
+                                                                                 []
+                                                                          )
+                                                                   )
+                                                            )
+                    )
+                    Basics.identity
+                , Elm.Case.branch
+                    (Elm.Arg.customType
+                       "SplashBucket"
+                       relicTypeTags.splashBucket
+                    )
+                    Basics.identity
+                , Elm.Case.branch
+                    (Elm.Arg.customType
+                       "GuestBook"
+                       relicTypeTags.guestBook |> Elm.Arg.item
+                                                        (Elm.Arg.varWith
+                                                               "setSet"
+                                                               (Type.namedWith
+                                                                      [ "Set" ]
+                                                                      "Set"
+                                                                      [ Type.string
+                                                                      ]
+                                                               )
+                                                        )
+                    )
+                    Basics.identity
                 ]
     , relicPosition =
         \relicPositionExpression relicPositionTags ->
             Elm.Case.custom
                 relicPositionExpression
                 (Type.namedWith [ "GameObjectTypes" ] "RelicPosition" [])
-                [ Elm.Case.branch1
-                    "HeldBy"
-                    ( "gameObjectTypesPersonId"
-                    , Type.namedWith [ "GameObjectTypes" ] "PersonId" []
+                [ Elm.Case.branch
+                    (Elm.Arg.customType
+                       "HeldBy"
+                       relicPositionTags.heldBy |> Elm.Arg.item
+                                                         (Elm.Arg.varWith
+                                                                "gameObjectIdsPersonId"
+                                                                (Type.namedWith
+                                                                       [ "GameObjectIds"
+                                                                       ]
+                                                                       "PersonId"
+                                                                       []
+                                                                )
+                                                         )
                     )
-                    relicPositionTags.heldBy
-                , Elm.Case.branch2
-                    "OnFloor"
-                    ( "basicsInt", Type.int )
-                    ( "basicsInt", Type.int )
-                    relicPositionTags.onFloor
+                    Basics.identity
+                , Elm.Case.branch
+                    (Elm.Arg.customType
+                       "OnFloor"
+                       relicPositionTags.onFloor |> Elm.Arg.item
+                                                          (Elm.Arg.varWith
+                                                                 "gameObjectTypesPoint"
+                                                                 (Type.namedWith
+                                                                        [ "GameObjectTypes"
+                                                                        ]
+                                                                        "Point"
+                                                                        []
+                                                                 )
+                                                          )
+                    )
+                    Basics.identity
                 ]
-    , gameObject =
-        \gameObjectExpression gameObjectTags ->
-            Elm.Case.custom
-                gameObjectExpression
-                (Type.namedWith [ "GameObjectTypes" ] "GameObject" [])
-                [ Elm.Case.branch1
-                    "Person"
-                    ( "gameObjectTypesPersonData"
-                    , Type.namedWith [ "GameObjectTypes" ] "PersonData" []
-                    )
-                    gameObjectTags.person
-                , Elm.Case.branch1
-                    "Dirt"
-                    ( "gameObjectTypesDirtData"
-                    , Type.namedWith [ "GameObjectTypes" ] "DirtData" []
-                    )
-                    gameObjectTags.dirt
-                , Elm.Case.branch1
-                    "Relic"
-                    ( "gameObjectTypesRelicData"
-                    , Type.namedWith [ "GameObjectTypes" ] "RelicData" []
-                    )
-                    gameObjectTags.relic
-                ]
-    , relicId =
-        \relicIdExpression relicIdTags ->
-            Elm.Case.custom
-                relicIdExpression
-                (Type.namedWith [ "GameObjectTypes" ] "RelicId" [])
-                [ Elm.Case.branch1
-                    "RelicId"
-                    ( "basicsInt", Type.int )
-                    relicIdTags.relicId
-                ]
-    , dirtId =
-        \dirtIdExpression dirtIdTags ->
-            Elm.Case.custom
-                dirtIdExpression
-                (Type.namedWith [ "GameObjectTypes" ] "DirtId" [])
-                [ Elm.Case.branch1
-                    "DirtId"
-                    ( "basicsInt", Type.int )
-                    dirtIdTags.dirtId
-                ]
-    , personId =
-        \personIdExpression personIdTags ->
-            Elm.Case.custom
-                personIdExpression
-                (Type.namedWith [ "GameObjectTypes" ] "PersonId" [])
-                [ Elm.Case.branch1
-                    "PersonId"
-                    ( "basicsInt", Type.int )
-                    personIdTags.personId
-                ]
-    }
-
-
-call_ :
-    { relicIdToInt : Elm.Expression -> Elm.Expression
-    , dirtIdToInt : Elm.Expression -> Elm.Expression
-    , personIdToInt : Elm.Expression -> Elm.Expression
-    }
-call_ =
-    { relicIdToInt =
-        \relicIdToIntArg ->
-            Elm.apply
-                (Elm.value
-                     { importFrom = [ "GameObjectTypes" ]
-                     , name = "relicIdToInt"
-                     , annotation =
-                         Just
-                             (Type.function
-                                  [ Type.namedWith
-                                      [ "GameObjectTypes" ]
-                                      "RelicId"
-                                      []
-                                  ]
-                                  Type.int
-                             )
-                     }
-                )
-                [ relicIdToIntArg ]
-    , dirtIdToInt =
-        \dirtIdToIntArg ->
-            Elm.apply
-                (Elm.value
-                     { importFrom = [ "GameObjectTypes" ]
-                     , name = "dirtIdToInt"
-                     , annotation =
-                         Just
-                             (Type.function
-                                  [ Type.namedWith
-                                      [ "GameObjectTypes" ]
-                                      "DirtId"
-                                      []
-                                  ]
-                                  Type.int
-                             )
-                     }
-                )
-                [ dirtIdToIntArg ]
-    , personIdToInt =
-        \personIdToIntArg ->
-            Elm.apply
-                (Elm.value
-                     { importFrom = [ "GameObjectTypes" ]
-                     , name = "personIdToInt"
-                     , annotation =
-                         Just
-                             (Type.function
-                                  [ Type.namedWith
-                                      [ "GameObjectTypes" ]
-                                      "PersonId"
-                                      []
-                                  ]
-                                  Type.int
-                             )
-                     }
-                )
-                [ personIdToIntArg ]
-    }
-
-
-values_ :
-    { relicIdToInt : Elm.Expression
-    , dirtIdToInt : Elm.Expression
-    , personIdToInt : Elm.Expression
-    }
-values_ =
-    { relicIdToInt =
-        Elm.value
-            { importFrom = [ "GameObjectTypes" ]
-            , name = "relicIdToInt"
-            , annotation =
-                Just
-                    (Type.function
-                         [ Type.namedWith [ "GameObjectTypes" ] "RelicId" [] ]
-                         Type.int
-                    )
-            }
-    , dirtIdToInt =
-        Elm.value
-            { importFrom = [ "GameObjectTypes" ]
-            , name = "dirtIdToInt"
-            , annotation =
-                Just
-                    (Type.function
-                         [ Type.namedWith [ "GameObjectTypes" ] "DirtId" [] ]
-                         Type.int
-                    )
-            }
-    , personIdToInt =
-        Elm.value
-            { importFrom = [ "GameObjectTypes" ]
-            , name = "personIdToInt"
-            , annotation =
-                Just
-                    (Type.function
-                         [ Type.namedWith [ "GameObjectTypes" ] "PersonId" [] ]
-                         Type.int
-                    )
-            }
     }

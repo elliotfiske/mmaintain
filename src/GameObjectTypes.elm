@@ -1,5 +1,9 @@
 module GameObjectTypes exposing (..)
 
+import GameObjectIds exposing (DirtId, PersonId, RelicId)
+import Set exposing (Set)
+
+
 {-| This is the "topmost" Types module. It knows about all the types relating to the GameState and
 the objects within.
 
@@ -12,47 +16,8 @@ GameObjectTypes => Types => Rest of world
 GameObjectTypes => RelicDict/PersonDict/DirtDict => Types
 
 -}
-
-
 type alias Point =
     { x : Int, y : Int }
-
-
-type PersonId
-    = PersonId Int
-
-
-personIdToInt : PersonId -> Int
-personIdToInt (PersonId id) =
-    id
-
-
-personIdToString : PersonId -> String
-personIdToString =
-    personIdToInt >> String.fromInt
-
-
-type DirtId
-    = DirtId Int
-
-
-dirtIdToInt : DirtId -> Int
-dirtIdToInt (DirtId id) =
-    id
-
-
-type RelicId
-    = RelicId Int
-
-
-relicIdToInt : RelicId -> Int
-relicIdToInt (RelicId id) =
-    id
-
-
-relicIdToString : RelicId -> String
-relicIdToString id =
-    String.fromInt (relicIdToInt id)
 
 
 type alias PersonStats =
@@ -88,6 +53,7 @@ type RelicType
     | MoreXP
     | DropAndDouble (List PersonId)
     | SplashBucket
+    | GuestBook (Set String)
 
 
 type RelicRarity

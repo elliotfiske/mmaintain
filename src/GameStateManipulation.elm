@@ -12,6 +12,7 @@ import PersonDict exposing (PersonDict)
 import PersonUtil
 import RelicDict
 import RelicUtil
+import Set
 import Types exposing (BackendTrigger(..), GameState, RealRelicDict)
 import Util
 
@@ -215,6 +216,18 @@ relicMiddleware action relic state =
 
                 _ ->
                     BackendTriggerUtil.withNoOp state
+
+        GuestBook peopleWhoHaveHeldIt ->
+            case action of
+                PickUpRelic _ personId ->
+                    let
+                        newPeopleWhoHaveHeldIt =
+                            Set.insert (PersonId.toString personId) peopleWhoHaveHeldIt
+
+                        newRelic =
+                            { relic | relicType = GuestBook newPeopleWhoHaveHeldIt }
+                    in
+                    ( { state | relicsByPosition = Dict.insert (RelicUtil.playerHolderToLocation personId) newRelic state.relicsByPosition }, NoOpBackendTrigger )
 
 
 updateRelicsByPositionWithExperience : PersonId -> Int -> Dict.Dict Types.RelicLocation RealRelicDict -> Dict.Dict Types.RelicLocation RealRelicDict
@@ -559,6 +572,9 @@ relicBody state relic me =
 
         SplashBucket ->
             RelicUtil.simpleRelicBody ("Also clean the dirt on adjacent squares at " ++ String.fromInt (RelicUtil.splashBucketStrength relic.rarity relic.exp) ++ " strength.")
+
+        GuestBook peopleWhoHaveHeldIt ->
+            RelicUtil.simpleRelicBody ("Gets more powerful for each person who has held it. Currently increases clean strength by " ++ String.fromInt (RelicUtil.guestBookStrength relic.rarity relic.exp (Set.size peopleWhoHaveHeldIt)) ++ ".")
 
 
 dropAndDoubleRelicBody : Types.FrontendPlayingState -> RelicData -> PersonData -> List PersonId -> Bool -> List (Html.Html Types.FrontendMsg)
