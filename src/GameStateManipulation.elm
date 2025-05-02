@@ -2,6 +2,7 @@ module GameStateManipulation exposing (..)
 
 import BackendTriggerUtil
 import Dict
+import DirtUtil
 import GameObjectTypes exposing (..)
 import GameState
 import Html
@@ -107,29 +108,19 @@ moveRelicFromPlayerToFloor dropper relicData heldDictToRemoveFrom state =
     { state | relicsByPosition = newRelicsByPosition }
 
 
-setDirtAmount : Int -> DirtData -> DirtData
-setDirtAmount amount dirt =
-    { dirt | amount = amount }
-
-
 changeDirtAmount : Types.DirtLocation -> Int -> Types.DirtByLocation -> Types.DirtByLocation
 changeDirtAmount location amount dict =
-    Dict.update location (Maybe.map (setDirtAmount amount)) dict
-
-
-pointToDirtLocation : GameObjectTypes.Point -> Types.DirtLocation
-pointToDirtLocation point =
-    ( point.x, point.y )
+    Dict.update location (Maybe.map (DirtUtil.setDirtAmount amount)) dict
 
 
 getDirtAtLocation : GameObjectTypes.Point -> Types.DirtByLocation -> Maybe DirtData
 getDirtAtLocation point dirtByLocation =
-    Dict.get (pointToDirtLocation point) dirtByLocation
+    Dict.get (DirtUtil.pointToDirtLocation point) dirtByLocation
 
 
 updateDirtAtLocation : GameObjectTypes.Point -> DirtData -> Types.DirtByLocation -> Types.DirtByLocation
 updateDirtAtLocation point dirtData dirtByLocation =
-    Dict.insert (pointToDirtLocation point) dirtData dirtByLocation
+    Dict.insert (DirtUtil.pointToDirtLocation point) dirtData dirtByLocation
 
 
 {-| Add a new dirt or modify an existing dirt's "amount".
@@ -150,7 +141,7 @@ addOrModifyDirt dirtData state =
         Just existingDirt ->
             let
                 newDirtDict =
-                    changeDirtAmount (pointToDirtLocation existingDirt.position) dirtData.amount state.dirtByLocation
+                    changeDirtAmount (DirtUtil.pointToDirtLocation existingDirt.position) dirtData.amount state.dirtByLocation
             in
             ( { state | dirtByLocation = newDirtDict }, NoOpBackendTrigger )
 
@@ -493,7 +484,7 @@ activateGenerosityTrap relicData personData numDoubles state =
 
 doClean : PersonId -> Point -> Int -> GameState -> ( GameState, Types.BackendTrigger )
 doClean personId location strength state =
-    case Dict.get (pointToDirtLocation location) state.dirtByLocation of
+    case Dict.get (DirtUtil.pointToDirtLocation location) state.dirtByLocation of
         Nothing ->
             -- This might happen if the user is lagging and someone else cleared the dirt
             ( state, NoOpBackendTrigger )
@@ -506,7 +497,7 @@ cleanDirt : PersonId -> DirtData -> Int -> GameState -> ( GameState, Types.Backe
 cleanDirt personId dirtData strength state =
     let
         newDirt =
-            reduceDirtAmount strength dirtData
+            DirtUtil.reduceDirtAmount strength dirtData
     in
     if newDirt.amount <= 0 then
         destroyDirt personId dirtData state
@@ -519,7 +510,7 @@ makeDirtSmaller : PersonId -> DirtData -> GameState -> ( GameState, Types.Backen
 makeDirtSmaller personId newDirt state =
     let
         newDirtDict =
-            Dict.insert (pointToDirtLocation newDirt.position) newDirt state.dirtByLocation
+            Dict.insert (DirtUtil.pointToDirtLocation newDirt.position) newDirt state.dirtByLocation
 
         newState =
             state
@@ -533,7 +524,7 @@ destroyDirt : PersonId -> DirtData -> GameState -> ( GameState, Types.BackendTri
 destroyDirt personId dirtData state =
     let
         newDirtDict =
-            Dict.remove (pointToDirtLocation dirtData.position) state.dirtByLocation
+            Dict.remove (DirtUtil.pointToDirtLocation dirtData.position) state.dirtByLocation
 
         newPersonDict =
             state.personDict
@@ -546,11 +537,6 @@ destroyDirt personId dirtData state =
                 |> playerEarnsExperience personId 10
     in
     ( newState, ClearedPollution personId dirtData )
-
-
-reduceDirtAmount : Int -> DirtData -> DirtData
-reduceDirtAmount cleanStrength dirt =
-    { dirt | amount = dirt.amount - cleanStrength }
 
 
 incrementClearCount : PersonId -> PersonDict PersonData -> PersonDict PersonData
