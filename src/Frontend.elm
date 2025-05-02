@@ -17,6 +17,7 @@ import Material.Icons.Outlined as Outlined
 import Material.Icons.Types as Coloring
 import Modals
 import PersonDict
+import PointUtil
 import RelicDict
 import RelicUtil
 import Task
@@ -249,7 +250,7 @@ moveMeTowardsTargetPoint state =
         ( Just target, Just me ) ->
             let
                 direction =
-                    GameStateManipulation.directionToMoveFrom me.position target
+                    PointUtil.directionToMoveFrom me.position target
             in
             case direction of
                 Just dir ->
