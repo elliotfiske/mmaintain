@@ -8,31 +8,11 @@ import Html
 import List.Extra
 import Markdown
 import PersonDict exposing (PersonDict)
-import PointUtil
+import PersonUtil
 import RelicDict
 import RelicUtil exposing (..)
 import Types exposing (BackendTrigger(..), GameState, RealRelicDict)
 import Util
-
-
-movePerson : Direction -> PersonData -> PersonData
-movePerson direction person =
-    let
-        destination =
-            PointUtil.newPoint direction person.position
-
-        tooLow =
-            destination.y < Util.yOrigin || destination.x < Util.xOrigin
-
-        tooHigh =
-            destination.y >= Util.mapYMax || destination.x >= Util.mapXMax
-    in
-    if tooLow || tooHigh then
-        -- out of bounds, don't complete the move
-        person
-
-    else
-        { person | position = PointUtil.newPoint direction person.position }
 
 
 pickUpRelic : PersonId -> RelicId -> GameState -> ( GameState, Types.BackendTrigger )
@@ -125,24 +105,6 @@ moveRelicFromPlayerToFloor dropper relicData heldDictToRemoveFrom state =
                 |> Dict.insert (RelicUtil.floorPointToLocation dropper.position) newFloorRelics
     in
     { state | relicsByPosition = newRelicsByPosition }
-
-
-createPerson : PersonId -> String -> PersonData
-createPerson id name =
-    { id = id
-    , name = name
-    , experience = 0
-    , position = { x = 3, y = 3 }
-    , stats =
-        { cleanCount = 0
-        , clearCount = 0
-        }
-    }
-
-
-movePersonWithId : PersonId -> Direction -> PersonDict PersonData -> PersonDict PersonData
-movePersonWithId id direction dict =
-    PersonDict.update id (Maybe.map (movePerson direction)) dict
 
 
 setDirtAmount : Int -> DirtData -> DirtData
@@ -252,6 +214,37 @@ applyRelicMiddleware action relic ( accState, accTriggers ) =
     ( newState, newTrigger :: accTriggers )
 
 
+{-| Some relics are interested in actions against the GameState. This function
+lets relics modify the GameState in response to actions.
+-}
+relicMiddleware : ActionOnGamestate -> RelicData -> GameState -> ( GameState, BackendTrigger )
+relicMiddleware action relic state =
+    case relic.relicType of
+        CleanFast ->
+            BackendTriggerUtil.withNoOp state
+
+        MoreXP ->
+            -- Handled in earnExperienceFromClean
+            BackendTriggerUtil.withNoOp state
+
+        DropAndDouble people ->
+            case action of
+                DropRelic relicId personId ->
+                    handleDroppingDoubler relicId relic personId people state
+                        |> BackendTriggerUtil.withNoOp
+
+                _ ->
+                    BackendTriggerUtil.withNoOp state
+
+        SplashBucket ->
+            case action of
+                Clean personId location ->
+                    handleSplashBucket location relic personId state
+
+                _ ->
+                    BackendTriggerUtil.withNoOp state
+
+
 relicSlotThreshholds : List Int
 relicSlotThreshholds =
     [ 3, 5, 10 ]
@@ -276,19 +269,7 @@ lockedRelicSlots level =
 
 incrementCleanCount : PersonId -> PersonDict PersonData -> PersonDict PersonData
 incrementCleanCount personId dict =
-    PersonDict.update personId (Maybe.map doIncrementCleanCount) dict
-
-
-doIncrementCleanCount : PersonData -> PersonData
-doIncrementCleanCount person =
-    let
-        stats =
-            person.stats
-
-        newStats =
-            { stats | cleanCount = stats.cleanCount + 1 }
-    in
-    { person | stats = newStats }
+    PersonDict.update personId (Maybe.map PersonUtil.doIncrementCleanCount) dict
 
 
 addCleanStats : PersonId -> GameState -> GameState
@@ -424,7 +405,7 @@ internalExecuteActionOnGameState action state =
                 |> doClean personId location strength
 
         MovePerson personId direction ->
-            BackendTriggerUtil.withNoOp { state | personDict = movePersonWithId personId direction state.personDict }
+            BackendTriggerUtil.withNoOp { state | personDict = PersonUtil.movePersonWithId personId direction state.personDict }
 
         AddPerson personData ->
             BackendTriggerUtil.withNoOp { state | personDict = PersonDict.insert personData.id personData state.personDict }
@@ -574,50 +555,7 @@ reduceDirtAmount cleanStrength dirt =
 
 incrementClearCount : PersonId -> PersonDict PersonData -> PersonDict PersonData
 incrementClearCount personId dict =
-    PersonDict.update personId (Maybe.map doIncrementClearCount) dict
-
-
-doIncrementClearCount : PersonData -> PersonData
-doIncrementClearCount person =
-    let
-        stats =
-            person.stats
-
-        newStats =
-            { stats | clearCount = stats.clearCount + 1 }
-    in
-    { person | stats = newStats }
-
-
-{-| Some relics are interested in actions against the GameState. This function
-lets relics modify the GameState in response to actions.
--}
-relicMiddleware : ActionOnGamestate -> RelicData -> GameState -> ( GameState, BackendTrigger )
-relicMiddleware action relic state =
-    case relic.relicType of
-        CleanFast ->
-            BackendTriggerUtil.withNoOp state
-
-        MoreXP ->
-            -- Handled in earnExperienceFromClean
-            BackendTriggerUtil.withNoOp state
-
-        DropAndDouble people ->
-            case action of
-                DropRelic relicId personId ->
-                    handleDroppingDoubler relicId relic personId people state
-                        |> BackendTriggerUtil.withNoOp
-
-                _ ->
-                    BackendTriggerUtil.withNoOp state
-
-        SplashBucket ->
-            case action of
-                Clean personId location ->
-                    handleSplashBucket location relic personId state
-
-                _ ->
-                    BackendTriggerUtil.withNoOp state
+    PersonDict.update personId (Maybe.map PersonUtil.doIncrementClearCount) dict
 
 
 handleSplashBucket : Point -> RelicData -> PersonId -> GameState -> ( GameState, BackendTrigger )

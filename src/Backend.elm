@@ -6,6 +6,7 @@ import GameState
 import GameStateManipulation exposing (executeActionOnGameState)
 import Lamdera
 import List
+import PersonUtil
 import RelicUtil
 import Types exposing (..)
 import Util
@@ -98,7 +99,7 @@ createPerson clientId model =
             getAndIncrementBiggestId model
 
         newPerson =
-            GameStateManipulation.createPerson (PersonId newPersonId) "Person"
+            PersonUtil.createPerson (PersonId newPersonId) "Person"
 
         createPersonAction =
             AddPerson newPerson
