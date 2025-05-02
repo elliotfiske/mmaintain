@@ -2,6 +2,7 @@ module Modals exposing (render)
 
 import BaseUI as UI
 import Dict
+import GameObjectIds exposing (..)
 import GameObjectTypes exposing (..)
 import Html exposing (..)
 import Html.Attributes exposing (..)
@@ -110,7 +111,7 @@ debugDictsView { gameState, myId } =
             ++ "<br>DirtDict: "
             ++ String.fromInt (Dict.size gameState.dirtByLocation)
             ++ "<br>MyId: "
-            ++ GameObjectTypes.personIdToString myId
+            ++ personIdToString myId
         )
 
 

@@ -1,7 +1,7 @@
 module GameObjectTypes exposing (..)
 
 import GameObjectIds exposing (DirtId, PersonId, RelicId)
-import Set exposing (Set)
+import PersonIdSet exposing (PersonIdSet)
 
 
 {-| This is the "topmost" Types module. It knows about all the types relating to the GameState and
@@ -53,7 +53,7 @@ type RelicType
     | MoreXP
     | DropAndDouble (List PersonId)
     | SplashBucket
-    | GuestBook (Set String)
+    | GuestBook PersonIdSet
 
 
 type RelicRarity

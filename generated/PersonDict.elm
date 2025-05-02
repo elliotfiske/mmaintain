@@ -1,34 +1,46 @@
-module PersonDict exposing (PersonDict, empty, filter, foldl, foldr, fromList, get, insert, isEmpty, keys, map, member, partition, remove, singleton, size, toList, update, values)
+module PersonDict exposing
+    ( empty, singleton, insert, update, remove
+    , PersonDict
+    , keys, values, toList, fromList
+    , isEmpty, member, get, size
+    , map, foldl, foldr, filter, partition
+    )
 
-{-| 
+{-|
+
+
 ## Build
 
 @docs empty, singleton, insert, update, remove
+
 
 ## Dictionaries
 
 @docs PersonDict
 
+
 ## Lists
 
 @docs keys, values, toList, fromList
+
 
 ## Query
 
 @docs isEmpty, member, get, size
 
+
 ## Transform
 
 @docs map, foldl, foldr, filter, partition
+
 -}
 
-
 import Dict
-import GameObjectTypes
+import GameObjectIds
 
 
 type PersonDict v
-    = PersonDict (Dict.Dict Int ( GameObjectTypes.PersonId, v ))
+    = PersonDict (Dict.Dict Int ( GameObjectIds.PersonId, v ))
 
 
 empty : PersonDict v
@@ -36,26 +48,26 @@ empty =
     PersonDict Dict.empty
 
 
-singleton : GameObjectTypes.PersonId -> v -> PersonDict v
+singleton : GameObjectIds.PersonId -> v -> PersonDict v
 singleton key value =
     PersonDict
-        (Dict.singleton (GameObjectTypes.personIdToInt key) ( key, value ))
+        (Dict.singleton (GameObjectIds.personIdToInt key) ( key, value ))
 
 
-insert : GameObjectTypes.PersonId -> v -> PersonDict v -> PersonDict v
+insert : GameObjectIds.PersonId -> v -> PersonDict v -> PersonDict v
 insert key value d =
     case d of
         PersonDict dict ->
             PersonDict
                 (Dict.insert
-                     (GameObjectTypes.personIdToInt key)
-                     ( key, value )
-                     dict
+                    (GameObjectIds.personIdToInt key)
+                    ( key, value )
+                    dict
                 )
 
 
 update :
-    GameObjectTypes.PersonId
+    GameObjectIds.PersonId
     -> (Maybe b -> Maybe b)
     -> PersonDict b
     -> PersonDict b
@@ -64,21 +76,21 @@ update key f d =
         PersonDict dict ->
             PersonDict
                 (Dict.update
-                     (GameObjectTypes.personIdToInt key)
-                     (\updateUnpack ->
-                          Maybe.map
-                              (Tuple.pair key)
-                              (f (Maybe.map Tuple.second updateUnpack))
-                     )
-                     dict
+                    (GameObjectIds.personIdToInt key)
+                    (\updateUnpack ->
+                        Maybe.map
+                            (Tuple.pair key)
+                            (f (Maybe.map Tuple.second updateUnpack))
+                    )
+                    dict
                 )
 
 
-remove : GameObjectTypes.PersonId -> PersonDict v -> PersonDict v
+remove : GameObjectIds.PersonId -> PersonDict v -> PersonDict v
 remove key d =
     case d of
         PersonDict dict ->
-            PersonDict (Dict.remove (GameObjectTypes.personIdToInt key) dict)
+            PersonDict (Dict.remove (GameObjectIds.personIdToInt key) dict)
 
 
 isEmpty : PersonDict v -> Bool
@@ -88,20 +100,20 @@ isEmpty d =
             Dict.isEmpty dict
 
 
-member : GameObjectTypes.PersonId -> PersonDict v -> Bool
+member : GameObjectIds.PersonId -> PersonDict v -> Bool
 member key d =
     case d of
         PersonDict dict ->
-            Dict.member (GameObjectTypes.personIdToInt key) dict
+            Dict.member (GameObjectIds.personIdToInt key) dict
 
 
-get : GameObjectTypes.PersonId -> PersonDict b -> Maybe b
+get : GameObjectIds.PersonId -> PersonDict b -> Maybe b
 get key d =
     case d of
         PersonDict dict ->
             Maybe.map
                 Tuple.second
-                (Dict.get (GameObjectTypes.personIdToInt key) dict)
+                (Dict.get (GameObjectIds.personIdToInt key) dict)
 
 
 size : PersonDict v -> Int
@@ -111,7 +123,7 @@ size d =
             Dict.size dict
 
 
-keys : PersonDict v -> List GameObjectTypes.PersonId
+keys : PersonDict v -> List GameObjectIds.PersonId
 keys d =
     case d of
         PersonDict dict ->
@@ -125,90 +137,90 @@ values d =
             List.map Tuple.second (Dict.values dict)
 
 
-toList : PersonDict v -> List ( GameObjectTypes.PersonId, v )
+toList : PersonDict v -> List ( GameObjectIds.PersonId, v )
 toList d =
     case d of
         PersonDict dict ->
             Dict.values dict
 
 
-fromList : List ( GameObjectTypes.PersonId, v ) -> PersonDict v
+fromList : List ( GameObjectIds.PersonId, v ) -> PersonDict v
 fromList l =
     PersonDict
         (Dict.fromList
-             (List.map
-                  (\e ->
-                       case e of
-                           ( k, v ) ->
-                               ( GameObjectTypes.personIdToInt k, e )
-                  )
-                  l
-             )
+            (List.map
+                (\e ->
+                    case e of
+                        ( k, v ) ->
+                            ( GameObjectIds.personIdToInt k, e )
+                )
+                l
+            )
         )
 
 
-map : (GameObjectTypes.PersonId -> a -> b) -> PersonDict a -> PersonDict b
+map : (GameObjectIds.PersonId -> a -> b) -> PersonDict a -> PersonDict b
 map f d =
     case d of
         PersonDict dict ->
             PersonDict
                 (Dict.map
-                     (\mapUnpack ->
-                          \unpack ->
-                              case unpack of
-                                  ( k, a ) ->
-                                      ( k, f k a )
-                     )
-                     dict
+                    (\mapUnpack ->
+                        \unpack ->
+                            case unpack of
+                                ( k, a ) ->
+                                    ( k, f k a )
+                    )
+                    dict
                 )
 
 
-foldl : (GameObjectTypes.PersonId -> v -> b -> b) -> b -> PersonDict v -> b
+foldl : (GameObjectIds.PersonId -> v -> b -> b) -> b -> PersonDict v -> b
 foldl f b0 d =
     case d of
         PersonDict dict ->
             Dict.foldl
                 (\_ kv b ->
-                     case kv of
-                         ( k, v ) ->
-                             f k v b
+                    case kv of
+                        ( k, v ) ->
+                            f k v b
                 )
                 b0
                 dict
 
 
-foldr : (GameObjectTypes.PersonId -> v -> b -> b) -> b -> PersonDict v -> b
+foldr : (GameObjectIds.PersonId -> v -> b -> b) -> b -> PersonDict v -> b
 foldr f b0 d =
     case d of
         PersonDict dict ->
             Dict.foldr
                 (\_ kv b ->
-                     case kv of
-                         ( k, v ) ->
-                             f k v b
+                    case kv of
+                        ( k, v ) ->
+                            f k v b
                 )
                 b0
                 dict
 
 
-filter : (GameObjectTypes.PersonId -> v -> Bool) -> PersonDict v -> PersonDict v
+filter : (GameObjectIds.PersonId -> v -> Bool) -> PersonDict v -> PersonDict v
 filter f d =
     PersonDict
         (case d of
-             PersonDict dict ->
-                 Dict.filter
-                     (\filterUnpack ->
-                          \unpack ->
-                              case unpack of
-                                  ( k, v ) ->
-                                      f k v
-                     )
-                     dict
+            PersonDict dict ->
+                Dict.filter
+                    (\filterUnpack ->
+                        \unpack ->
+                            case unpack of
+                                ( k, v ) ->
+                                    f k v
+                    )
+                    dict
         )
 
 
 partition :
-    (GameObjectTypes.PersonId -> v -> Bool)
+    (GameObjectIds.PersonId -> v -> Bool)
     -> PersonDict v
     -> ( PersonDict v, PersonDict v )
 partition f d =
@@ -218,11 +230,11 @@ partition f d =
                 PersonDict
                 PersonDict
                 (Dict.partition
-                     (\partitionUnpack ->
-                          \unpack ->
-                              case unpack of
-                                  ( k, v ) ->
-                                      f k v
-                     )
-                     dict
+                    (\partitionUnpack ->
+                        \unpack ->
+                            case unpack of
+                                ( k, v ) ->
+                                    f k v
+                    )
+                    dict
                 )

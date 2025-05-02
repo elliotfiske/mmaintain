@@ -1,18 +1,19 @@
-module GameStateManipulation exposing (..)
+module GameStateManipulation exposing (activateGenerosityTrap, activateRelicWithPersonData, addCleanStats, addOrModifyDirt, applyClean, applyRelicMiddleware, changeDirtAmount, cleanDirt, cleanStrengthForPlayer, combineBatchActionResult, createActionOnGameStateFromRelicActivation, destroyDirt, doClean, dropAndDoubleRelicBody, dropRelic, executeActionOnGameState, getDirtAtLocation, getRarestRelicAtLocation, getRelicsAtFloorPoint, getRelicsHeldByPlayer, handleActivateGenerosityTrap, handleBatchAction, handleDroppingDoubler, handleSplashBucket, incrementCleanCount, incrementClearCount, internalExecuteActionOnGameState, isRelicHeldByPerson, makeDirtSmaller, maybeActivateRelic, moveRelicFromFloorToPlayer, moveRelicFromPlayerToFloor, pickUpRelic, playerEarnsExperience, relicBody, relicMiddleware, relicsAtLocation, updateDirtAtLocation, updatePersonDictWithExperience, updateRelicsByPositionWithExperience, updateWithRelics, xpMultiplierForPlayer)
 
 import BackendTriggerUtil
 import Dict
 import DirtUtil
+import GameObjectIds exposing (..)
 import GameObjectTypes exposing (..)
 import GameState
 import Html
 import List.Extra
 import Markdown
 import PersonDict exposing (PersonDict)
+import PersonIdSet
 import PersonUtil
 import RelicDict
 import RelicUtil
-import Set
 import Types exposing (BackendTrigger(..), GameState, RealRelicDict)
 import Util
 
@@ -222,12 +223,18 @@ relicMiddleware action relic state =
                 PickUpRelic _ personId ->
                     let
                         newPeopleWhoHaveHeldIt =
-                            Set.insert (PersonId.toString personId) peopleWhoHaveHeldIt
+                            PersonIdSet.insert personId peopleWhoHaveHeldIt
 
                         newRelic =
                             { relic | relicType = GuestBook newPeopleWhoHaveHeldIt }
+
+                        updatedRelicDict =
+                            RelicDict.singleton newRelic.id newRelic
                     in
-                    ( { state | relicsByPosition = Dict.insert (RelicUtil.playerHolderToLocation personId) newRelic state.relicsByPosition }, NoOpBackendTrigger )
+                    ( { state | relicsByPosition = Dict.insert (RelicUtil.playerHolderToLocation personId) updatedRelicDict state.relicsByPosition }, NoOpBackendTrigger )
+
+                _ ->
+                    BackendTriggerUtil.withNoOp state
 
 
 updateRelicsByPositionWithExperience : PersonId -> Int -> Dict.Dict Types.RelicLocation RealRelicDict -> Dict.Dict Types.RelicLocation RealRelicDict
@@ -574,7 +581,7 @@ relicBody state relic me =
             RelicUtil.simpleRelicBody ("Also clean the dirt on adjacent squares at " ++ String.fromInt (RelicUtil.splashBucketStrength relic.rarity relic.exp) ++ " strength.")
 
         GuestBook peopleWhoHaveHeldIt ->
-            RelicUtil.simpleRelicBody ("Gets more powerful for each person who has held it. Currently increases clean strength by " ++ String.fromInt (RelicUtil.guestBookStrength relic.rarity relic.exp (Set.size peopleWhoHaveHeldIt)) ++ ".")
+            RelicUtil.simpleRelicBody ("Gets more powerful for each person who has held it. Currently increases clean strength by " ++ String.fromInt (RelicUtil.guestBookStrength relic.rarity relic.exp (PersonIdSet.size peopleWhoHaveHeldIt)) ++ ".")
 
 
 dropAndDoubleRelicBody : Types.FrontendPlayingState -> RelicData -> PersonData -> List PersonId -> Bool -> List (Html.Html Types.FrontendMsg)

@@ -1,7 +1,8 @@
 module Backend exposing (app)
 
 import Dict
-import GameObjectTypes exposing (ActionOnGamestate(..), PersonId(..))
+import GameObjectIds exposing (..)
+import GameObjectTypes exposing (ActionOnGamestate(..))
 import GameState
 import GameStateManipulation exposing (executeActionOnGameState)
 import Lamdera
@@ -125,7 +126,7 @@ createDirt args model =
 
         newDirt : GameObjectTypes.DirtData
         newDirt =
-            { position = args.point, amount = args.amount, id = GameObjectTypes.DirtId newId }
+            { position = args.point, amount = args.amount, id = DirtId newId }
 
         ( finalModel, _ ) =
             executeActionOnModel Server incrementedModel (AddDirt newDirt)
@@ -307,7 +308,7 @@ addRelic position relicType rarity model =
             getAndIncrementBiggestId model
 
         newRelic =
-            { id = GameObjectTypes.RelicId newId
+            { id = RelicId newId
             , relicType = relicType
             , rarity = rarity
             , exp = 0
@@ -327,7 +328,7 @@ debugAddRelic model =
 
         newRelic : GameObjectTypes.RelicData
         newRelic =
-            { id = GameObjectTypes.RelicId newId
+            { id = RelicId newId
             , relicType = GameObjectTypes.SplashBucket
             , rarity = GameObjectTypes.Legendary
             , exp = 0

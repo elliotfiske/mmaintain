@@ -1,6 +1,7 @@
 module RelicUtil exposing (..)
 
 import Dict
+import GameObjectIds exposing (..)
 import GameObjectTypes exposing (..)
 import Html
 import Html.Attributes

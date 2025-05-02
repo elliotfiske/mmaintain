@@ -6,7 +6,7 @@
             "miniBill/elm-generic-dict": "1.1.0"
         },
         "local": [
-            "../src/"
+            "./src/"
         ]
     }
 }

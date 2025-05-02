@@ -5,7 +5,8 @@ import Browser exposing (UrlRequest(..))
 import Browser.Dom
 import Browser.Events exposing (onKeyDown)
 import Browser.Navigation as Nav
-import GameObjectTypes exposing (ActionOnGamestate(..), Direction(..), DirtData, PersonData, PersonId)
+import GameObjectIds exposing (..)
+import GameObjectTypes exposing (ActionOnGamestate(..), Direction(..), DirtData, PersonData)
 import GameStateManipulation
 import Html exposing (..)
 import Html.Attributes exposing (..)
@@ -417,7 +418,7 @@ renderPlayingState state =
             renderPlayingStateWithMe state me
 
         Nothing ->
-            Html.text ("I couldn't find YOU in the dictionary of players. Your ID is " ++ GameObjectTypes.personIdToString state.myId)
+            Html.text ("I couldn't find YOU in the dictionary of players. Your ID is " ++ personIdToString state.myId)
 
 
 renderPlayingStateWithMe : FrontendPlayingState -> PersonData -> Html.Html FrontendMsg
@@ -712,7 +713,7 @@ relicCardTitle state me relicData =
         ]
 
 
-dropButton : GameObjectTypes.RelicId -> PersonId -> Html FrontendMsg
+dropButton : RelicId -> PersonId -> Html FrontendMsg
 dropButton relicId myId =
     Html.button
         [ Html.Events.onClick (PerformAction (DropRelic relicId myId))
@@ -722,7 +723,7 @@ dropButton relicId myId =
         [ Outlined.file_download 18 Coloring.Inherit ]
 
 
-pickUpButton : GameObjectTypes.RelicId -> PersonId -> Html FrontendMsg
+pickUpButton : RelicId -> PersonId -> Html FrontendMsg
 pickUpButton relicId myId =
     Html.button
         [ Html.Events.onClick (PerformAction (PickUpRelic relicId myId))
