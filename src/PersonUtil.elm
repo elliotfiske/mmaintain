@@ -2,8 +2,8 @@ module PersonUtil exposing (createPerson, doIncrementCleanCount, doIncrementClea
 
 import GameObjectIds exposing (PersonId)
 import GameObjectTypes exposing (..)
-import PersonDict exposing (PersonDict)
 import PointUtil
+import SeqDict exposing (SeqDict)
 import Util
 
 
@@ -40,9 +40,9 @@ createPerson id name =
     }
 
 
-movePersonWithId : PersonId -> Direction -> PersonDict PersonData -> PersonDict PersonData
+movePersonWithId : PersonId -> Direction -> SeqDict PersonId PersonData -> SeqDict PersonId PersonData
 movePersonWithId id direction dict =
-    PersonDict.update id (Maybe.map (movePerson direction)) dict
+    SeqDict.update id (Maybe.map (movePerson direction)) dict
 
 
 doIncrementCleanCount : PersonData -> PersonData

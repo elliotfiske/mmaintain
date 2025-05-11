@@ -8,7 +8,7 @@ import Html exposing (..)
 import Html.Attributes exposing (..)
 import Html.Events
 import Markdown
-import PersonDict
+import SeqDict exposing (SeqDict)
 import Types exposing (..)
 
 
@@ -105,7 +105,7 @@ debugDictsView { gameState, myId } =
     Markdown.toHtml
         Nothing
         ("PersonDict: "
-            ++ String.fromInt (PersonDict.size gameState.personDict)
+            ++ String.fromInt (SeqDict.size gameState.personDict)
             ++ "<br>Relics By Position Dict: "
             ++ String.fromInt (Dict.size gameState.relicsByPosition)
             ++ "<br>DirtDict: "

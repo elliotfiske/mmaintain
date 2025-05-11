@@ -9,11 +9,12 @@ import GameState
 import Html
 import List.Extra
 import Markdown
-import PersonDict exposing (PersonDict)
 import PersonIdSet
 import PersonUtil
 import RelicDict
 import RelicUtil
+import SeqDict exposing (SeqDict)
+import SeqSet exposing (SeqSet)
 import Types exposing (BackendTrigger(..), GameState, RealRelicDict)
 import Util
 
@@ -22,7 +23,7 @@ pickUpRelic : PersonId -> RelicId -> GameState -> ( GameState, Types.BackendTrig
 pickUpRelic takerId relicId state =
     let
         maybeTaker =
-            PersonDict.get takerId state.personDict
+            SeqDict.get takerId state.personDict
 
         existingRelicsOnGround =
             maybeTaker
@@ -69,7 +70,7 @@ dropRelic : PersonId -> RelicId -> GameState -> ( GameState, Types.BackendTrigge
 dropRelic dropperId relicId state =
     let
         maybeDropper =
-            PersonDict.get dropperId state.personDict
+            SeqDict.get dropperId state.personDict
 
         existingRelicsHeldByPlayer =
             getRelicsHeldByPlayer dropperId state
@@ -223,7 +224,7 @@ relicMiddleware action relic state =
                 PickUpRelic _ personId ->
                     let
                         newPeopleWhoHaveHeldIt =
-                            PersonIdSet.insert personId peopleWhoHaveHeldIt
+                            SeqSet.insert personId peopleWhoHaveHeldIt
 
                         newRelic =
                             { relic | relicType = GuestBook newPeopleWhoHaveHeldIt }
@@ -258,7 +259,7 @@ updateRelicsByPositionWithExperience personId totalXpEarned relicsByPosition =
 
 playerEarnsExperience : PersonId -> Int -> GameState -> GameState
 playerEarnsExperience personId xpEarned state =
-    case PersonDict.get personId state.personDict of
+    case SeqDict.get personId state.personDict of
         Nothing ->
             state
 
@@ -291,7 +292,7 @@ handleActivateGenerosityTrap personId relicId numDoubles state =
                 |> RelicDict.get relicId
 
         maybeFella =
-            PersonDict.get personId state.personDict
+            SeqDict.get personId state.personDict
     in
     case ( maybeRelic, maybeFella ) of
         ( Just relicData, Just fella ) ->
@@ -311,7 +312,7 @@ internalExecuteActionOnGameState : ActionOnGamestate -> GameState -> ( GameState
 internalExecuteActionOnGameState action state =
     case action of
         Clean personId location ->
-            case PersonDict.get personId state.personDict of
+            case SeqDict.get personId state.personDict of
                 Nothing ->
                     ( state, NoOpBackendTrigger )
 
@@ -328,7 +329,7 @@ internalExecuteActionOnGameState action state =
             BackendTriggerUtil.withNoOp { state | personDict = PersonUtil.movePersonWithId personId direction state.personDict }
 
         AddPerson personData ->
-            BackendTriggerUtil.withNoOp { state | personDict = PersonDict.insert personData.id personData state.personDict }
+            BackendTriggerUtil.withNoOp { state | personDict = SeqDict.insert personData.id personData state.personDict }
 
         PickUpRelic relicId personId ->
             pickUpRelic personId relicId state
@@ -476,9 +477,25 @@ destroyDirt personId dirtData state =
     ( newState, ClearedPollution personId dirtData )
 
 
-incrementClearCount : PersonId -> PersonDict PersonData -> PersonDict PersonData
+incrementCleanCount : PersonId -> SeqDict PersonId PersonData -> SeqDict PersonId PersonData
+incrementCleanCount personId dict =
+    SeqDict.update personId (Maybe.map PersonUtil.doIncrementCleanCount) dict
+
+
+incrementClearCount : PersonId -> SeqDict PersonId PersonData -> SeqDict PersonId PersonData
 incrementClearCount personId dict =
-    PersonDict.update personId (Maybe.map PersonUtil.doIncrementClearCount) dict
+    SeqDict.update personId (Maybe.map PersonUtil.doIncrementClearCount) dict
+
+
+updatePersonDictWithExperience : PersonId -> Int -> SeqDict PersonId PersonData -> SeqDict PersonId PersonData
+updatePersonDictWithExperience personId totalXpEarned dict =
+    SeqDict.update personId
+        (Maybe.map
+            (\person ->
+                { person | experience = person.experience + totalXpEarned }
+            )
+        )
+        dict
 
 
 handleSplashBucket : Point -> RelicData -> PersonId -> GameState -> ( GameState, BackendTrigger )
@@ -585,9 +602,9 @@ relicBody state relic me =
         GuestBook peopleWhoHaveHeldIt ->
             RelicUtil.simpleRelicBody
                 ("Gets more powerful for each person who has held it. Currently increases clean strength by "
-                    ++ String.fromInt (RelicUtil.guestBookStrength relic.rarity relic.exp (PersonIdSet.size peopleWhoHaveHeldIt))
+                    ++ String.fromInt (RelicUtil.guestBookStrength relic.rarity relic.exp (SeqSet.size peopleWhoHaveHeldIt))
                     ++ ". List of IDs who have held it: "
-                    ++ String.join ", " (PersonIdSet.toList peopleWhoHaveHeldIt)
+                    ++ String.join ", " (List.map personIdToString (SeqSet.toList peopleWhoHaveHeldIt))
                     ++ "."
                 )
 
@@ -636,7 +653,7 @@ createActionOnGameStateFromRelicActivation activatorId relicId state =
             RelicUtil.getRelicAtLocation (RelicUtil.playerHolderToLocation activatorId) relicId state
 
         maybePerson =
-            PersonDict.get activatorId state.personDict
+            SeqDict.get activatorId state.personDict
     in
     case ( maybeRelic, maybePerson ) of
         ( Just relic, Just person ) ->
@@ -658,7 +675,7 @@ maybeActivateRelic activatorId relicId state =
             RelicUtil.getRelicAtLocation (RelicUtil.playerHolderToLocation activatorId) relicId state
 
         maybePerson =
-            PersonDict.get activatorId state.personDict
+            SeqDict.get activatorId state.personDict
     in
     case ( maybeRelic, maybePerson ) of
         ( Just relic, Just person ) ->
@@ -676,28 +693,10 @@ activateRelicWithPersonData state person relic =
                 newPersonState =
                     { person | experience = person.experience + RelicUtil.dropDoubleCurrentExperience relic.rarity relic.exp (List.length people) }
             in
-            ( { state | personDict = PersonDict.insert person.id newPersonState state.personDict }, NoOpBackendTrigger )
+            ( { state | personDict = SeqDict.insert person.id newPersonState state.personDict }, NoOpBackendTrigger )
 
         _ ->
             ( state, NoOpBackendTrigger )
-
-
-updatePersonDictWithExperience : PersonId -> Int -> PersonDict PersonData -> PersonDict PersonData
-updatePersonDictWithExperience personId totalXpEarned dict =
-    PersonDict.update personId
-        (Maybe.map
-            (\player ->
-                { player
-                    | experience = player.experience + totalXpEarned
-                }
-            )
-        )
-        dict
-
-
-incrementCleanCount : PersonId -> PersonDict PersonData -> PersonDict PersonData
-incrementCleanCount personId dict =
-    PersonDict.update personId (Maybe.map PersonUtil.doIncrementCleanCount) dict
 
 
 addCleanStats : PersonId -> GameState -> GameState

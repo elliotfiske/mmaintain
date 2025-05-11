@@ -7,8 +7,8 @@ import DirtDict exposing (DirtDict)
 import GameObjectIds exposing (..)
 import GameObjectTypes exposing (..)
 import Lamdera exposing (ClientId, SessionId)
-import PersonDict exposing (PersonDict)
 import RelicDict exposing (RelicDict)
+import SeqDict exposing (SeqDict)
 import Time exposing (Posix)
 import Url exposing (Url)
 
@@ -18,7 +18,7 @@ import Url exposing (Url)
 
 
 type alias RealPersonDict =
-    PersonDict PersonData
+    SeqDict PersonId PersonData
 
 
 type alias RealRelicDict =
@@ -50,7 +50,7 @@ type alias DirtByLocation =
 
 
 type alias GameState =
-    { personDict : PersonDict PersonData
+    { personDict : SeqDict PersonId PersonData
     , relicsByPosition : RelicsByLocation
     , dirtByLocation : DirtByLocation
     }

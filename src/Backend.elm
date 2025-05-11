@@ -7,9 +7,9 @@ import GameState
 import GameStateManipulation exposing (executeActionOnGameState)
 import Lamdera
 import List
-import PersonIdSet
 import PersonUtil
 import RelicUtil
+import SeqSet exposing (SeqSet)
 import Types exposing (..)
 import Util
 
@@ -330,7 +330,7 @@ debugAddRelic model =
         newRelic : GameObjectTypes.RelicData
         newRelic =
             { id = RelicId newId
-            , relicType = GameObjectTypes.GuestBook PersonIdSet.empty
+            , relicType = GameObjectTypes.GuestBook SeqSet.empty
             , rarity = GameObjectTypes.Legendary
             , exp = 0
             }

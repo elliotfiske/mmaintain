@@ -4,6 +4,10 @@ Focus on small, simple, and correct functions. Focus on readability over being p
 
 Please prefer named functions over anonymous inline closures where possible for readability.
 
+Please run the following terminal commands to verify your solution works after each change:
+`lamdera make src/Frontend.elm`
+`lamdera make src/Backend.elm`
+
 # This project
 This project is a web game using the Lamdera framework. The Lamdera framework defines a "Frontend" (web  browser) and a "Backend" (server). They communicate with "Messages" created through functions like `Lamdera.sendToBackend` and `Lamdera.sendToFrontend`.
 
@@ -16,21 +20,20 @@ The code is organized into several modules:
 
 - `Frontend` - The module that renders the web UI.
 - `Backend` - The module that defines the backend logic.
+- `GameObjectIds` - A module that defines the unique identifiers for the different objects in the game.
 - `GameObjectTypes` 
-    - This is the "topmost" Types module. It knows about all the types relating to the GameState and
-the objects within.
+    - This is the "topmost" Types module besides `GameObjectIds`. It knows about all the types relating to the GameState and the objects within.
     - It _doesn't_ know about things like a "frontend" vs a "backend".
-    - Also note that it can't have the idea of a "PersonDict" or "RelicDict" because those are dependent on what a Person and Relic is.
-    - Overall dependency chain:
-        - GameObjectTypes => Types => GameObject and all other modules
-        - GameObjectTypes => RelicDict/PersonDict/DirtDict => Types
+- Utilities: there are a class of files that provide functions that manipulate specific Game Objects (Person, Relic, Dirt). They are:
+    - `PersonUtil`
+    - `RelicUtil`
+    - `DirtUtil`
 - `Types` - The module that defines the types used in the project. It is a "base" module that is used by both `Frontend` and `Backend`.
-- `GameObject` - A module that defines the logic for modifying the different elements of the GameState.  The `GameState` is a collection of dictionaries containing the different objects in the game. These are the "objects" that are in the GameState:
+- `GameStateManipulation` - A module that defines the logic for modifying the different elements of the GameState.  The `GameState` is a collection of dictionaries containing the different objects in the game. These are the "objects" that are in the GameState:
     - `Relic` - Items that the player can pick up to improve their cleaning abilities.
     - `Person` - Represents a player in the game. The user controls 1 Person.
     - `Dirt` - Dirt that the player can clean up. It has a position and an amount. When the player cleans the dirt, the amount is decreased. When the amount reaches 0, the dirt is removed from the GameState and a Relic may be created.
+- Overall dependency chain:
+    - GameObjectIds => GameObjectTypes => Types => PersonUtil, RelicUtil, DirtUtil => GameStateManipulation => Frontend/Backend
 - `BaseUI` - A module that defines reusable UI components.
 - `Modals` - A module that defines the logic for the modals that can appear in the UI.
-
-# Important notes
-Please note that files under the ./generated directory are auto-generated. Only edit the files under the ./src directory.

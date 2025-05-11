@@ -17,10 +17,10 @@ import MapRenderer
 import Material.Icons.Outlined as Outlined
 import Material.Icons.Types as Coloring
 import Modals
-import PersonDict
 import PointUtil
 import RelicDict
 import RelicUtil
+import SeqDict exposing (SeqDict)
 import Task
 import Time
 import Types exposing (..)
@@ -247,7 +247,7 @@ moveMeTowardsMyTargetIfAny model =
 
 moveMeTowardsTargetPoint : FrontendPlayingState -> ( FrontendPlayingState, Cmd FrontendMsg )
 moveMeTowardsTargetPoint state =
-    case ( state.targetPosition, PersonDict.get state.myId state.gameState.personDict ) of
+    case ( state.targetPosition, SeqDict.get state.myId state.gameState.personDict ) of
         ( Just target, Just me ) ->
             let
                 direction =
@@ -408,7 +408,7 @@ renderModel model =
 
 extractMyself : FrontendPlayingState -> Maybe PersonData
 extractMyself state =
-    PersonDict.get state.myId state.gameState.personDict
+    SeqDict.get state.myId state.gameState.personDict
 
 
 renderPlayingState : FrontendPlayingState -> Html.Html FrontendMsg

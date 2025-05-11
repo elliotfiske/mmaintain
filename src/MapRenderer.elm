@@ -7,9 +7,9 @@ import GameStateManipulation
 import Html exposing (..)
 import Html.Attributes exposing (..)
 import Html.Events
-import PersonDict
 import RelicDict
 import RelicUtil
+import SeqDict exposing (SeqDict)
 import Types exposing (..)
 import Util
 
@@ -26,7 +26,7 @@ render state me =
 
 renderPeople : FrontendPlayingState -> List (Html.Html FrontendMsg)
 renderPeople state =
-    PersonDict.values state.gameState.personDict
+    SeqDict.values state.gameState.personDict
         |> List.map (personView state.cameraPosition)
 
 
