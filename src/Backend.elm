@@ -7,6 +7,7 @@ import GameState
 import GameStateManipulation exposing (executeActionOnGameState)
 import Lamdera
 import List
+import PersonIdSet
 import PersonUtil
 import RelicUtil
 import Types exposing (..)
@@ -329,7 +330,7 @@ debugAddRelic model =
         newRelic : GameObjectTypes.RelicData
         newRelic =
             { id = RelicId newId
-            , relicType = GameObjectTypes.SplashBucket
+            , relicType = GameObjectTypes.GuestBook PersonIdSet.empty
             , rarity = GameObjectTypes.Legendary
             , exp = 0
             }

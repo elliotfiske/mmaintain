@@ -229,9 +229,11 @@ relicMiddleware action relic state =
                             { relic | relicType = GuestBook newPeopleWhoHaveHeldIt }
 
                         updatedRelicDict =
-                            RelicDict.singleton newRelic.id newRelic
+                            RelicUtil.updateRelicAtLocation
+
+                        -- todo: this doesn't work. Need to update the relic data and put it back in the state.
                     in
-                    ( { state | relicsByPosition = Dict.insert (RelicUtil.playerHolderToLocation personId) updatedRelicDict state.relicsByPosition }, NoOpBackendTrigger )
+                    ( state, NoOpBackendTrigger )
 
                 _ ->
                     BackendTriggerUtil.withNoOp state
@@ -581,7 +583,13 @@ relicBody state relic me =
             RelicUtil.simpleRelicBody ("Also clean the dirt on adjacent squares at " ++ String.fromInt (RelicUtil.splashBucketStrength relic.rarity relic.exp) ++ " strength.")
 
         GuestBook peopleWhoHaveHeldIt ->
-            RelicUtil.simpleRelicBody ("Gets more powerful for each person who has held it. Currently increases clean strength by " ++ String.fromInt (RelicUtil.guestBookStrength relic.rarity relic.exp (PersonIdSet.size peopleWhoHaveHeldIt)) ++ ".")
+            RelicUtil.simpleRelicBody
+                ("Gets more powerful for each person who has held it. Currently increases clean strength by "
+                    ++ String.fromInt (RelicUtil.guestBookStrength relic.rarity relic.exp (PersonIdSet.size peopleWhoHaveHeldIt))
+                    ++ ". List of IDs who have held it: "
+                    ++ String.join ", " (PersonIdSet.toList peopleWhoHaveHeldIt)
+                    ++ "."
+                )
 
 
 dropAndDoubleRelicBody : Types.FrontendPlayingState -> RelicData -> PersonData -> List PersonId -> Bool -> List (Html.Html Types.FrontendMsg)

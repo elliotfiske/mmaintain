@@ -26,3 +26,13 @@ remove personId (PersonIdSet set) =
 member : PersonId -> PersonIdSet -> Bool
 member personId (PersonIdSet set) =
     Set.member (GameObjectIds.personIdToString personId) set
+
+
+empty : PersonIdSet
+empty =
+    PersonIdSet Set.empty
+
+
+toList : PersonIdSet -> List String
+toList (PersonIdSet set) =
+    Set.toList set
