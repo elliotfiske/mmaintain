@@ -6,7 +6,10 @@ import GameObjectTypes exposing (..)
 import Html
 import Html.Attributes
 import Html.Events
-import RelicDict
+import List.Extra
+import Maybe
+import SeqDict exposing (SeqDict)
+import SeqSet exposing (SeqSet)
 import Types exposing (..)
 
 
@@ -241,7 +244,7 @@ floorPointToLocation { x, y } =
 getRelicAtLocation : RelicLocation -> RelicId -> GameState -> Maybe RelicData
 getRelicAtLocation location relicId state =
     Dict.get location state.relicsByPosition
-        |> Maybe.andThen (RelicDict.get relicId)
+        |> Maybe.andThen (SeqDict.get relicId)
 
 
 updateRelicAtLocation : RelicLocation -> RelicData -> GameState -> GameState
@@ -253,10 +256,10 @@ updateRelicAtLocation location relic state =
         newRelicDict =
             case maybeRelicDict of
                 Just relicDict ->
-                    RelicDict.insert relic.id relic relicDict
+                    SeqDict.insert relic.id relic relicDict
 
                 Nothing ->
-                    RelicDict.insert relic.id relic RelicDict.empty
+                    SeqDict.insert relic.id relic SeqDict.empty
     in
     { state | relicsByPosition = Dict.insert location newRelicDict state.relicsByPosition }
 

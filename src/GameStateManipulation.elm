@@ -9,9 +9,7 @@ import GameState
 import Html
 import List.Extra
 import Markdown
-import PersonIdSet
 import PersonUtil
-import RelicDict
 import RelicUtil
 import SeqDict exposing (SeqDict)
 import SeqSet exposing (SeqSet)
@@ -28,10 +26,10 @@ pickUpRelic takerId relicId state =
         existingRelicsOnGround =
             maybeTaker
                 |> Maybe.map (\taker -> getRelicsAtFloorPoint taker.position state)
-                |> Maybe.withDefault RelicDict.empty
+                |> Maybe.withDefault SeqDict.empty
 
         maybeTargetRelic =
-            RelicDict.get relicId existingRelicsOnGround
+            SeqDict.get relicId existingRelicsOnGround
     in
     case ( maybeTaker, maybeTargetRelic ) of
         ( Just taker, Just targetRelic ) ->
@@ -49,14 +47,14 @@ moveRelicFromFloorToPlayer : PersonData -> RelicData -> RealRelicDict -> GameSta
 moveRelicFromFloorToPlayer taker relicData floorDictToRemoveFrom state =
     let
         newFloorRelicDict =
-            RelicDict.remove relicData.id floorDictToRemoveFrom
+            SeqDict.remove relicData.id floorDictToRemoveFrom
 
         existingHeldRelics =
             Dict.get (RelicUtil.playerHolderToLocation taker.id) state.relicsByPosition
-                |> Maybe.withDefault RelicDict.empty
+                |> Maybe.withDefault SeqDict.empty
 
         newHeldRelics =
-            RelicDict.insert relicData.id relicData existingHeldRelics
+            SeqDict.insert relicData.id relicData existingHeldRelics
 
         newRelicsByPosition =
             state.relicsByPosition
@@ -76,7 +74,7 @@ dropRelic dropperId relicId state =
             getRelicsHeldByPlayer dropperId state
 
         maybeRelicBeingDropped =
-            RelicDict.get relicId existingRelicsHeldByPlayer
+            SeqDict.get relicId existingRelicsHeldByPlayer
     in
     case ( maybeDropper, maybeRelicBeingDropped ) of
         ( Just dropper, Just relic ) ->
@@ -94,14 +92,14 @@ moveRelicFromPlayerToFloor : PersonData -> RelicData -> RealRelicDict -> GameSta
 moveRelicFromPlayerToFloor dropper relicData heldDictToRemoveFrom state =
     let
         newHeldRelicDict =
-            RelicDict.remove relicData.id heldDictToRemoveFrom
+            SeqDict.remove relicData.id heldDictToRemoveFrom
 
         existingFloorRelics =
             Dict.get (RelicUtil.floorPointToLocation dropper.position) state.relicsByPosition
-                |> Maybe.withDefault RelicDict.empty
+                |> Maybe.withDefault SeqDict.empty
 
         newFloorRelics =
-            RelicDict.insert relicData.id relicData existingFloorRelics
+            SeqDict.insert relicData.id relicData existingFloorRelics
 
         newRelicsByPosition =
             state.relicsByPosition
@@ -159,8 +157,8 @@ getRarestRelicAtLocation point state =
 relicsAtLocation : GameObjectTypes.Point -> GameState -> List RelicData
 relicsAtLocation point state =
     Dict.get (RelicUtil.floorPointToLocation point) state.relicsByPosition
-        |> Maybe.withDefault RelicDict.empty
-        |> RelicDict.values
+        |> Maybe.withDefault SeqDict.empty
+        |> SeqDict.values
 
 
 updateWithRelics : Types.ActionPerformer -> ActionOnGamestate -> GameState -> ( GameState, Types.BackendTrigger )
@@ -172,8 +170,8 @@ updateWithRelics actorId action state =
 
         Types.Client personId ->
             Dict.get (RelicUtil.playerHolderToLocation personId) state.relicsByPosition
-                |> Maybe.withDefault RelicDict.empty
-                |> RelicDict.values
+                |> Maybe.withDefault SeqDict.empty
+                |> SeqDict.values
                 |> List.foldl
                     (applyRelicMiddleware action)
                     ( state, [] )
@@ -245,11 +243,11 @@ updateRelicsByPositionWithExperience personId totalXpEarned relicsByPosition =
     let
         heldRelics =
             Dict.get (RelicUtil.playerHolderToLocation personId) relicsByPosition
-                |> Maybe.withDefault RelicDict.empty
+                |> Maybe.withDefault SeqDict.empty
 
         newHeldRelics =
             heldRelics
-                |> RelicDict.map
+                |> SeqDict.map
                     (\_ relic ->
                         { relic | exp = relic.exp + totalXpEarned }
                     )
@@ -288,8 +286,8 @@ handleActivateGenerosityTrap personId relicId numDoubles state =
     let
         maybeRelic =
             Dict.get (RelicUtil.playerHolderToLocation personId) state.relicsByPosition
-                |> Maybe.withDefault RelicDict.empty
-                |> RelicDict.get relicId
+                |> Maybe.withDefault SeqDict.empty
+                |> SeqDict.get relicId
 
         maybeFella =
             SeqDict.get personId state.personDict
@@ -344,10 +342,10 @@ internalExecuteActionOnGameState action state =
             let
                 existingRelicDict =
                     Dict.get (RelicUtil.floorPointToLocation floorPoint) state.relicsByPosition
-                        |> Maybe.withDefault RelicDict.empty
+                        |> Maybe.withDefault SeqDict.empty
 
                 newRelicDict =
-                    RelicDict.insert relicData.id relicData existingRelicDict
+                    SeqDict.insert relicData.id relicData existingRelicDict
             in
             BackendTriggerUtil.withNoOp { state | relicsByPosition = Dict.insert (RelicUtil.floorPointToLocation floorPoint) newRelicDict state.relicsByPosition }
 
@@ -405,7 +403,7 @@ activateGenerosityTrap relicData personData numDoubles state =
             getRelicsHeldByPlayer personData.id state
 
         newRelicDict =
-            RelicDict.remove relicData.id relicsHeldByPlayer
+            SeqDict.remove relicData.id relicsHeldByPlayer
 
         newRelicsByPosition =
             state.relicsByPosition
@@ -547,8 +545,8 @@ xpMultiplierForPlayer state person =
     let
         heldRelics =
             Dict.get (RelicUtil.playerHolderToLocation person.id) state.relicsByPosition
-                |> Maybe.withDefault RelicDict.empty
-                |> RelicDict.values
+                |> Maybe.withDefault SeqDict.empty
+                |> SeqDict.values
     in
     heldRelics
         |> List.foldl
@@ -566,18 +564,18 @@ xpMultiplierForPlayer state person =
 getRelicsAtFloorPoint : Point -> GameState -> RealRelicDict
 getRelicsAtFloorPoint point state =
     Dict.get (RelicUtil.floorPointToLocation point) state.relicsByPosition
-        |> Maybe.withDefault RelicDict.empty
+        |> Maybe.withDefault SeqDict.empty
 
 
 getRelicsHeldByPlayer : PersonId -> GameState -> RealRelicDict
 getRelicsHeldByPlayer personId state =
     Dict.get (RelicUtil.playerHolderToLocation personId) state.relicsByPosition
-        |> Maybe.withDefault RelicDict.empty
+        |> Maybe.withDefault SeqDict.empty
 
 
 isRelicHeldByPerson : GameState -> RelicId -> PersonId -> Bool
 isRelicHeldByPerson state relicId personId =
-    RelicDict.member relicId (getRelicsHeldByPlayer personId state)
+    SeqDict.member relicId (getRelicsHeldByPlayer personId state)
 
 
 relicBody : Types.FrontendPlayingState -> RelicData -> PersonData -> List (Html.Html Types.FrontendMsg)
@@ -709,8 +707,8 @@ cleanStrengthForPlayer state person =
     let
         heldRelics =
             Dict.get (RelicUtil.playerHolderToLocation person.id) state.relicsByPosition
-                |> Maybe.withDefault RelicDict.empty
-                |> RelicDict.values
+                |> Maybe.withDefault SeqDict.empty
+                |> SeqDict.values
 
         baseXP =
             toFloat (10 + Util.levelForExp person.experience)

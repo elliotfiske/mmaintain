@@ -7,7 +7,6 @@ import GameStateManipulation
 import Html exposing (..)
 import Html.Attributes exposing (..)
 import Html.Events
-import RelicDict
 import RelicUtil
 import SeqDict exposing (SeqDict)
 import Types exposing (..)
@@ -238,7 +237,7 @@ rarestRelicAtPoint ( point, relics ) =
 
 relicLocationAndDictToFloorRelics : ( Types.RelicLocation, RealRelicDict ) -> ( GameObjectTypes.Point, List GameObjectTypes.RelicData )
 relicLocationAndDictToFloorRelics ( position, relicDict ) =
-    ( RelicUtil.floorRelicLocationToFloorPoint position, RelicDict.values relicDict )
+    ( RelicUtil.floorRelicLocationToFloorPoint position, SeqDict.values relicDict )
 
 
 renderedOffset : GameObjectTypes.Point -> GameObjectTypes.Point -> ( String, String )

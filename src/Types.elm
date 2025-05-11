@@ -3,11 +3,9 @@ module Types exposing (..)
 import Browser exposing (UrlRequest)
 import Browser.Navigation exposing (Key)
 import Dict exposing (Dict)
-import DirtDict exposing (DirtDict)
 import GameObjectIds exposing (..)
 import GameObjectTypes exposing (..)
 import Lamdera exposing (ClientId, SessionId)
-import RelicDict exposing (RelicDict)
 import SeqDict exposing (SeqDict)
 import Time exposing (Posix)
 import Url exposing (Url)
@@ -22,11 +20,7 @@ type alias RealPersonDict =
 
 
 type alias RealRelicDict =
-    RelicDict RelicData
-
-
-type alias RealDirtDict =
-    DirtDict DirtData
+    SeqDict RelicId RelicData
 
 
 type alias PersonWithRelics =
@@ -110,6 +104,7 @@ type FrontendMsg
     | ClickTarget Point
     | Tick Posix
     | ToggleDebugStuff
+    | CloseModals
     | ReceivedMapSize { width : Float, height : Float }
     | ToggleMobileRelicMenu
     | NoOpFrontendMsg

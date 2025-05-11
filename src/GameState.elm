@@ -1,7 +1,6 @@
 module GameState exposing (..)
 
 import Dict exposing (Dict)
-import DirtDict exposing (DirtDict)
 import GameObjectIds exposing (PersonId)
 import GameObjectTypes
 import SeqDict exposing (SeqDict)

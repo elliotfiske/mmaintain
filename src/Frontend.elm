@@ -18,7 +18,6 @@ import Material.Icons.Outlined as Outlined
 import Material.Icons.Types as Coloring
 import Modals
 import PointUtil
-import RelicDict
 import RelicUtil
 import SeqDict exposing (SeqDict)
 import Task
@@ -73,11 +72,11 @@ maybeFireEveryTick model =
 
 keyDecoder : Model -> Decode.Decoder FrontendMsg
 keyDecoder model =
-    Decode.map (toKey model) (Decode.field "key" Decode.string)
+    Decode.map (msgFromKey model) (Decode.field "key" Decode.string)
 
 
-toKey : Model -> String -> FrontendMsg
-toKey model str =
+msgFromKey : Model -> String -> FrontendMsg
+msgFromKey model str =
     case model.state of
         Loading ->
             NoOpFrontendMsg
@@ -128,6 +127,9 @@ handleKey state key =
 
         "`" ->
             ToggleDebugStuff
+
+        "Escape" ->
+            CloseModals
 
         _ ->
             NoOpFrontendMsg
@@ -189,6 +191,9 @@ update msg model =
         ToggleDebugStuff ->
             ( modelUpdateIfPlaying toggleDebugStuff model, Cmd.none )
 
+        CloseModals ->
+            ( modelUpdateIfPlaying closeModals model, Cmd.none )
+
         ToggleMobileRelicMenu ->
             ( modelUpdateIfPlaying toggleMobileRelicMenu model, Cmd.none )
 
@@ -199,6 +204,11 @@ update msg model =
 toggleDebugStuff : FrontendPlayingState -> FrontendPlayingState
 toggleDebugStuff state =
     { state | showingDebugStuff = not state.showingDebugStuff }
+
+
+closeModals : FrontendPlayingState -> FrontendPlayingState
+closeModals state =
+    { state | showingDebugStuff = False, mobileRelicMenuOpen = False }
 
 
 toggleMobileRelicMenu : FrontendPlayingState -> FrontendPlayingState
@@ -528,7 +538,7 @@ renderRelicContent state me =
     let
         myRelics =
             GameStateManipulation.getRelicsHeldByPlayer state.myId state.gameState
-                |> RelicDict.values
+                |> SeqDict.values
     in
     [ Html.div [ class "prose mt-8" ]
         [ Html.h2 [ class "text-center" ]
@@ -753,7 +763,7 @@ performClean me state =
     let
         myRelicCount =
             GameStateManipulation.getRelicsHeldByPlayer state.myId state.gameState
-                |> RelicDict.size
+                |> SeqDict.size
     in
     case GameStateManipulation.getDirtAtLocation me.position state.gameState.dirtByLocation of
         Nothing ->
