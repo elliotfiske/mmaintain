@@ -1,7 +1,6 @@
-module GameStateManipulation exposing (activateGenerosityTrap, activateRelicWithPersonData, addCleanStats, addOrModifyDirt, applyClean, applyRelicMiddleware, changeDirtAmount, cleanDirt, cleanStrengthForPlayer, combineBatchActionResult, createActionOnGameStateFromRelicActivation, destroyDirt, doClean, dropAndDoubleRelicBody, dropRelic, executeActionOnGameState, getRarestRelicAtLocation, getRelicsAtFloorPoint, getRelicsHeldByPlayer, handleActivateGenerosityTrap, handleBatchAction, handleDroppingDoubler, handleSplashBucket, incrementCleanCount, incrementClearCount, internalExecuteActionOnGameState, isRelicHeldByPerson, makeDirtSmaller, maybeActivateRelic, moveRelicFromFloorToPlayer, moveRelicFromPlayerToFloor, pickUpRelic, playerEarnsExperience, relicBody, relicMiddleware, relicsAtLocation, updatePersonDictWithExperience, updateRelicsByPositionWithExperience, updateWithRelics, xpMultiplierForPlayer)
+module GameStateManipulation exposing (activateGenerosityTrap, activateRelicWithPersonData, addCleanStats, addOrModifyDirt, applyClean, applyRelicMiddleware, changeDirtAmount, cleanDirt, cleanStrengthForPlayer, combineBatchActionResult, createActionOnGameStateFromRelicActivation, destroyDirt, doClean, dropAndDoubleRelicBody, dropRelic, executeActionOnGameState, findNearestDirtWithLowestAmount, getRarestRelicAtLocation, getRelicsAtFloorPoint, getRelicsHeldByPlayer, handleActivateGenerosityTrap, handleBatchAction, handleDroppingDoubler, handleSplashBucket, incrementCleanCount, incrementClearCount, internalExecuteActionOnGameState, isRelicHeldByPerson, makeDirtSmaller, maybeActivateRelic, moveRelicFromFloorToPlayer, moveRelicFromPlayerToFloor, pickUpRelic, playerEarnsExperience, relicBody, relicMiddleware, relicsAtLocation, updatePersonDictWithExperience, updateRelicsByPositionWithExperience, updateWithRelics, xpMultiplierForPlayer)
 
 import BackendTriggerUtil
-import Dict
 import DirtUtil
 import GameObjectIds exposing (..)
 import GameObjectTypes exposing (..)
@@ -209,20 +208,8 @@ relicMiddleware action relic state =
 
         GuestBook peopleWhoHaveHeldIt ->
             case action of
-                PickUpRelic _ personId ->
-                    let
-                        newPeopleWhoHaveHeldIt =
-                            SeqSet.insert personId peopleWhoHaveHeldIt
-
-                        newRelic =
-                            { relic | relicType = GuestBook newPeopleWhoHaveHeldIt }
-
-                        updatedRelicDict =
-                            RelicUtil.updateRelicAtLocation
-
-                        -- todo: this doesn't work. Need to update the relic data and put it back in the state.
-                    in
-                    ( state, NoOpBackendTrigger )
+                PickUpRelic relicId personId ->
+                    handleGuestBookPickup relicId relic personId peopleWhoHaveHeldIt state
 
                 _ ->
                     BackendTriggerUtil.withNoOp state
@@ -714,3 +701,50 @@ cleanStrengthForPlayer state person =
             )
             baseXP
         |> round
+
+
+findNearestDirtWithLowestAmount : Point -> GameState -> Maybe Point
+findNearestDirtWithLowestAmount playerPosition state =
+    let
+        allDirt =
+            SeqDict.values state.dirtByLocation
+
+        distanceToPlayer dirt =
+            abs (dirt.position.x - playerPosition.x) + abs (dirt.position.y - playerPosition.y)
+
+        sortedDirt =
+            allDirt
+                |> List.sortBy (\dirt -> ( distanceToPlayer dirt, dirt.amount ))
+    in
+    List.head sortedDirt
+        |> Maybe.map .position
+
+
+handleGuestBookPickup : RelicId -> RelicData -> PersonId -> SeqSet PersonId -> GameState -> ( GameState, Types.BackendTrigger )
+handleGuestBookPickup relicId relic personId peopleWhoHaveHeldIt state =
+    if relicId == relic.id then
+        let
+            newPeopleWhoHaveHeldIt =
+                SeqSet.insert personId peopleWhoHaveHeldIt
+
+            newRelic =
+                { relic | relicType = GuestBook newPeopleWhoHaveHeldIt }
+
+            maybeLocation =
+                SeqDict.get personId state.personDict
+                    |> Maybe.map .position
+        in
+        case maybeLocation of
+            Just location ->
+                ( RelicUtil.updateRelicAtLocation
+                    (GameObjectTypes.OnFloor location)
+                    newRelic
+                    state
+                , NoOpBackendTrigger
+                )
+
+            Nothing ->
+                BackendTriggerUtil.withNoOp state
+
+    else
+        BackendTriggerUtil.withNoOp (Debug.log "GuestBook relic is not the one we're looking for" state)

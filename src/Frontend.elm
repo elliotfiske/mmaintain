@@ -597,6 +597,36 @@ renderHeldRelics state me =
         ]
 
 
+renderEmptySquareWithNearestDirt : FrontendPlayingState -> PersonData -> Html.Html FrontendMsg
+renderEmptySquareWithNearestDirt state me =
+    case GameStateManipulation.findNearestDirtWithLowestAmount me.position state.gameState of
+        Just nearestDirt ->
+            Html.div [ class "prose" ]
+                [ Html.h2 [ class "text-center" ]
+                    [ Html.text "No dirt or relics here!" ]
+                , Html.div [ class "flex justify-center px-8" ]
+                    [ Html.button
+                        [ class "btn btn-primary w-full"
+                        , Html.Events.onClick (ClickTarget nearestDirt)
+                        ]
+                        [ text "Move to nearest dirt" ]
+                    ]
+                ]
+
+        Nothing ->
+            Html.div [ class "prose" ]
+                [ Html.h2 [ class "text-center" ]
+                    [ Html.text "No dirt or relics here!" ]
+                ]
+
+
+renderRelicsOnSquare : FrontendPlayingState -> PersonData -> List GameObjectTypes.RelicData -> Html.Html FrontendMsg
+renderRelicsOnSquare state me relics =
+    relics
+        |> List.map (heldRelicView state me)
+        |> Html.div [ class "flex flex-col gap-2 flex-grow flex-wrap p-2" ]
+
+
 renderOnThisSquare : FrontendPlayingState -> PersonData -> Html.Html FrontendMsg
 renderOnThisSquare state me =
     Html.div [ class "order-3 md:order-none touch-manipulation overflow-y-scroll" ]
@@ -605,9 +635,12 @@ renderOnThisSquare state me =
                 renderDirtOnThisSquare me dirt
 
             Nothing ->
-                GameStateManipulation.relicsAtLocation me.position state.gameState
-                    |> List.map (heldRelicView state me)
-                    |> Html.div [ class "flex flex-col gap-2 flex-grow flex-wrap p-2" ]
+                case GameStateManipulation.relicsAtLocation me.position state.gameState of
+                    [] ->
+                        renderEmptySquareWithNearestDirt state me
+
+                    relics ->
+                        renderRelicsOnSquare state me relics
         ]
 
 
@@ -615,7 +648,7 @@ renderDirtOnThisSquare : PersonData -> DirtData -> Html.Html FrontendMsg
 renderDirtOnThisSquare me dirt =
     Html.div [ class "prose" ]
         [ Html.h2 [ class "text-center" ]
-            [ Html.text ("Dirty dirty dirt! " ++ String.fromInt dirt.amount) ]
+            [ Html.text ("Dirt here! Amount left: " ++ String.fromInt dirt.amount) ]
         , Html.div [ class "flex justify-center px-8" ]
             [ Html.button
                 [ class "btn btn-primary w-full"
@@ -727,10 +760,10 @@ dropButton : RelicId -> PersonId -> Html FrontendMsg
 dropButton relicId myId =
     Html.button
         [ Html.Events.onClick (PerformAction (DropRelic relicId myId))
-        , class "btn btn-sm btn-outline btn-square"
+        , class "btn btn-sm btn-outline"
         , id "drop-button"
         ]
-        [ Outlined.file_download 18 Coloring.Inherit ]
+        [ Html.text "Drop" ]
 
 
 pickUpButton : RelicId -> PersonId -> Html FrontendMsg
@@ -740,7 +773,7 @@ pickUpButton relicId myId =
         , class "btn btn-sm btn-outline btn-square"
         , id "pickup-button"
         ]
-        [ Html.img [ src "/public/hand-pick-up.png", class "w-8 h-8 invert" ] [] ]
+        [ Html.img [ src "/public/hand-pick-up.png", class "w-8 h-8 dark:invert" ] [] ]
 
 
 tryCleaning : FrontendPlayingState -> ActionOnGamestate
