@@ -6,7 +6,6 @@ import GameObjectTypes exposing (..)
 import Html
 import Html.Attributes
 import Html.Events
-import List.Extra
 import Maybe
 import SeqDict exposing (SeqDict)
 import SeqSet exposing (SeqSet)
@@ -236,22 +235,17 @@ dropDoubleCurrentExperience rarity xp droppedPeople =
     dropDoubleBaseExperience rarity xp * 2 ^ droppedPeople
 
 
-floorPointToLocation : Point -> RelicLocation
-floorPointToLocation { x, y } =
-    ( 0, x, y )
-
-
-getRelicAtLocation : RelicLocation -> RelicId -> GameState -> Maybe RelicData
+getRelicAtLocation : GameObjectTypes.RelicPosition -> RelicId -> GameState -> Maybe RelicData
 getRelicAtLocation location relicId state =
-    Dict.get location state.relicsByPosition
+    SeqDict.get location state.relicsByLocation
         |> Maybe.andThen (SeqDict.get relicId)
 
 
-updateRelicAtLocation : RelicLocation -> RelicData -> GameState -> GameState
+updateRelicAtLocation : GameObjectTypes.RelicPosition -> RelicData -> GameState -> GameState
 updateRelicAtLocation location relic state =
     let
         maybeRelicDict =
-            Dict.get location state.relicsByPosition
+            SeqDict.get location state.relicsByLocation
 
         newRelicDict =
             case maybeRelicDict of
@@ -261,17 +255,7 @@ updateRelicAtLocation location relic state =
                 Nothing ->
                     SeqDict.insert relic.id relic SeqDict.empty
     in
-    { state | relicsByPosition = Dict.insert location newRelicDict state.relicsByPosition }
-
-
-relicLocationIsOnFloor : RelicLocation -> Bool
-relicLocationIsOnFloor ( floor, _, _ ) =
-    floor == 0
-
-
-floorRelicLocationToFloorPoint : RelicLocation -> Point
-floorRelicLocationToFloorPoint ( _, x, y ) =
-    { x = x, y = y }
+    { state | relicsByLocation = SeqDict.insert location newRelicDict state.relicsByLocation }
 
 
 {-| Roll for the rarity of a relic.
@@ -467,11 +451,6 @@ guestBookStrength rarity exp peopleWhoHaveHeldIt =
             relicLevelForExp rarity exp
     in
     level * peopleWhoHaveHeldIt
-
-
-playerHolderToLocation : PersonId -> Types.RelicLocation
-playerHolderToLocation (PersonId rawId) =
-    ( -1, rawId, 0 )
 
 
 byRelicRarity : RelicData -> Int

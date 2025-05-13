@@ -1,4 +1,4 @@
-module GameStateManipulation exposing (activateGenerosityTrap, activateRelicWithPersonData, addCleanStats, addOrModifyDirt, applyClean, applyRelicMiddleware, changeDirtAmount, cleanDirt, cleanStrengthForPlayer, combineBatchActionResult, createActionOnGameStateFromRelicActivation, destroyDirt, doClean, dropAndDoubleRelicBody, dropRelic, executeActionOnGameState, getDirtAtLocation, getRarestRelicAtLocation, getRelicsAtFloorPoint, getRelicsHeldByPlayer, handleActivateGenerosityTrap, handleBatchAction, handleDroppingDoubler, handleSplashBucket, incrementCleanCount, incrementClearCount, internalExecuteActionOnGameState, isRelicHeldByPerson, makeDirtSmaller, maybeActivateRelic, moveRelicFromFloorToPlayer, moveRelicFromPlayerToFloor, pickUpRelic, playerEarnsExperience, relicBody, relicMiddleware, relicsAtLocation, updateDirtAtLocation, updatePersonDictWithExperience, updateRelicsByPositionWithExperience, updateWithRelics, xpMultiplierForPlayer)
+module GameStateManipulation exposing (activateGenerosityTrap, activateRelicWithPersonData, addCleanStats, addOrModifyDirt, applyClean, applyRelicMiddleware, changeDirtAmount, cleanDirt, cleanStrengthForPlayer, combineBatchActionResult, createActionOnGameStateFromRelicActivation, destroyDirt, doClean, dropAndDoubleRelicBody, dropRelic, executeActionOnGameState, getRarestRelicAtLocation, getRelicsAtFloorPoint, getRelicsHeldByPlayer, handleActivateGenerosityTrap, handleBatchAction, handleDroppingDoubler, handleSplashBucket, incrementCleanCount, incrementClearCount, internalExecuteActionOnGameState, isRelicHeldByPerson, makeDirtSmaller, maybeActivateRelic, moveRelicFromFloorToPlayer, moveRelicFromPlayerToFloor, pickUpRelic, playerEarnsExperience, relicBody, relicMiddleware, relicsAtLocation, updatePersonDictWithExperience, updateRelicsByPositionWithExperience, updateWithRelics, xpMultiplierForPlayer)
 
 import BackendTriggerUtil
 import Dict
@@ -13,7 +13,7 @@ import PersonUtil
 import RelicUtil
 import SeqDict exposing (SeqDict)
 import SeqSet exposing (SeqSet)
-import Types exposing (BackendTrigger(..), GameState, RealRelicDict)
+import Types exposing (BackendTrigger(..), GameState, RealRelicDict, RelicsByLocation)
 import Util
 
 
@@ -50,18 +50,18 @@ moveRelicFromFloorToPlayer taker relicData floorDictToRemoveFrom state =
             SeqDict.remove relicData.id floorDictToRemoveFrom
 
         existingHeldRelics =
-            Dict.get (RelicUtil.playerHolderToLocation taker.id) state.relicsByPosition
+            SeqDict.get (GameObjectTypes.HeldBy taker.id) state.relicsByLocation
                 |> Maybe.withDefault SeqDict.empty
 
         newHeldRelics =
             SeqDict.insert relicData.id relicData existingHeldRelics
 
         newRelicsByPosition =
-            state.relicsByPosition
-                |> Dict.insert (RelicUtil.playerHolderToLocation taker.id) newHeldRelics
-                |> Dict.insert (RelicUtil.floorPointToLocation taker.position) newFloorRelicDict
+            state.relicsByLocation
+                |> SeqDict.insert (GameObjectTypes.HeldBy taker.id) newHeldRelics
+                |> SeqDict.insert (GameObjectTypes.OnFloor taker.position) newFloorRelicDict
     in
-    { state | relicsByPosition = newRelicsByPosition }
+    { state | relicsByLocation = newRelicsByPosition }
 
 
 dropRelic : PersonId -> RelicId -> GameState -> ( GameState, Types.BackendTrigger )
@@ -95,54 +95,44 @@ moveRelicFromPlayerToFloor dropper relicData heldDictToRemoveFrom state =
             SeqDict.remove relicData.id heldDictToRemoveFrom
 
         existingFloorRelics =
-            Dict.get (RelicUtil.floorPointToLocation dropper.position) state.relicsByPosition
+            SeqDict.get (GameObjectTypes.OnFloor dropper.position) state.relicsByLocation
                 |> Maybe.withDefault SeqDict.empty
 
         newFloorRelics =
             SeqDict.insert relicData.id relicData existingFloorRelics
 
         newRelicsByPosition =
-            state.relicsByPosition
-                |> Dict.insert (RelicUtil.playerHolderToLocation dropper.id) newHeldRelicDict
-                |> Dict.insert (RelicUtil.floorPointToLocation dropper.position) newFloorRelics
+            state.relicsByLocation
+                |> SeqDict.insert (GameObjectTypes.HeldBy dropper.id) newHeldRelicDict
+                |> SeqDict.insert (GameObjectTypes.OnFloor dropper.position) newFloorRelics
     in
-    { state | relicsByPosition = newRelicsByPosition }
+    { state | relicsByLocation = newRelicsByPosition }
 
 
-changeDirtAmount : Types.DirtLocation -> Int -> Types.DirtByLocation -> Types.DirtByLocation
+changeDirtAmount : Point -> Int -> Types.DirtByLocation -> Types.DirtByLocation
 changeDirtAmount location amount dict =
-    Dict.update location (Maybe.map (DirtUtil.setDirtAmount amount)) dict
-
-
-getDirtAtLocation : GameObjectTypes.Point -> Types.DirtByLocation -> Maybe DirtData
-getDirtAtLocation point dirtByLocation =
-    Dict.get (DirtUtil.pointToDirtLocation point) dirtByLocation
-
-
-updateDirtAtLocation : GameObjectTypes.Point -> DirtData -> Types.DirtByLocation -> Types.DirtByLocation
-updateDirtAtLocation point dirtData dirtByLocation =
-    Dict.insert (DirtUtil.pointToDirtLocation point) dirtData dirtByLocation
+    SeqDict.update location (Maybe.map (DirtUtil.setDirtAmount amount)) dict
 
 
 {-| Add a new dirt or modify an existing dirt's "amount".
 
-Currently used to spawn dirt as a "debug action", not for normal gameplay.
+Currently used to spawn dirt as a "debug action", not for user-initiated actions.
 
 -}
 addOrModifyDirt : DirtData -> GameState -> ( GameState, Types.BackendTrigger )
 addOrModifyDirt dirtData state =
     let
         maybeExistingDirt =
-            getDirtAtLocation dirtData.position state.dirtByLocation
+            SeqDict.get dirtData.position state.dirtByLocation
     in
     case maybeExistingDirt of
         Nothing ->
-            ( { state | dirtByLocation = updateDirtAtLocation dirtData.position dirtData state.dirtByLocation }, NoOpBackendTrigger )
+            ( { state | dirtByLocation = SeqDict.insert dirtData.position dirtData state.dirtByLocation }, NoOpBackendTrigger )
 
         Just existingDirt ->
             let
                 newDirtDict =
-                    changeDirtAmount (DirtUtil.pointToDirtLocation existingDirt.position) dirtData.amount state.dirtByLocation
+                    changeDirtAmount existingDirt.position dirtData.amount state.dirtByLocation
             in
             ( { state | dirtByLocation = newDirtDict }, NoOpBackendTrigger )
 
@@ -156,7 +146,7 @@ getRarestRelicAtLocation point state =
 
 relicsAtLocation : GameObjectTypes.Point -> GameState -> List RelicData
 relicsAtLocation point state =
-    Dict.get (RelicUtil.floorPointToLocation point) state.relicsByPosition
+    SeqDict.get (GameObjectTypes.OnFloor point) state.relicsByLocation
         |> Maybe.withDefault SeqDict.empty
         |> SeqDict.values
 
@@ -169,7 +159,7 @@ updateWithRelics actorId action state =
             BackendTriggerUtil.withNoOp state
 
         Types.Client personId ->
-            Dict.get (RelicUtil.playerHolderToLocation personId) state.relicsByPosition
+            SeqDict.get (GameObjectTypes.HeldBy personId) state.relicsByLocation
                 |> Maybe.withDefault SeqDict.empty
                 |> SeqDict.values
                 |> List.foldl
@@ -238,11 +228,11 @@ relicMiddleware action relic state =
                     BackendTriggerUtil.withNoOp state
 
 
-updateRelicsByPositionWithExperience : PersonId -> Int -> Dict.Dict Types.RelicLocation RealRelicDict -> Dict.Dict Types.RelicLocation RealRelicDict
-updateRelicsByPositionWithExperience personId totalXpEarned relicsByPosition =
+updateRelicsByPositionWithExperience : PersonId -> Int -> RelicsByLocation -> RelicsByLocation
+updateRelicsByPositionWithExperience personId totalXpEarned relicsByLocation =
     let
         heldRelics =
-            Dict.get (RelicUtil.playerHolderToLocation personId) relicsByPosition
+            SeqDict.get (GameObjectTypes.HeldBy personId) relicsByLocation
                 |> Maybe.withDefault SeqDict.empty
 
         newHeldRelics =
@@ -252,7 +242,7 @@ updateRelicsByPositionWithExperience personId totalXpEarned relicsByPosition =
                         { relic | exp = relic.exp + totalXpEarned }
                     )
     in
-    Dict.insert (RelicUtil.playerHolderToLocation personId) newHeldRelics relicsByPosition
+    SeqDict.insert (GameObjectTypes.HeldBy personId) newHeldRelics relicsByLocation
 
 
 playerEarnsExperience : PersonId -> Int -> GameState -> GameState
@@ -273,19 +263,18 @@ playerEarnsExperience personId xpEarned state =
                     updatePersonDictWithExperience personId totalXpEarned state.personDict
 
                 newRelicsByPosition =
-                    updateRelicsByPositionWithExperience personId totalXpEarned state.relicsByPosition
+                    updateRelicsByPositionWithExperience personId totalXpEarned state.relicsByLocation
             in
-            { state
-                | personDict = newPersonDict
-                , relicsByPosition = newRelicsByPosition
-            }
+            state
+                |> GameState.updateGameStatePersonDict newPersonDict
+                |> GameState.updateGameStateRelicDict newRelicsByPosition
 
 
 handleActivateGenerosityTrap : PersonId -> RelicId -> Int -> GameState -> ( GameState, Types.BackendTrigger )
 handleActivateGenerosityTrap personId relicId numDoubles state =
     let
         maybeRelic =
-            Dict.get (RelicUtil.playerHolderToLocation personId) state.relicsByPosition
+            SeqDict.get (GameObjectTypes.HeldBy personId) state.relicsByLocation
                 |> Maybe.withDefault SeqDict.empty
                 |> SeqDict.get relicId
 
@@ -341,13 +330,13 @@ internalExecuteActionOnGameState action state =
         AddRelic relicData floorPoint ->
             let
                 existingRelicDict =
-                    Dict.get (RelicUtil.floorPointToLocation floorPoint) state.relicsByPosition
+                    SeqDict.get (GameObjectTypes.OnFloor floorPoint) state.relicsByLocation
                         |> Maybe.withDefault SeqDict.empty
 
                 newRelicDict =
                     SeqDict.insert relicData.id relicData existingRelicDict
             in
-            BackendTriggerUtil.withNoOp { state | relicsByPosition = Dict.insert (RelicUtil.floorPointToLocation floorPoint) newRelicDict state.relicsByPosition }
+            BackendTriggerUtil.withNoOp { state | relicsByLocation = SeqDict.insert (GameObjectTypes.OnFloor floorPoint) newRelicDict state.relicsByLocation }
 
         GameStateNoOp ->
             BackendTriggerUtil.withNoOp state
@@ -406,8 +395,8 @@ activateGenerosityTrap relicData personData numDoubles state =
             SeqDict.remove relicData.id relicsHeldByPlayer
 
         newRelicsByPosition =
-            state.relicsByPosition
-                |> Dict.insert (RelicUtil.playerHolderToLocation personData.id) newRelicDict
+            state.relicsByLocation
+                |> SeqDict.insert (GameObjectTypes.HeldBy personData.id) newRelicDict
 
         xpEarned =
             RelicUtil.dropDoubleCurrentExperience relicData.rarity relicData.exp numDoubles
@@ -415,12 +404,12 @@ activateGenerosityTrap relicData personData numDoubles state =
         newState =
             playerEarnsExperience personData.id xpEarned state
     in
-    { newState | relicsByPosition = newRelicsByPosition }
+    { newState | relicsByLocation = newRelicsByPosition }
 
 
 doClean : PersonId -> Point -> Int -> GameState -> ( GameState, Types.BackendTrigger )
 doClean personId location strength state =
-    case Dict.get (DirtUtil.pointToDirtLocation location) state.dirtByLocation of
+    case SeqDict.get location state.dirtByLocation of
         Nothing ->
             -- This might happen if the user is lagging and someone else cleared the dirt
             ( state, NoOpBackendTrigger )
@@ -446,7 +435,7 @@ makeDirtSmaller : PersonId -> DirtData -> GameState -> ( GameState, Types.Backen
 makeDirtSmaller personId newDirt state =
     let
         newDirtDict =
-            Dict.insert (DirtUtil.pointToDirtLocation newDirt.position) newDirt state.dirtByLocation
+            SeqDict.insert newDirt.position newDirt state.dirtByLocation
 
         newState =
             state
@@ -460,7 +449,7 @@ destroyDirt : PersonId -> DirtData -> GameState -> ( GameState, Types.BackendTri
 destroyDirt personId dirtData state =
     let
         newDirtDict =
-            Dict.remove (DirtUtil.pointToDirtLocation dirtData.position) state.dirtByLocation
+            SeqDict.remove dirtData.position state.dirtByLocation
 
         newPersonDict =
             state.personDict
@@ -534,7 +523,7 @@ handleDroppingDoubler relicId relic personId people state =
             newRelic =
                 { relic | relicType = DropAndDouble newPersonList }
         in
-        RelicUtil.updateRelicAtLocation (RelicUtil.playerHolderToLocation personId) newRelic state
+        RelicUtil.updateRelicAtLocation (GameObjectTypes.HeldBy personId) newRelic state
 
     else
         state
@@ -544,7 +533,7 @@ xpMultiplierForPlayer : GameState -> PersonData -> Float
 xpMultiplierForPlayer state person =
     let
         heldRelics =
-            Dict.get (RelicUtil.playerHolderToLocation person.id) state.relicsByPosition
+            SeqDict.get (GameObjectTypes.HeldBy person.id) state.relicsByLocation
                 |> Maybe.withDefault SeqDict.empty
                 |> SeqDict.values
     in
@@ -563,13 +552,13 @@ xpMultiplierForPlayer state person =
 
 getRelicsAtFloorPoint : Point -> GameState -> RealRelicDict
 getRelicsAtFloorPoint point state =
-    Dict.get (RelicUtil.floorPointToLocation point) state.relicsByPosition
+    SeqDict.get (GameObjectTypes.OnFloor point) state.relicsByLocation
         |> Maybe.withDefault SeqDict.empty
 
 
 getRelicsHeldByPlayer : PersonId -> GameState -> RealRelicDict
 getRelicsHeldByPlayer personId state =
-    Dict.get (RelicUtil.playerHolderToLocation personId) state.relicsByPosition
+    SeqDict.get (GameObjectTypes.HeldBy personId) state.relicsByLocation
         |> Maybe.withDefault SeqDict.empty
 
 
@@ -648,7 +637,7 @@ createActionOnGameStateFromRelicActivation : PersonId -> RelicId -> GameState ->
 createActionOnGameStateFromRelicActivation activatorId relicId state =
     let
         maybeRelic =
-            RelicUtil.getRelicAtLocation (RelicUtil.playerHolderToLocation activatorId) relicId state
+            RelicUtil.getRelicAtLocation (GameObjectTypes.HeldBy activatorId) relicId state
 
         maybePerson =
             SeqDict.get activatorId state.personDict
@@ -670,7 +659,7 @@ maybeActivateRelic : PersonId -> RelicId -> GameState -> ( GameState, Types.Back
 maybeActivateRelic activatorId relicId state =
     let
         maybeRelic =
-            RelicUtil.getRelicAtLocation (RelicUtil.playerHolderToLocation activatorId) relicId state
+            RelicUtil.getRelicAtLocation (GameObjectTypes.HeldBy activatorId) relicId state
 
         maybePerson =
             SeqDict.get activatorId state.personDict
@@ -706,7 +695,7 @@ cleanStrengthForPlayer : GameState -> PersonData -> Int
 cleanStrengthForPlayer state person =
     let
         heldRelics =
-            Dict.get (RelicUtil.playerHolderToLocation person.id) state.relicsByPosition
+            SeqDict.get (GameObjectTypes.HeldBy person.id) state.relicsByLocation
                 |> Maybe.withDefault SeqDict.empty
                 |> SeqDict.values
 

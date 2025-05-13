@@ -27,25 +27,17 @@ type alias PersonWithRelics =
     { person : PersonData, heldRelics : List RelicData }
 
 
-type alias RelicLocation =
-    ( Int, Int, Int )
-
-
 type alias RelicsByLocation =
-    Dict RelicLocation RealRelicDict
-
-
-type alias DirtLocation =
-    ( Int, Int )
+    SeqDict GameObjectTypes.RelicPosition RealRelicDict
 
 
 type alias DirtByLocation =
-    Dict DirtLocation DirtData
+    SeqDict Point DirtData
 
 
 type alias GameState =
     { personDict : SeqDict PersonId PersonData
-    , relicsByPosition : RelicsByLocation
+    , relicsByLocation : RelicsByLocation
     , dirtByLocation : DirtByLocation
     }
 

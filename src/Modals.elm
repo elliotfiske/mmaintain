@@ -1,14 +1,13 @@
 module Modals exposing (render)
 
 import BaseUI as UI
-import Dict
 import GameObjectIds exposing (..)
 import GameObjectTypes exposing (..)
 import Html exposing (..)
 import Html.Attributes exposing (..)
 import Html.Events
 import Markdown
-import SeqDict exposing (SeqDict)
+import SeqDict
 import Types exposing (..)
 
 
@@ -17,7 +16,7 @@ render state me =
     if state.showingDebugStuff then
         renderDebugModal state
 
-    else if Dict.size state.gameState.dirtByLocation == 0 then
+    else if SeqDict.size state.gameState.dirtByLocation == 0 then
         renderVictoryModal me
 
     else
@@ -107,9 +106,9 @@ debugDictsView { gameState, myId } =
         ("PersonDict: "
             ++ String.fromInt (SeqDict.size gameState.personDict)
             ++ "<br>Relics By Position Dict: "
-            ++ String.fromInt (Dict.size gameState.relicsByPosition)
+            ++ String.fromInt (SeqDict.size gameState.relicsByLocation)
             ++ "<br>DirtDict: "
-            ++ String.fromInt (Dict.size gameState.dirtByLocation)
+            ++ String.fromInt (SeqDict.size gameState.dirtByLocation)
             ++ "<br>MyId: "
             ++ personIdToString myId
         )

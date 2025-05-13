@@ -600,7 +600,7 @@ renderHeldRelics state me =
 renderOnThisSquare : FrontendPlayingState -> PersonData -> Html.Html FrontendMsg
 renderOnThisSquare state me =
     Html.div [ class "order-3 md:order-none touch-manipulation" ]
-        [ case GameStateManipulation.getDirtAtLocation me.position state.gameState.dirtByLocation of
+        [ case SeqDict.get me.position state.gameState.dirtByLocation of
             Just dirt ->
                 renderDirtOnThisSquare me dirt
 
@@ -765,7 +765,7 @@ performClean me state =
             GameStateManipulation.getRelicsHeldByPlayer state.myId state.gameState
                 |> SeqDict.size
     in
-    case GameStateManipulation.getDirtAtLocation me.position state.gameState.dirtByLocation of
+    case SeqDict.get me.position state.gameState.dirtByLocation of
         Nothing ->
             case GameStateManipulation.getRarestRelicAtLocation me.position state.gameState of
                 Nothing ->

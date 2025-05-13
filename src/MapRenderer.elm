@@ -52,11 +52,11 @@ getVisibleDirt state =
                 isVisible dirt =
                     isDirtVisible state.cameraPosition dirt.position viewportSize.x viewportSize.y
             in
-            Dict.values state.gameState.dirtByLocation
+            SeqDict.values state.gameState.dirtByLocation
                 |> List.filter isVisible
 
         Nothing ->
-            Dict.values state.gameState.dirtByLocation
+            SeqDict.values state.gameState.dirtByLocation
 
 
 renderDirt : FrontendPlayingState -> List (Html.Html FrontendMsg)
@@ -217,9 +217,16 @@ floorRelicView camera ( floorPosition, relicData ) =
 
 relicsOnFloor : FrontendPlayingState -> List ( GameObjectTypes.Point, List GameObjectTypes.RelicData )
 relicsOnFloor state =
-    Dict.toList state.gameState.relicsByPosition
-        |> List.filter (\( position, _ ) -> RelicUtil.relicLocationIsOnFloor position)
-        |> List.map relicLocationAndDictToFloorRelics
+    SeqDict.toList state.gameState.relicsByLocation
+        |> List.filterMap
+            (\( position, relicData ) ->
+                case position of
+                    GameObjectTypes.OnFloor floorPoint ->
+                        Just ( floorPoint, SeqDict.values relicData )
+
+                    GameObjectTypes.HeldBy _ ->
+                        Nothing
+            )
 
 
 rarestRelicAtPoints : FrontendPlayingState -> List ( GameObjectTypes.Point, GameObjectTypes.RelicData )
@@ -233,11 +240,6 @@ rarestRelicAtPoint ( point, relics ) =
     List.sortBy RelicUtil.byRelicRarity relics
         |> List.head
         |> Maybe.map (\relic -> ( point, relic ))
-
-
-relicLocationAndDictToFloorRelics : ( Types.RelicLocation, RealRelicDict ) -> ( GameObjectTypes.Point, List GameObjectTypes.RelicData )
-relicLocationAndDictToFloorRelics ( position, relicDict ) =
-    ( RelicUtil.floorRelicLocationToFloorPoint position, SeqDict.values relicDict )
 
 
 renderedOffset : GameObjectTypes.Point -> GameObjectTypes.Point -> ( String, String )

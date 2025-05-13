@@ -34,7 +34,7 @@ type alias DirtByLocation =
 
 type alias GameState =
     { personDict : Evergreen.V6.PersonDict.PersonDict Evergreen.V6.GameObjectTypes.PersonData
-    , relicsByPosition : RelicsByLocation
+    , relicsByLocation : RelicsByLocation
     , dirtByLocation : DirtByLocation
     }
 
