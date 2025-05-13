@@ -599,7 +599,7 @@ renderHeldRelics state me =
 
 renderOnThisSquare : FrontendPlayingState -> PersonData -> Html.Html FrontendMsg
 renderOnThisSquare state me =
-    Html.div [ class "order-3 md:order-none touch-manipulation" ]
+    Html.div [ class "order-3 md:order-none touch-manipulation overflow-y-scroll" ]
         [ case SeqDict.get me.position state.gameState.dirtByLocation of
             Just dirt ->
                 renderDirtOnThisSquare me dirt
