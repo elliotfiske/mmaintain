@@ -740,7 +740,7 @@ pickUpButton relicId myId =
         , class "btn btn-sm btn-outline btn-square"
         , id "pickup-button"
         ]
-        [ Outlined.file_upload 18 Coloring.Inherit ]
+        [ Html.img [ src "/public/hand-pick-up.png", class "w-8 h-8 invert" ] [] ]
 
 
 tryCleaning : FrontendPlayingState -> ActionOnGamestate
