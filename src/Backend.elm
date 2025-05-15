@@ -9,7 +9,7 @@ import Lamdera
 import List
 import PersonUtil
 import RelicUtil
-import SeqSet exposing (SeqSet)
+import SeqSet
 import Types exposing (..)
 import Util
 
@@ -223,10 +223,6 @@ updateModelFromTrigger performer trigger model =
         ClearedPollution personId dirtData ->
             doRelicRoll personId dirtData model
 
-        NuhUh personId ->
-            -- TODO: Unimplemented
-            ( model, GameStateNoOp )
-
 
 {-| Process a list of triggers, updating the model and collecting the resulting actions.
 Returns the final model and a single action (either GameStateNoOp, the single resulting action, or a BatchAction).
@@ -350,9 +346,9 @@ addSomeDirt model =
         ( model, Cmd.none )
         (Util.generateGridOfPoints
             { minX = 5
-            , maxX = 6
+            , maxX = 10
             , minY = 5
-            , maxY = 6
+            , maxY = 10
             }
         )
 

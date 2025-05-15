@@ -616,7 +616,7 @@ renderEmptySquareWithNearestDirt state me =
         Nothing ->
             Html.div [ class "prose" ]
                 [ Html.h2 [ class "text-center" ]
-                    [ Html.text "No dirt or relics here!" ]
+                    [ Html.text "No dirt or relics nearby!" ]
                 ]
 
 

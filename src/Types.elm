@@ -82,8 +82,6 @@ type BackendTrigger
     = NoOpBackendTrigger
     | ClearedPollution PersonId DirtData
     | BatchTrigger (List BackendTrigger)
-      -- Player is out of sync with the backend and needs the full state sent down
-    | NuhUh PersonId
 
 
 type FrontendMsg

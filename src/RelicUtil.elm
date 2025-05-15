@@ -1,6 +1,5 @@
 module RelicUtil exposing (..)
 
-import Dict
 import GameObjectIds exposing (..)
 import GameObjectTypes exposing (..)
 import Html
@@ -127,14 +126,14 @@ dropAndDoubleActivationButton myId droppers relicId =
 
 {-| Calculates the strength multiplier for CleanFast relics based on rarity and level.
 -}
-cleanFastStrengthMultiplier : RelicRarity -> Int -> Float
-cleanFastStrengthMultiplier rarity xp =
+cleanFastStrengthMultiplier : RelicData -> Float
+cleanFastStrengthMultiplier relicData =
     let
         level =
-            toFloat (relicLevelForExp rarity xp)
+            toFloat (relicLevelForExp relicData.rarity relicData.exp)
 
         baseMultiplier =
-            case rarity of
+            case relicData.rarity of
                 Common ->
                     1.3
 
@@ -444,13 +443,13 @@ splashBucketStrength rarity exp =
     round (toFloat baseStrength + (level - 1.0) * increasePerLevel)
 
 
-guestBookStrength : RelicRarity -> Int -> Int -> Int
-guestBookStrength rarity exp peopleWhoHaveHeldIt =
+guestBookStrength : RelicData -> SeqSet PersonId -> Int
+guestBookStrength relicData peopleWhoHaveHeldIt =
     let
         level =
-            relicLevelForExp rarity exp
+            relicLevelForExp relicData.rarity relicData.exp
     in
-    level * peopleWhoHaveHeldIt
+    (10 + level) ^ SeqSet.size peopleWhoHaveHeldIt
 
 
 byRelicRarity : RelicData -> Int

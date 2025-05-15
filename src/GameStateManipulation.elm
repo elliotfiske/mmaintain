@@ -1,4 +1,4 @@
-module GameStateManipulation exposing (activateGenerosityTrap, activateRelicWithPersonData, addCleanStats, addOrModifyDirt, applyClean, applyRelicMiddleware, changeDirtAmount, cleanDirt, cleanStrengthForPlayer, combineBatchActionResult, createActionOnGameStateFromRelicActivation, destroyDirt, doClean, dropAndDoubleRelicBody, dropRelic, executeActionOnGameState, findNearestDirtWithLowestAmount, getRarestRelicAtLocation, getRelicsAtFloorPoint, getRelicsHeldByPlayer, handleActivateGenerosityTrap, handleBatchAction, handleDroppingDoubler, handleSplashBucket, incrementCleanCount, incrementClearCount, internalExecuteActionOnGameState, isRelicHeldByPerson, makeDirtSmaller, maybeActivateRelic, moveRelicFromFloorToPlayer, moveRelicFromPlayerToFloor, pickUpRelic, playerEarnsExperience, relicBody, relicMiddleware, relicsAtLocation, updatePersonDictWithExperience, updateRelicsByPositionWithExperience, updateWithRelics, xpMultiplierForPlayer)
+module GameStateManipulation exposing (activateGenerosityTrap, activateRelicWithPersonData, addCleanStats, addOrModifyDirt, applyClean, applyRelicMiddleware, changeDirtAmount, cleanDirt, cleanStrengthForPlayer, combineBatchActionResult, createActionOnGameStateFromRelicActivation, destroyDirt, doClean, dropAndDoubleRelicBody, dropRelic, executeActionOnGameState, findNearestDirtWithLowestAmount, getRarestRelicAtLocation, getRelicsAtFloorPoint, getRelicsHeldByPlayer, handleActivateGenerosityTrap, handleBatchAction, handleDroppingDoubler, handleSplashBucket, incrementCleanCount, incrementClearCount, internalExecuteActionOnGameState, isRelicHeldByPerson, makeDirtSmaller, maybeActivateRelic, moveRelicFromFloorToPlayer, moveRelicFromPlayerToFloor, pickUpRelic, playerEarnsExperience, relicBody, relicMiddleware, relicsAtLocation, updatePersonDictWithExperience, updateRelicsByPositionWithExperience, xpMultiplierForPlayer)
 
 import BackendTriggerUtil
 import DirtUtil
@@ -39,7 +39,7 @@ pickUpRelic takerId relicId state =
             ( newState, NoOpBackendTrigger )
 
         _ ->
-            ( state, NuhUh takerId )
+            ( state, NoOpBackendTrigger )
 
 
 moveRelicFromFloorToPlayer : PersonData -> RelicData -> RealRelicDict -> GameState -> GameState
@@ -84,7 +84,7 @@ dropRelic dropperId relicId state =
             ( newState, NoOpBackendTrigger )
 
         _ ->
-            ( state, NuhUh dropperId )
+            ( state, NoOpBackendTrigger )
 
 
 moveRelicFromPlayerToFloor : PersonData -> RelicData -> RealRelicDict -> GameState -> GameState
@@ -158,9 +158,8 @@ updateWithRelics actorId action state =
             BackendTriggerUtil.withNoOp state
 
         Types.Client personId ->
-            SeqDict.get (GameObjectTypes.HeldBy personId) state.relicsByLocation
-                |> Maybe.withDefault SeqDict.empty
-                |> SeqDict.values
+            SeqDict.values state.relicsByLocation
+                |> List.concatMap SeqDict.values
                 |> List.foldl
                     (applyRelicMiddleware action)
                     ( state, [] )
@@ -190,18 +189,23 @@ relicMiddleware action relic state =
             BackendTriggerUtil.withNoOp state
 
         DropAndDouble people ->
-            case action of
+            (case action of
                 DropRelic relicId personId ->
                     handleDroppingDoubler relicId relic personId people state
-                        |> BackendTriggerUtil.withNoOp
 
                 _ ->
-                    BackendTriggerUtil.withNoOp state
+                    state
+            )
+                |> BackendTriggerUtil.withNoOp
 
         SplashBucket ->
             case action of
                 Clean personId location ->
-                    handleSplashBucket location relic personId state
+                    if isRelicHeldByPerson state relic.id personId then
+                        handleSplashBucket location relic personId state
+
+                    else
+                        BackendTriggerUtil.withNoOp state
 
                 _ ->
                     BackendTriggerUtil.withNoOp state
@@ -276,10 +280,10 @@ handleActivateGenerosityTrap personId relicId numDoubles state =
 
                 _ ->
                     -- User tried to activate Generosity on a relic that wasn't Generosity. Cheating???
-                    ( state, NuhUh personId )
+                    ( state, NoOpBackendTrigger )
 
         _ ->
-            ( state, NuhUh personId )
+            ( state, NoOpBackendTrigger )
 
 
 internalExecuteActionOnGameState : ActionOnGamestate -> GameState -> ( GameState, Types.BackendTrigger )
@@ -562,7 +566,7 @@ relicBody state relic me =
     in
     case relic.relicType of
         CleanFast ->
-            RelicUtil.simpleRelicBody ("x" ++ Util.readableStringFromFloat (RelicUtil.cleanFastStrengthMultiplier relic.rarity relic.exp) ++ " to Cleaning Strength.")
+            RelicUtil.simpleRelicBody ("x" ++ Util.readableStringFromFloat (RelicUtil.cleanFastStrengthMultiplier relic) ++ " to Cleaning Strength.")
 
         MoreXP ->
             RelicUtil.simpleRelicBody ("x" ++ Util.readableStringFromFloat (RelicUtil.xpMultiplier relic.rarity relic.exp) ++ " to all XP earned.")
@@ -576,7 +580,7 @@ relicBody state relic me =
         GuestBook peopleWhoHaveHeldIt ->
             RelicUtil.simpleRelicBody
                 ("Gets more powerful for each person who has held it. Currently increases clean strength by "
-                    ++ String.fromInt (RelicUtil.guestBookStrength relic.rarity relic.exp (SeqSet.size peopleWhoHaveHeldIt))
+                    ++ String.fromInt (RelicUtil.guestBookStrength relic peopleWhoHaveHeldIt)
                     ++ ". List of IDs who have held it: "
                     ++ String.join ", " (List.map personIdToString (SeqSet.toList peopleWhoHaveHeldIt))
                     ++ "."
@@ -694,7 +698,10 @@ cleanStrengthForPlayer state person =
             (\relic acc ->
                 case relic.relicType of
                     CleanFast ->
-                        acc * RelicUtil.cleanFastStrengthMultiplier relic.rarity relic.exp
+                        acc * RelicUtil.cleanFastStrengthMultiplier relic
+
+                    GuestBook holders ->
+                        acc + toFloat (RelicUtil.guestBookStrength relic holders)
 
                     _ ->
                         acc
