@@ -459,7 +459,7 @@ renderMyHUD state me =
         , renderExpProgress me
         , renderCleanStrength state me
         , renderXPMultiplier state me
-        , renderMobileHamburgerButton
+        , renderMobileRelicsButton state me
         ]
 
 
@@ -554,13 +554,25 @@ renderRelicContent state me =
     ]
 
 
-renderMobileHamburgerButton : Html.Html FrontendMsg
-renderMobileHamburgerButton =
+renderMobileRelicsButton : FrontendPlayingState -> PersonData -> Html.Html FrontendMsg
+renderMobileRelicsButton state me =
+    let
+        numHeldRelics =
+            GameStateManipulation.getRelicsHeldByPlayer state.myId state.gameState
+                |> SeqDict.size
+                |> String.fromInt
+
+        myLevel =
+            Util.levelForExp me.experience
+
+        totalUnlockedSlots =
+            RelicUtil.relicSlotsForLevel myLevel |> String.fromInt
+    in
     Html.button
-        [ class "btn btn-square btn-ghost md:hidden fixed top-4 right-4 z-50"
+        [ class "btn btn-outline btn-ghost md:hidden fixed top-4 right-4 z-50"
         , Html.Events.onClick ToggleMobileRelicMenu
         ]
-        [ Outlined.menu 24 Coloring.Inherit ]
+        [ "Relics: " ++ numHeldRelics ++ "/" ++ totalUnlockedSlots |> Html.text ]
 
 
 renderMobileRelicDialog : FrontendPlayingState -> PersonData -> Html.Html FrontendMsg
@@ -610,7 +622,7 @@ renderEmptySquareWithNearestDirt state me =
         Nothing ->
             Html.div [ class "prose" ]
                 [ Html.h2 [ class "text-center" ]
-                    [ Html.text "No dirt or relics nearby!" ]
+                    [ Html.text "No dirt nearby!" ]
                 ]
 
 
