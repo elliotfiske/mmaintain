@@ -1,4 +1,4 @@
-module GameStateManipulation exposing (activateGenerosityTrap, activateRelicWithPersonData, addCleanStats, addOrModifyDirt, applyClean, applyRelicMiddleware, changeDirtAmount, cleanDirt, cleanStrengthForPlayer, combineBatchActionResult, createActionOnGameStateFromRelicActivation, destroyDirt, doClean, dropAndDoubleRelicBody, dropRelic, executeActionOnGameState, findNearestDirtWithLowestAmount, getRarestRelicAtLocation, getRelicsAtFloorPoint, getRelicsHeldByPlayer, handleActivateGenerosityTrap, handleBatchAction, handleDroppingDoubler, handleSplashBucket, incrementCleanCount, incrementClearCount, internalExecuteActionOnGameState, isRelicHeldByPerson, makeDirtSmaller, maybeActivateRelic, moveRelicFromFloorToPlayer, moveRelicFromPlayerToFloor, pickUpRelic, playerEarnsExperience, relicBody, relicMiddleware, relicsAtLocation, updatePersonDictWithExperience, updateRelicsByPositionWithExperience, xpMultiplierForPlayer)
+module GameStateManipulation exposing (activateGenerosityTrap, activateRelicWithPersonData, addCleanStats, addOrModifyDirt, applyClean, applyRelicMiddleware, changeDirtAmount, cleanDirt, cleanStrengthForPlayer, combineBatchActionResult, createActionOnGameStateFromRelicActivation, destroyDirt, doClean, dropAndDoubleRelicBody, dropRelic, executeActionOnGameState, findSmallestAndLargestNearbyDirts, getRarestRelicAtLocation, getRelicsAtFloorPoint, getRelicsHeldByPlayer, handleActivateGenerosityTrap, handleBatchAction, handleDroppingDoubler, handleSplashBucket, incrementCleanCount, incrementClearCount, internalExecuteActionOnGameState, isRelicHeldByPerson, makeDirtSmaller, maybeActivateRelic, moveRelicFromFloorToPlayer, moveRelicFromPlayerToFloor, pickUpRelic, playerEarnsExperience, relicBody, relicMiddleware, relicsAtLocation, updatePersonDictWithExperience, updateRelicsByPositionWithExperience, xpMultiplierForPlayer)
 
 import BackendTriggerUtil
 import DirtUtil
@@ -710,21 +710,23 @@ cleanStrengthForPlayer state person =
         |> round
 
 
-findNearestDirtWithLowestAmount : Point -> GameState -> Maybe Point
-findNearestDirtWithLowestAmount playerPosition state =
+findSmallestAndLargestNearbyDirts : Point -> GameState -> Maybe ( DirtData, DirtData )
+findSmallestAndLargestNearbyDirts playerPosition state =
+    findNearbyDirt playerPosition state
+        |> Util.listOutliers .amount
+
+
+findNearbyDirt : Point -> GameState -> List DirtData
+findNearbyDirt playerPosition state =
     let
         allDirt =
             SeqDict.values state.dirtByLocation
 
         distanceToPlayer dirt =
             abs (dirt.position.x - playerPosition.x) + abs (dirt.position.y - playerPosition.y)
-
-        sortedDirt =
-            allDirt
-                |> List.sortBy (\dirt -> ( distanceToPlayer dirt, dirt.amount ))
     in
-    List.head sortedDirt
-        |> Maybe.map .position
+    allDirt
+        |> List.filter (\dirt -> distanceToPlayer dirt <= 10)
 
 
 handleGuestBookPickup : RelicId -> RelicData -> PersonId -> SeqSet PersonId -> GameState -> ( GameState, Types.BackendTrigger )

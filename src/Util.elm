@@ -168,6 +168,34 @@ pixelsToTiles { width, height } =
     }
 
 
+{-| Return the highest and lowest elements of a List
+-}
+listOutliers : (a -> comparable) -> List a -> Maybe ( a, a )
+listOutliers sortBy list =
+    case list of
+        [] ->
+            Nothing
+
+        x :: xs ->
+            Just (List.foldl (listOutliersHelper sortBy) ( x, x ) xs)
+
+
+listOutliersHelper : (a -> comparable) -> a -> ( a, a ) -> ( a, a )
+listOutliersHelper sortBy current ( smallest, biggest ) =
+    let
+        currentComparable =
+            sortBy current
+    in
+    if currentComparable < sortBy smallest then
+        ( current, biggest )
+
+    else if currentComparable > sortBy biggest then
+        ( smallest, current )
+
+    else
+        ( smallest, biggest )
+
+
 {-| Rules for camera movement:
 
 Must not go lower than 0,0

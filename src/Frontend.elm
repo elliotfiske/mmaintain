@@ -599,18 +599,12 @@ renderHeldRelics state me =
 
 renderEmptySquareWithNearestDirt : FrontendPlayingState -> PersonData -> Html.Html FrontendMsg
 renderEmptySquareWithNearestDirt state me =
-    case GameStateManipulation.findNearestDirtWithLowestAmount me.position state.gameState of
-        Just nearestDirt ->
+    case GameStateManipulation.findSmallestAndLargestNearbyDirts me.position state.gameState of
+        Just ( lowDirt, highDirt ) ->
             Html.div [ class "prose" ]
                 [ Html.h2 [ class "text-center" ]
                     [ Html.text "No dirt or relics here!" ]
-                , Html.div [ class "flex justify-center px-8" ]
-                    [ Html.button
-                        [ class "btn btn-primary w-full"
-                        , Html.Events.onClick (ClickTarget nearestDirt)
-                        ]
-                        [ text "Move to nearest dirt" ]
-                    ]
+                , moveToDirtButtons lowDirt highDirt
                 ]
 
         Nothing ->
@@ -618,6 +612,26 @@ renderEmptySquareWithNearestDirt state me =
                 [ Html.h2 [ class "text-center" ]
                     [ Html.text "No dirt or relics nearby!" ]
                 ]
+
+
+moveToDirtButtons : DirtData -> DirtData -> Html.Html FrontendMsg
+moveToDirtButtons lowDirt highDirt =
+    Html.div [ class "flex flex-col justify-center px-8" ]
+        (if lowDirt.id == highDirt.id then
+            [ singleMoveToDirtButton lowDirt ]
+
+         else
+            [ singleMoveToDirtButton lowDirt, singleMoveToDirtButton highDirt ]
+        )
+
+
+singleMoveToDirtButton : DirtData -> Html.Html FrontendMsg
+singleMoveToDirtButton dirt =
+    Html.button
+        [ class "btn btn-primary w-full"
+        , Html.Events.onClick (ClickTarget dirt.position)
+        ]
+        [ text ("Go to dirt with " ++ String.fromInt dirt.amount ++ " left") ]
 
 
 renderRelicsOnSquare : FrontendPlayingState -> PersonData -> List GameObjectTypes.RelicData -> Html.Html FrontendMsg
