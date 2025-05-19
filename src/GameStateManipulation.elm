@@ -562,7 +562,7 @@ relicBody : Types.FrontendPlayingState -> RelicData -> PersonData -> List (Html.
 relicBody state relic me =
     let
         heldByMe =
-            isRelicHeldByPerson state.gameState relic.id state.myId
+            isRelicHeldByPerson state.backendConfirmedGameState relic.id state.myId
     in
     case relic.relicType of
         CleanFast ->
@@ -597,7 +597,7 @@ dropAndDoubleRelicBody state relic me people heldByMe =
             RelicUtil.dropDoubleCurrentExperience relic.rarity relic.exp (List.length people)
 
         playerXpMultiplier =
-            xpMultiplierForPlayer state.gameState me
+            xpMultiplierForPlayer state.backendConfirmedGameState me
 
         finalExp =
             toFloat baseExp

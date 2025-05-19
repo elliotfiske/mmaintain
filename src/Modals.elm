@@ -16,7 +16,7 @@ render state me =
     if state.showingDebugStuff then
         renderDebugModal state
 
-    else if SeqDict.size state.gameState.dirtByLocation == 0 then
+    else if SeqDict.size state.backendConfirmedGameState.dirtByLocation == 0 then
         renderVictoryModal me
 
     else
@@ -92,7 +92,7 @@ debugStuff state =
         Html.div [ class "flex flex-col" ]
             (Html.button [ Html.Events.onClick ClickedPleaseMakeMeDirty, class "btn btn-primary" ] [ text "Add Dirt" ]
                 :: debugDictsView state
-                ++ [ renderDirtDict state.gameState.dirtByLocation, renderRelicsByLocation state.gameState.relicsByLocation ]
+                ++ [ renderDirtDict state.backendConfirmedGameState.dirtByLocation, renderRelicsByLocation state.backendConfirmedGameState.relicsByLocation ]
             )
 
     else
@@ -100,15 +100,15 @@ debugStuff state =
 
 
 debugDictsView : FrontendPlayingState -> List (Html FrontendMsg)
-debugDictsView { gameState, myId } =
+debugDictsView { backendConfirmedGameState, myId } =
     Markdown.toHtml
         Nothing
         ("PersonDict: "
-            ++ String.fromInt (SeqDict.size gameState.personDict)
+            ++ String.fromInt (SeqDict.size backendConfirmedGameState.personDict)
             ++ "<br>Relics By Position Dict: "
-            ++ String.fromInt (SeqDict.size gameState.relicsByLocation)
+            ++ String.fromInt (SeqDict.size backendConfirmedGameState.relicsByLocation)
             ++ "<br>DirtDict: "
-            ++ String.fromInt (SeqDict.size gameState.dirtByLocation)
+            ++ String.fromInt (SeqDict.size backendConfirmedGameState.dirtByLocation)
             ++ "<br>MyId: "
             ++ personIdToString myId
         )

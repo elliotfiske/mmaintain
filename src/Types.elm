@@ -49,7 +49,8 @@ type alias FrontendModel =
 
 
 type alias FrontendPlayingState =
-    { gameState : GameState
+    { backendConfirmedGameState : GameState
+    , optimisticActions : List ActionOnGamestate
     , myId : PersonId
     , targetPosition : Maybe Point
     , showingDebugStuff : Bool

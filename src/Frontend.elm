@@ -257,7 +257,7 @@ moveMeTowardsMyTargetIfAny model =
 
 moveMeTowardsTargetPoint : FrontendPlayingState -> ( FrontendPlayingState, Cmd FrontendMsg )
 moveMeTowardsTargetPoint state =
-    case ( state.targetPosition, SeqDict.get state.myId state.gameState.personDict ) of
+    case ( state.targetPosition, SeqDict.get state.myId state.backendConfirmedGameState.personDict ) of
         ( Just target, Just me ) ->
             let
                 direction =
@@ -310,11 +310,12 @@ updateModelWithAction who actionOnGamestate model =
 
 updateStateWithAction : ActionPerformer -> ActionOnGamestate -> FrontendPlayingState -> FrontendPlayingState
 updateStateWithAction who action prevState =
+    -- UP NEXT: Instead of modifying the state here, add to the list of "optimistic actions".
     let
         ( newState, _ ) =
-            GameStateManipulation.executeActionOnGameState who action prevState.gameState
+            GameStateManipulation.executeActionOnGameState who action prevState.backendConfirmedGameState
     in
-    { prevState | gameState = newState }
+    { prevState | backendConfirmedGameState = newState }
         |> updateCameraPosition
 
 
@@ -376,13 +377,14 @@ updateFromBackend msg model =
 
 updatePlayingStateWithBackendStateDump : BackendToFrontendState -> FrontendPlayingState -> FrontendPlayingState
 updatePlayingStateWithBackendStateDump stateDump state =
-    { state | gameState = stateDump.gameState, myId = stateDump.myId }
+    { state | backendConfirmedGameState = stateDump.gameState, optimisticActions = [], myId = stateDump.myId }
 
 
 initFrontendPlayingState : BackendToFrontendState -> FrontendPlayingState
 initFrontendPlayingState { gameState, myId } =
-    { gameState = gameState
+    { backendConfirmedGameState = gameState
     , myId = myId
+    , optimisticActions = []
     , targetPosition = Nothing
     , showingDebugStuff = False
     , mapSize = Nothing
@@ -418,7 +420,7 @@ renderModel model =
 
 extractMyself : FrontendPlayingState -> Maybe PersonData
 extractMyself state =
-    SeqDict.get state.myId state.gameState.personDict
+    SeqDict.get state.myId state.backendConfirmedGameState.personDict
 
 
 renderPlayingState : FrontendPlayingState -> Html.Html FrontendMsg
@@ -492,7 +494,7 @@ renderCleanStrength : FrontendPlayingState -> PersonData -> Html.Html FrontendMs
 renderCleanStrength state me =
     let
         strength =
-            GameStateManipulation.cleanStrengthForPlayer state.gameState me
+            GameStateManipulation.cleanStrengthForPlayer state.backendConfirmedGameState me
     in
     Html.div [ class "w-full prose" ]
         [ Html.h3 [ class "text-center" ]
@@ -521,7 +523,7 @@ renderXPMultiplier : FrontendPlayingState -> PersonData -> Html.Html FrontendMsg
 renderXPMultiplier state me =
     let
         xpMultiplier =
-            GameStateManipulation.xpMultiplierForPlayer state.gameState me
+            GameStateManipulation.xpMultiplierForPlayer state.backendConfirmedGameState me
     in
     if xpMultiplier == 1 then
         Html.text ""
@@ -537,7 +539,7 @@ renderRelicContent : FrontendPlayingState -> PersonData -> List (Html.Html Front
 renderRelicContent state me =
     let
         myRelics =
-            GameStateManipulation.getRelicsHeldByPlayer state.myId state.gameState
+            GameStateManipulation.getRelicsHeldByPlayer state.myId state.backendConfirmedGameState
                 |> SeqDict.values
     in
     [ Html.div [ class "prose mt-8" ]
@@ -558,7 +560,7 @@ renderMobileRelicsButton : FrontendPlayingState -> PersonData -> Html.Html Front
 renderMobileRelicsButton state me =
     let
         numHeldRelics =
-            GameStateManipulation.getRelicsHeldByPlayer state.myId state.gameState
+            GameStateManipulation.getRelicsHeldByPlayer state.myId state.backendConfirmedGameState
                 |> SeqDict.size
                 |> String.fromInt
 
@@ -611,7 +613,7 @@ renderHeldRelics state me =
 
 renderEmptySquareWithNearestDirt : FrontendPlayingState -> PersonData -> Html.Html FrontendMsg
 renderEmptySquareWithNearestDirt state me =
-    case GameStateManipulation.findSmallestAndLargestNearbyDirts me.position state.gameState of
+    case GameStateManipulation.findSmallestAndLargestNearbyDirts me.position state.backendConfirmedGameState of
         Just ( lowDirt, highDirt ) ->
             Html.div [ class "prose" ]
                 [ Html.h2 [ class "text-center" ]
@@ -656,12 +658,12 @@ renderRelicsOnSquare state me relics =
 renderOnThisSquare : FrontendPlayingState -> PersonData -> Html.Html FrontendMsg
 renderOnThisSquare state me =
     Html.div [ class "order-3 md:order-none touch-manipulation overflow-y-scroll" ]
-        [ case SeqDict.get me.position state.gameState.dirtByLocation of
+        [ case SeqDict.get me.position state.backendConfirmedGameState.dirtByLocation of
             Just dirt ->
                 renderDirtOnThisSquare me dirt
 
             Nothing ->
-                case GameStateManipulation.relicsAtLocation me.position state.gameState of
+                case GameStateManipulation.relicsAtLocation me.position state.backendConfirmedGameState of
                     [] ->
                         renderEmptySquareWithNearestDirt state me
 
@@ -768,7 +770,7 @@ relicCardTitle : FrontendPlayingState -> PersonData -> GameObjectTypes.RelicData
 relicCardTitle state me relicData =
     let
         isHeldByMe =
-            GameStateManipulation.isRelicHeldByPerson state.gameState relicData.id me.id
+            GameStateManipulation.isRelicHeldByPerson state.backendConfirmedGameState relicData.id me.id
     in
     Html.div [ class "flex justify-between items-center w-full" ]
         [ Html.span []
@@ -821,12 +823,12 @@ performClean me state =
     -- TODO: You'll be back here when we implement "no dropping relics on dirt". Hello future me!
     let
         myRelicCount =
-            GameStateManipulation.getRelicsHeldByPlayer state.myId state.gameState
+            GameStateManipulation.getRelicsHeldByPlayer state.myId state.backendConfirmedGameState
                 |> SeqDict.size
     in
-    case SeqDict.get me.position state.gameState.dirtByLocation of
+    case SeqDict.get me.position state.backendConfirmedGameState.dirtByLocation of
         Nothing ->
-            case GameStateManipulation.getRarestRelicAtLocation me.position state.gameState of
+            case GameStateManipulation.getRarestRelicAtLocation me.position state.backendConfirmedGameState of
                 Nothing ->
                     GameStateNoOp
 

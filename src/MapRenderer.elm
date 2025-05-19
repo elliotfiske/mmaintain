@@ -25,7 +25,7 @@ render state me =
 
 renderPeople : FrontendPlayingState -> List (Html.Html FrontendMsg)
 renderPeople state =
-    SeqDict.values state.gameState.personDict
+    SeqDict.values state.backendConfirmedGameState.personDict
         |> List.map (personView state.cameraPosition)
 
 
@@ -52,11 +52,11 @@ getVisibleDirt state =
                 isVisible dirt =
                     isDirtVisible state.cameraPosition dirt.position viewportSize.x viewportSize.y
             in
-            SeqDict.values state.gameState.dirtByLocation
+            SeqDict.values state.backendConfirmedGameState.dirtByLocation
                 |> List.filter isVisible
 
         Nothing ->
-            SeqDict.values state.gameState.dirtByLocation
+            SeqDict.values state.backendConfirmedGameState.dirtByLocation
 
 
 renderDirt : FrontendPlayingState -> List (Html.Html FrontendMsg)
@@ -217,7 +217,7 @@ floorRelicView camera ( floorPosition, relicData ) =
 
 relicsOnFloor : FrontendPlayingState -> List ( GameObjectTypes.Point, List GameObjectTypes.RelicData )
 relicsOnFloor state =
-    SeqDict.toList state.gameState.relicsByLocation
+    SeqDict.toList state.backendConfirmedGameState.relicsByLocation
         |> List.filterMap
             (\( position, relicData ) ->
                 case position of
