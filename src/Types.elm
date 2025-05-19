@@ -1,13 +1,13 @@
 module Types exposing (..)
 
-import Browser exposing (UrlRequest)
-import Browser.Navigation exposing (Key)
 import Dict exposing (Dict)
+import Effect.Browser exposing (UrlRequest)
+import Effect.Browser.Navigation exposing (Key)
+import Effect.Lamdera exposing (ClientId, SessionId)
+import Effect.Time exposing (Posix)
 import GameObjectIds exposing (..)
 import GameObjectTypes exposing (..)
-import Lamdera exposing (ClientId, SessionId)
 import SeqDict exposing (SeqDict)
-import Time exposing (Posix)
 import Url exposing (Url)
 
 
@@ -43,7 +43,7 @@ type alias GameState =
 
 
 type alias FrontendModel =
-    { key : Key
+    { key : Effect.Browser.Navigation.Key
     , state : FrontendState
     }
 
@@ -86,14 +86,14 @@ type BackendTrigger
 
 
 type FrontendMsg
-    = UrlClicked UrlRequest
+    = UrlClicked Effect.Browser.UrlRequest
     | UrlChanged Url
     | PerformAction ActionOnGamestate
     | ClickedPleaseMakeMeDirty
     | DebugGenerateRelic
     | ActivatedRelic PersonId RelicId
     | ClickTarget Point
-    | Tick Posix
+    | Tick Effect.Time.Posix
     | ToggleDebugStuff
     | CloseModals
     | ReceivedMapSize { width : Float, height : Float }

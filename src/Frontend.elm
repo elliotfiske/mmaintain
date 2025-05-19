@@ -1,10 +1,15 @@
 port module Frontend exposing (..)
 
 import BaseUI as UI
-import Browser exposing (UrlRequest(..))
-import Browser.Dom
-import Browser.Events exposing (onKeyDown)
-import Browser.Navigation as Nav
+import Effect.Browser exposing (UrlRequest(..))
+import Effect.Browser.Dom
+import Effect.Browser.Events exposing (onKeyDown)
+import Effect.Browser.Navigation as Nav
+import Effect.Command as Command exposing (Command)
+import Effect.Lamdera
+import Effect.Subscription as Subscription exposing (Subscription)
+import Effect.Task
+import Effect.Time
 import GameObjectIds exposing (..)
 import GameObjectTypes exposing (ActionOnGamestate(..), Direction(..), DirtData, PersonData)
 import GameStateManipulation
@@ -12,7 +17,6 @@ import Html exposing (..)
 import Html.Attributes exposing (..)
 import Html.Events
 import Json.Decode as Decode
-import Lamdera
 import MapRenderer
 import Material.Icons.Outlined as Outlined
 import Material.Icons.Types as Coloring
@@ -20,8 +24,6 @@ import Modals
 import PointUtil
 import RelicUtil
 import SeqDict exposing (SeqDict)
-import Task
-import Time
 import Types exposing (..)
 import Url
 import Util
@@ -32,7 +34,7 @@ type alias Model =
 
 
 app =
-    Lamdera.frontend
+    Effect.Lamdera.frontend
         { init = init
         , onUrlRequest = UrlClicked
         , onUrlChange = UrlChanged
@@ -46,28 +48,28 @@ app =
 port receiveElementSize : ({ width : Float, height : Float } -> msg) -> Sub msg
 
 
-subscriptions : Model -> Sub FrontendMsg
+subscriptions : Model -> Subscription restriction FrontendMsg
 subscriptions model =
-    Sub.batch
-        [ onKeyDown (keyDecoder model)
+    Subscription.batch
+        [ Effect.Browser.Events.onKeyDown (keyDecoder model)
         , maybeFireEveryTick model
         , receiveElementSize ReceivedMapSize
         ]
 
 
-maybeFireEveryTick : Model -> Sub FrontendMsg
+maybeFireEveryTick : Model -> Subscription restriction FrontendMsg
 maybeFireEveryTick model =
     case model.state of
         Playing playingState ->
             case playingState.targetPosition of
                 Just _ ->
-                    Time.every 50 Tick
+                    Effect.Time.every 50 Tick
 
                 Nothing ->
-                    Sub.none
+                    Subscription.none
 
         _ ->
-            Sub.none
+            Subscription.none
 
 
 keyDecoder : Model -> Decode.Decoder FrontendMsg
@@ -135,34 +137,34 @@ handleKey state key =
             NoOpFrontendMsg
 
 
-init : Url.Url -> Nav.Key -> ( Model, Cmd FrontendMsg )
+init : Url.Url -> Effect.Browser.Navigation.Key -> ( Model, Command restriction toMsg FrontendMsg )
 init _ key =
     ( { key = key
       , state = Loading
       }
-    , Cmd.none
+    , Command.none
     )
 
 
-update : FrontendMsg -> Model -> ( Model, Cmd FrontendMsg )
+update : FrontendMsg -> Model -> ( Model, Command restriction toMsg FrontendMsg )
 update msg model =
     case msg of
         NoOpFrontendMsg ->
-            ( model, Cmd.none )
+            ( model, Command.none )
 
         UrlClicked _ ->
             -- unhandled for now (may eventually use for stuff like "join my park" links, or logging in)
-            ( model, Cmd.none )
+            ( model, Command.none )
 
         UrlChanged _ ->
             -- also unhandled
-            ( model, Cmd.none )
+            ( model, Command.none )
 
         PerformAction action ->
             let
                 -- Necessary otherwise the next "space" keypress will activate buttons unexpectedly
                 refocus =
-                    Task.attempt (\_ -> NoOpFrontendMsg) (Browser.Dom.focus "main-map")
+                    Effect.Task.attempt (\_ -> NoOpFrontendMsg) (Effect.Browser.Dom.focus "main-map")
 
                 newModel =
                     model
@@ -170,35 +172,35 @@ update msg model =
                         |> modelUpdateTarget Nothing
                         |> updateModelWithActionFromMyself action
             in
-            ( newModel, Cmd.batch [ Lamdera.sendToBackend (ClientPerformsAction action), refocus ] )
+            ( newModel, Command.batch [ Effect.Lamdera.sendToBackend (ClientPerformsAction action), refocus ] )
 
         ActivatedRelic myId relicId ->
             -- todo: set "loading" state, since this is a backend-authoritative action and it could take time
-            ( model, Lamdera.sendToBackend (PleaseActivateRelic myId relicId) )
+            ( model, Effect.Lamdera.sendToBackend (PleaseActivateRelic myId relicId) )
 
         ClickedPleaseMakeMeDirty ->
-            ( model, Lamdera.sendToBackend PleaseMakeMeDirty )
+            ( model, Effect.Lamdera.sendToBackend PleaseMakeMeDirty )
 
         DebugGenerateRelic ->
-            ( model, Lamdera.sendToBackend PleaseGenerateRelic )
+            ( model, Effect.Lamdera.sendToBackend PleaseGenerateRelic )
 
         Tick _ ->
             moveMeTowardsMyTargetIfAny model
 
         ClickTarget point ->
-            ( modelUpdateTarget (Just point) model, Cmd.none )
+            ( modelUpdateTarget (Just point) model, Command.none )
 
         ToggleDebugStuff ->
-            ( modelUpdateIfPlaying toggleDebugStuff model, Cmd.none )
+            ( modelUpdateIfPlaying toggleDebugStuff model, Command.none )
 
         CloseModals ->
-            ( modelUpdateIfPlaying closeModals model, Cmd.none )
+            ( modelUpdateIfPlaying closeModals model, Command.none )
 
         ToggleMobileRelicMenu ->
-            ( modelUpdateIfPlaying toggleMobileRelicMenu model, Cmd.none )
+            ( modelUpdateIfPlaying toggleMobileRelicMenu model, Command.none )
 
         ReceivedMapSize size ->
-            ( modelUpdateIfPlaying (\state -> { state | mapSize = Just size } |> updateCameraPosition) model, Cmd.none )
+            ( modelUpdateIfPlaying (\state -> { state | mapSize = Just size } |> updateCameraPosition) model, Command.none )
 
 
 toggleDebugStuff : FrontendPlayingState -> FrontendPlayingState
@@ -236,13 +238,13 @@ modelUpdateTarget maybePoint model =
             model
 
 
-moveMeTowardsMyTargetIfAny : Model -> ( Model, Cmd FrontendMsg )
+moveMeTowardsMyTargetIfAny : Model -> ( Model, Command restriction toMsg FrontendMsg )
 moveMeTowardsMyTargetIfAny model =
     case model.state of
         Playing state ->
             case state.targetPosition of
                 Nothing ->
-                    ( model, Cmd.none )
+                    ( model, Command.none )
 
                 Just _ ->
                     let
@@ -252,10 +254,10 @@ moveMeTowardsMyTargetIfAny model =
                     ( { model | state = Playing newState }, cmd )
 
         _ ->
-            ( model, Cmd.none )
+            ( model, Command.none )
 
 
-moveMeTowardsTargetPoint : FrontendPlayingState -> ( FrontendPlayingState, Cmd FrontendMsg )
+moveMeTowardsTargetPoint : FrontendPlayingState -> ( FrontendPlayingState, Command restriction toMsg FrontendMsg )
 moveMeTowardsTargetPoint state =
     case ( state.targetPosition, SeqDict.get state.myId state.backendConfirmedGameState.personDict ) of
         ( Just target, Just me ) ->
@@ -268,17 +270,17 @@ moveMeTowardsTargetPoint state =
                     let
                         ( newState, action ) =
                             ( updateStateWithAction (Client state.myId) (MovePerson state.myId dir) state
-                            , Lamdera.sendToBackend (ClientPerformsAction (MovePerson state.myId dir))
+                            , Effect.Lamdera.sendToBackend (ClientPerformsAction (MovePerson state.myId dir))
                             )
                     in
                     ( newState, action )
 
                 Nothing ->
                     -- we're already at the target
-                    ( { state | targetPosition = Nothing }, Cmd.none )
+                    ( { state | targetPosition = Nothing }, Command.none )
 
         _ ->
-            ( state, Cmd.none )
+            ( state, Command.none )
 
 
 updateModelWithActionFromMyself : ActionOnGamestate -> Model -> Model
@@ -349,11 +351,11 @@ updateCameraPositionWithPlayer state me mapSizePixels =
     }
 
 
-updateFromBackend : ToFrontend -> Model -> ( Model, Cmd FrontendMsg )
+updateFromBackend : ToFrontend -> Model -> ( Model, Command restriction toMsg FrontendMsg )
 updateFromBackend msg model =
     case msg of
         NoOpToFrontend ->
-            ( model, Cmd.none )
+            ( model, Command.none )
 
         UpdateFullState stateDump ->
             let
@@ -369,10 +371,10 @@ updateFromBackend msg model =
                         Playing playingState ->
                             Playing (updatePlayingStateWithBackendStateDump stateDump playingState)
             in
-            ( { model | state = newState }, Cmd.none )
+            ( { model | state = newState }, Command.none )
 
         OtherClientPerformedAction who action ->
-            ( updateModelWithAction who action model, Cmd.none )
+            ( updateModelWithAction who action model, Command.none )
 
 
 updatePlayingStateWithBackendStateDump : BackendToFrontendState -> FrontendPlayingState -> FrontendPlayingState
@@ -394,7 +396,7 @@ initFrontendPlayingState { gameState, myId } =
         |> updateCameraPosition
 
 
-view : Model -> Browser.Document FrontendMsg
+view : Model -> Effect.Browser.Document FrontendMsg
 view model =
     { title = "mmaintain"
     , body =
