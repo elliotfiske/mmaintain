@@ -1,11 +1,12 @@
 port module Frontend exposing (..)
 
 import BaseUI as UI
-import Effect.Browser exposing (UrlRequest(..))
+import Duration
+import Effect.Browser exposing (UrlRequest)
 import Effect.Browser.Dom
 import Effect.Browser.Events exposing (onKeyDown)
-import Effect.Browser.Navigation as Nav
-import Effect.Command as Command exposing (Command)
+import Effect.Browser.Navigation
+import Effect.Command as Command exposing (Command, FrontendOnly)
 import Effect.Lamdera
 import Effect.Subscription as Subscription exposing (Subscription)
 import Effect.Task
@@ -17,6 +18,8 @@ import Html exposing (..)
 import Html.Attributes exposing (..)
 import Html.Events
 import Json.Decode as Decode
+import Json.Encode as Encode
+import Lamdera
 import MapRenderer
 import Material.Icons.Outlined as Outlined
 import Material.Icons.Types as Coloring
@@ -35,6 +38,7 @@ type alias Model =
 
 app =
     Effect.Lamdera.frontend
+        Lamdera.sendToBackend
         { init = init
         , onUrlRequest = UrlClicked
         , onUrlChange = UrlChanged
@@ -45,25 +49,25 @@ app =
         }
 
 
-port receiveElementSize : ({ width : Float, height : Float } -> msg) -> Sub msg
+port receiveElementSize : (Decode.Value -> msg) -> Sub msg
 
 
-subscriptions : Model -> Subscription restriction FrontendMsg
+subscriptions : Model -> Subscription FrontendOnly FrontendMsg
 subscriptions model =
     Subscription.batch
         [ Effect.Browser.Events.onKeyDown (keyDecoder model)
         , maybeFireEveryTick model
-        , receiveElementSize ReceivedMapSize
+        , Subscription.fromJs "receiveElementSize" receiveElementSize ReceivedMapSize
         ]
 
 
-maybeFireEveryTick : Model -> Subscription restriction FrontendMsg
+maybeFireEveryTick : Model -> Subscription FrontendOnly FrontendMsg
 maybeFireEveryTick model =
     case model.state of
         Playing playingState ->
             case playingState.targetPosition of
                 Just _ ->
-                    Effect.Time.every 50 Tick
+                    Effect.Time.every (Duration.milliseconds 50) Tick
 
                 Nothing ->
                     Subscription.none
@@ -146,7 +150,7 @@ init _ key =
     )
 
 
-update : FrontendMsg -> Model -> ( Model, Command restriction toMsg FrontendMsg )
+update : FrontendMsg -> Model -> ( Model, Command FrontendOnly ToBackend FrontendMsg )
 update msg model =
     case msg of
         NoOpFrontendMsg ->
@@ -164,7 +168,7 @@ update msg model =
             let
                 -- Necessary otherwise the next "space" keypress will activate buttons unexpectedly
                 refocus =
-                    Effect.Task.attempt (\_ -> NoOpFrontendMsg) (Effect.Browser.Dom.focus "main-map")
+                    Effect.Task.attempt (\_ -> NoOpFrontendMsg) (Effect.Browser.Dom.focus (Effect.Browser.Dom.id "main-map"))
 
                 newModel =
                     model
@@ -199,8 +203,22 @@ update msg model =
         ToggleMobileRelicMenu ->
             ( modelUpdateIfPlaying toggleMobileRelicMenu model, Command.none )
 
-        ReceivedMapSize size ->
-            ( modelUpdateIfPlaying (\state -> { state | mapSize = Just size } |> updateCameraPosition) model, Command.none )
+        ReceivedMapSize sizeValue ->
+            let
+                sizeResult =
+                    Decode.decodeValue
+                        (Decode.map2 (\w h -> { width = w, height = h })
+                            (Decode.field "width" Decode.float)
+                            (Decode.field "height" Decode.float)
+                        )
+                        sizeValue
+            in
+            case sizeResult of
+                Ok size ->
+                    ( modelUpdateIfPlaying (\state -> { state | mapSize = Just size } |> updateCameraPosition) model, Command.none )
+
+                Err _ ->
+                    ( { model | state = Error ("Failed to decode map size. Input: " ++ Encode.encode 0 sizeValue) }, Command.none )
 
 
 toggleDebugStuff : FrontendPlayingState -> FrontendPlayingState
@@ -238,7 +256,7 @@ modelUpdateTarget maybePoint model =
             model
 
 
-moveMeTowardsMyTargetIfAny : Model -> ( Model, Command restriction toMsg FrontendMsg )
+moveMeTowardsMyTargetIfAny : Model -> ( Model, Command FrontendOnly ToBackend FrontendMsg )
 moveMeTowardsMyTargetIfAny model =
     case model.state of
         Playing state ->
@@ -257,7 +275,7 @@ moveMeTowardsMyTargetIfAny model =
             ( model, Command.none )
 
 
-moveMeTowardsTargetPoint : FrontendPlayingState -> ( FrontendPlayingState, Command restriction toMsg FrontendMsg )
+moveMeTowardsTargetPoint : FrontendPlayingState -> ( FrontendPlayingState, Command FrontendOnly ToBackend FrontendMsg )
 moveMeTowardsTargetPoint state =
     case ( state.targetPosition, SeqDict.get state.myId state.backendConfirmedGameState.personDict ) of
         ( Just target, Just me ) ->

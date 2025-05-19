@@ -7,6 +7,7 @@ import Effect.Lamdera exposing (ClientId, SessionId)
 import Effect.Time exposing (Posix)
 import GameObjectIds exposing (..)
 import GameObjectTypes exposing (..)
+import Json.Decode as Decode
 import SeqDict exposing (SeqDict)
 import Url exposing (Url)
 
@@ -73,7 +74,7 @@ type FrontendState
 type alias BackendModel =
     { gameState : GameState
     , connectedClients : List ClientId
-    , sessionIdToPersonId : Dict SessionId PersonId
+    , sessionIdToPersonId : SeqDict SessionId PersonId
     , biggestId : Int
     , bigRandom : Int
     }
@@ -96,7 +97,7 @@ type FrontendMsg
     | Tick Effect.Time.Posix
     | ToggleDebugStuff
     | CloseModals
-    | ReceivedMapSize { width : Float, height : Float }
+    | ReceivedMapSize Decode.Value
     | ToggleMobileRelicMenu
     | NoOpFrontendMsg
 

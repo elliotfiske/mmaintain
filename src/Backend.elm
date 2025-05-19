@@ -1,16 +1,17 @@
 module Backend exposing (app)
 
-import Dict
-import Effect.Command as Command exposing (Command)
+import Effect.Command as Command exposing (BackendOnly, Command)
 import Effect.Lamdera
 import Effect.Subscription as Subscription exposing (Subscription)
 import GameObjectIds exposing (..)
 import GameObjectTypes exposing (ActionOnGamestate(..))
 import GameState
 import GameStateManipulation exposing (executeActionOnGameState)
+import Lamdera
 import List
 import PersonUtil
 import RelicUtil
+import SeqDict exposing (SeqDict)
 import SeqSet
 import Types exposing (..)
 import Util
@@ -22,14 +23,20 @@ type alias Model =
 
 app =
     Effect.Lamdera.backend
-        { init = init
-        , update = update
-        , updateFromFrontend = updateFromFrontend
-        , subscriptions = subscriptions
-        }
+        Lamdera.broadcast
+        Lamdera.sendToFrontend
+        app_
 
 
-subscriptions : a -> Subscription restriction BackendMsg
+app_ =
+    { init = init
+    , update = update
+    , updateFromFrontend = updateFromFrontend
+    , subscriptions = subscriptions
+    }
+
+
+subscriptions : Model -> Subscription BackendOnly BackendMsg
 subscriptions _ =
     Subscription.batch
         [ Effect.Lamdera.onConnect ClientConnected
@@ -37,10 +44,10 @@ subscriptions _ =
         ]
 
 
-init : ( Model, Command restriction toMsg BackendMsg )
+init : ( Model, Command BackendOnly ToFrontend BackendMsg )
 init =
     ( { connectedClients = []
-      , sessionIdToPersonId = Dict.empty
+      , sessionIdToPersonId = SeqDict.empty
       , gameState = GameState.empty
       , biggestId = 0
       , bigRandom = 46296
@@ -49,7 +56,7 @@ init =
     )
 
 
-update : BackendMsg -> Model -> ( Model, Command restriction toMsg BackendMsg )
+update : BackendMsg -> Model -> ( Model, Command BackendOnly ToFrontend BackendMsg )
 update msg model =
     case msg of
         NoOpBackendMsg ->
@@ -62,7 +69,7 @@ update msg model =
             ( { model | connectedClients = List.filter (\c -> c /= clientId) model.connectedClients }, Command.none )
 
 
-handleClientConnected : Lamdera.SessionId -> Lamdera.ClientId -> Model -> ( Model, Command restriction toMsg BackendMsg )
+handleClientConnected : Effect.Lamdera.SessionId -> Effect.Lamdera.ClientId -> Model -> ( Model, Command BackendOnly ToFrontend BackendMsg )
 handleClientConnected sessionId clientId model =
     let
         ( newModel, newPersonCmd, personId ) =
@@ -71,7 +78,7 @@ handleClientConnected sessionId clientId model =
         updatedModel =
             { newModel
                 | connectedClients = clientId :: newModel.connectedClients
-                , sessionIdToPersonId = Dict.insert sessionId personId newModel.sessionIdToPersonId
+                , sessionIdToPersonId = SeqDict.insert sessionId personId newModel.sessionIdToPersonId
             }
 
         newState : BackendToFrontendState
@@ -86,9 +93,9 @@ handleClientConnected sessionId clientId model =
     ( updatedModel, Command.batch [ newPersonCmd, dumpStateToNewClientCmd ] )
 
 
-createPersonIfNeeded : Lamdera.SessionId -> Lamdera.ClientId -> Model -> ( Model, Command restriction toMsg BackendMsg, PersonId )
+createPersonIfNeeded : Effect.Lamdera.SessionId -> Effect.Lamdera.ClientId -> Model -> ( Model, Command BackendOnly ToFrontend BackendMsg, PersonId )
 createPersonIfNeeded sessionId clientId model =
-    case Dict.get sessionId model.sessionIdToPersonId of
+    case SeqDict.get sessionId model.sessionIdToPersonId of
         Just existingPersonId ->
             ( model, Command.none, existingPersonId )
 
@@ -96,7 +103,7 @@ createPersonIfNeeded sessionId clientId model =
             createPerson clientId model
 
 
-createPerson : Lamdera.ClientId -> Model -> ( Model, Command restriction toMsg BackendMsg, PersonId )
+createPerson : Effect.Lamdera.ClientId -> Model -> ( Model, Command BackendOnly ToFrontend BackendMsg, PersonId )
 createPerson clientId model =
     let
         ( newPersonId, incModel ) =
@@ -121,7 +128,7 @@ type alias CreateDirtArgs =
     { point : GameObjectTypes.Point, amount : Int }
 
 
-createDirt : CreateDirtArgs -> Model -> ( Model, Command restriction toMsg BackendMsg )
+createDirt : CreateDirtArgs -> Model -> ( Model, Command BackendOnly ToFrontend BackendMsg )
 createDirt args model =
     let
         ( newId, incrementedModel ) =
@@ -137,7 +144,7 @@ createDirt args model =
     ( finalModel, Effect.Lamdera.broadcast (OtherClientPerformedAction Server (AddDirt newDirt)) )
 
 
-handleClientPerformedAction : PersonId -> Lamdera.ClientId -> ActionOnGamestate -> Model -> ( Model, Command restriction toMsg BackendMsg )
+handleClientPerformedAction : PersonId -> Effect.Lamdera.ClientId -> ActionOnGamestate -> Model -> ( Model, Command BackendOnly ToFrontend BackendMsg )
 handleClientPerformedAction personId clientId actionOnGamestate model =
     let
         ( newGameState, trigger ) =
@@ -163,7 +170,7 @@ handleClientPerformedAction personId clientId actionOnGamestate model =
     )
 
 
-updateFromFrontend : Lamdera.SessionId -> Lamdera.ClientId -> ToBackend -> Model -> ( Model, Command restriction toMsg BackendMsg )
+updateFromFrontend : Effect.Lamdera.SessionId -> Effect.Lamdera.ClientId -> ToBackend -> Model -> ( Model, Command BackendOnly ToFrontend BackendMsg )
 updateFromFrontend sessionId clientId msg model =
     -- todo: currently we allow anybody to do anything. Need to check "legality" of action (a client could
     -- currently move other characters, for instance)
@@ -174,7 +181,7 @@ updateFromFrontend sessionId clientId msg model =
         ClientPerformsAction actionOnGamestate ->
             let
                 maybePersonId =
-                    Dict.get sessionId model.sessionIdToPersonId
+                    SeqDict.get sessionId model.sessionIdToPersonId
             in
             case maybePersonId of
                 Nothing ->
@@ -316,7 +323,7 @@ addRelic position relicType rarity model =
     ( incModel, AddRelic newRelic position )
 
 
-debugAddRelic : Model -> ( Model, Command restriction toMsg BackendMsg )
+debugAddRelic : Model -> ( Model, Command BackendOnly ToFrontend BackendMsg )
 debugAddRelic model =
     let
         ( newId, incModel ) =
@@ -342,7 +349,7 @@ debugAddRelic model =
     ( newModel, Effect.Lamdera.broadcast (OtherClientPerformedAction Server action) )
 
 
-addSomeDirt : Model -> ( Model, Command restriction toMsg BackendMsg )
+addSomeDirt : Model -> ( Model, Command BackendOnly ToFrontend BackendMsg )
 addSomeDirt model =
     List.foldl andThenAddDirtToSpot
         ( model, Command.none )
@@ -355,7 +362,7 @@ addSomeDirt model =
         )
 
 
-andThenAddDirtToSpot : GameObjectTypes.Point -> ( Model, Command restriction toMsg BackendMsg ) -> ( Model, Command restriction toMsg BackendMsg )
+andThenAddDirtToSpot : GameObjectTypes.Point -> ( Model, Command BackendOnly ToFrontend BackendMsg ) -> ( Model, Command BackendOnly ToFrontend BackendMsg )
 andThenAddDirtToSpot point ( model, msg ) =
     let
         ( randomValue, newModel ) =
@@ -380,7 +387,7 @@ getAndIncrementBiggestId model =
     ( model.biggestId, { model | biggestId = model.biggestId + 1 } )
 
 
-forwardToEveryoneButMe : ActionOnGamestate -> ActionPerformer -> Lamdera.ClientId -> Model -> Command restriction toMsg BackendMsg
+forwardToEveryoneButMe : ActionOnGamestate -> ActionPerformer -> Effect.Lamdera.ClientId -> Model -> Command BackendOnly ToFrontend BackendMsg
 forwardToEveryoneButMe action performer myClientId model =
     model.connectedClients
         |> List.filter (\c -> c /= myClientId)
@@ -414,7 +421,7 @@ getRandomValue model =
     ( model.bigRandom, { model | bigRandom = nextRandom } )
 
 
-andThenModel : (Model -> ( Model, Command restriction toMsg msg )) -> ( Model, Command restriction toMsg msg ) -> ( Model, Command restriction toMsg msg )
+andThenModel : (Model -> ( Model, Command BackendOnly ToFrontend BackendMsg )) -> ( Model, Command BackendOnly ToFrontend BackendMsg ) -> ( Model, Command BackendOnly ToFrontend BackendMsg )
 andThenModel updateFunc ( model, cmd ) =
     let
         ( newModel, newCmd ) =
