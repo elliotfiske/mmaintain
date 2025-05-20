@@ -39,14 +39,18 @@ type alias Model =
 app =
     Effect.Lamdera.frontend
         Lamdera.sendToBackend
-        { init = init
-        , onUrlRequest = UrlClicked
-        , onUrlChange = UrlChanged
-        , update = update
-        , updateFromBackend = updateFromBackend
-        , subscriptions = subscriptions
-        , view = view
-        }
+        app_
+
+
+app_ =
+    { init = init
+    , onUrlRequest = UrlClicked
+    , onUrlChange = UrlChanged
+    , update = update
+    , updateFromBackend = updateFromBackend
+    , subscriptions = subscriptions
+    , view = view
+    }
 
 
 port receiveElementSize : (Decode.Value -> msg) -> Sub msg
