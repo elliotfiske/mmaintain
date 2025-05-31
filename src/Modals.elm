@@ -93,7 +93,6 @@ debugStuff state =
         Html.div [ class "flex flex-col" ]
             (Html.button [ Html.Events.onClick ClickedPleaseMakeMeDirty, class "btn btn-primary" ] [ text "Add Dirt" ]
                 :: debugDictsView state
-                ++ [ renderDirtDict state.backendConfirmedGameState.dirtByLocation, renderRelicsByLocation state.backendConfirmedGameState.relicsByLocation ]
             )
 
     else
@@ -113,19 +112,3 @@ debugDictsView { backendConfirmedGameState, myId } =
             ++ "<br>MyId: "
             ++ personIdToString myId
         )
-
-
-renderDirtDict : DirtByLocation -> Html FrontendMsg
-renderDirtDict dirtDict =
-    Html.div []
-        [ text "Dirt Dict: "
-        , Html.pre [ class "whitespace-pre-wrap" ] [ Html.text (Debug.toString dirtDict) ]
-        ]
-
-
-renderRelicsByLocation : RelicsByLocation -> Html FrontendMsg
-renderRelicsByLocation relicsByLocation =
-    Html.div []
-        [ text "Relics By Location: "
-        , Html.pre [ class "whitespace-pre-wrap" ] [ Html.text (Debug.toString relicsByLocation) ]
-        ]
