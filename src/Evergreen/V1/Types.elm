@@ -1,43 +1,38 @@
 module Evergreen.V1.Types exposing (..)
 
-import Browser
-import Browser.Navigation
-import Dict
-import Evergreen.V1.DirtDict
+import Effect.Browser
+import Effect.Browser.Navigation
+import Effect.Lamdera
+import Effect.Time
+import Evergreen.V1.GameObjectIds
 import Evergreen.V1.GameObjectTypes
-import Evergreen.V1.PersonDict
-import Evergreen.V1.RelicDict
-import Lamdera
-import Time
+import SeqDict
 import Url
 
 
-type alias RealDirtDict =
-    Evergreen.V1.DirtDict.DirtDict Evergreen.V1.GameObjectTypes.DirtData
-
-
-type alias RelicLocation =
-    ( Int, Int, Int )
-
-
 type alias RealRelicDict =
-    Evergreen.V1.RelicDict.RelicDict Evergreen.V1.GameObjectTypes.RelicData
+    SeqDict.SeqDict Evergreen.V1.GameObjectIds.RelicId Evergreen.V1.GameObjectTypes.RelicData
 
 
 type alias RelicsByLocation =
-    Dict.Dict RelicLocation RealRelicDict
+    SeqDict.SeqDict Evergreen.V1.GameObjectTypes.RelicPosition RealRelicDict
+
+
+type alias DirtByLocation =
+    SeqDict.SeqDict Evergreen.V1.GameObjectTypes.Point Evergreen.V1.GameObjectTypes.DirtData
 
 
 type alias GameState =
-    { personDict : Evergreen.V1.PersonDict.PersonDict Evergreen.V1.GameObjectTypes.PersonData
-    , dirtDict : RealDirtDict
+    { personDict : SeqDict.SeqDict Evergreen.V1.GameObjectIds.PersonId Evergreen.V1.GameObjectTypes.PersonData
     , relicsByLocation : RelicsByLocation
+    , dirtByLocation : DirtByLocation
     }
 
 
 type alias FrontendPlayingState =
-    { gameState : GameState
-    , myId : Evergreen.V1.GameObjectTypes.PersonId
+    { backendConfirmedGameState : GameState
+    , optimisticActions : List Evergreen.V1.GameObjectTypes.ActionOnGamestate
+    , myId : Evergreen.V1.GameObjectIds.PersonId
     , targetPosition : Maybe Evergreen.V1.GameObjectTypes.Point
     , showingDebugStuff : Bool
     , mapSize :
@@ -57,30 +52,31 @@ type FrontendState
 
 
 type alias FrontendModel =
-    { key : Browser.Navigation.Key
+    { key : Effect.Browser.Navigation.Key
     , state : FrontendState
     }
 
 
 type alias BackendModel =
     { gameState : GameState
-    , connectedClients : List Lamdera.ClientId
-    , sessionIdToPersonId : Dict.Dict Lamdera.SessionId Evergreen.V1.GameObjectTypes.PersonId
+    , connectedClients : List Effect.Lamdera.ClientId
+    , sessionIdToPersonId : SeqDict.SeqDict Effect.Lamdera.SessionId Evergreen.V1.GameObjectIds.PersonId
     , biggestId : Int
     , bigRandom : Int
     }
 
 
 type FrontendMsg
-    = UrlClicked Browser.UrlRequest
+    = UrlClicked Effect.Browser.UrlRequest
     | UrlChanged Url.Url
     | PerformAction Evergreen.V1.GameObjectTypes.ActionOnGamestate
     | ClickedPleaseMakeMeDirty
     | DebugGenerateRelic
-    | ActivatedRelic Evergreen.V1.GameObjectTypes.PersonId Evergreen.V1.GameObjectTypes.RelicId
+    | ActivatedRelic Evergreen.V1.GameObjectIds.PersonId Evergreen.V1.GameObjectIds.RelicId
     | ClickTarget Evergreen.V1.GameObjectTypes.Point
-    | Tick Time.Posix
+    | Tick Effect.Time.Posix
     | ToggleDebugStuff
+    | CloseModals
     | ReceivedMapSize
         { width : Float
         , height : Float
@@ -94,23 +90,23 @@ type ToBackend
     | ClientPerformsAction Evergreen.V1.GameObjectTypes.ActionOnGamestate
     | PleaseMakeMeDirty
     | PleaseGenerateRelic
-    | PleaseActivateRelic Evergreen.V1.GameObjectTypes.PersonId Evergreen.V1.GameObjectTypes.RelicId
+    | PleaseActivateRelic Evergreen.V1.GameObjectIds.PersonId Evergreen.V1.GameObjectIds.RelicId
 
 
 type BackendMsg
     = NoOpBackendMsg
-    | ClientConnected Lamdera.SessionId Lamdera.ClientId
-    | ClientDisconnected Lamdera.SessionId Lamdera.ClientId
+    | ClientConnected Effect.Lamdera.SessionId Effect.Lamdera.ClientId
+    | ClientDisconnected Effect.Lamdera.SessionId Effect.Lamdera.ClientId
 
 
 type ActionPerformer
-    = Client Evergreen.V1.GameObjectTypes.PersonId
+    = Client Evergreen.V1.GameObjectIds.PersonId
     | Server
 
 
 type alias BackendToFrontendState =
     { gameState : GameState
-    , myId : Evergreen.V1.GameObjectTypes.PersonId
+    , myId : Evergreen.V1.GameObjectIds.PersonId
     }
 
 

@@ -1,4 +1,4 @@
-module Evergreen.V6.GameObjectIds exposing (..)
+module Evergreen.V1.GameObjectIds exposing (..)
 
 
 type PersonId

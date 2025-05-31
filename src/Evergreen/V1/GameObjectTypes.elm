@@ -1,8 +1,7 @@
 module Evergreen.V1.GameObjectTypes exposing (..)
 
-
-type PersonId
-    = PersonId Int
+import Evergreen.V1.GameObjectIds
+import SeqSet
 
 
 type alias Point =
@@ -18,7 +17,7 @@ type alias PersonStats =
 
 
 type alias PersonData =
-    { id : PersonId
+    { id : Evergreen.V1.GameObjectIds.PersonId
     , name : String
     , experience : Int
     , position : Point
@@ -26,25 +25,17 @@ type alias PersonData =
     }
 
 
-type DirtId
-    = DirtId Int
-
-
-type alias DirtData =
-    { id : DirtId
-    , amount : Int
-    , position : Point
-    }
-
-
-type RelicId
-    = RelicId Int
+type RelicPosition
+    = HeldBy Evergreen.V1.GameObjectIds.PersonId
+    | OnFloor Point
 
 
 type RelicType
     = CleanFast
     | MoreXP
-    | DropAndDouble (List PersonId)
+    | DropAndDouble (List Evergreen.V1.GameObjectIds.PersonId)
+    | SplashBucket
+    | GuestBook (SeqSet.SeqSet Evergreen.V1.GameObjectIds.PersonId)
 
 
 type RelicRarity
@@ -56,10 +47,17 @@ type RelicRarity
 
 
 type alias RelicData =
-    { id : RelicId
+    { id : Evergreen.V1.GameObjectIds.RelicId
     , relicType : RelicType
     , rarity : RelicRarity
     , exp : Int
+    }
+
+
+type alias DirtData =
+    { id : Evergreen.V1.GameObjectIds.DirtId
+    , amount : Int
+    , position : Point
     }
 
 
@@ -75,12 +73,13 @@ type Direction
 
 
 type ActionOnGamestate
-    = MovePerson PersonId Direction
-    | Clean PersonId DirtId
+    = MovePerson Evergreen.V1.GameObjectIds.PersonId Direction
+    | Clean Evergreen.V1.GameObjectIds.PersonId Point
     | AddDirt DirtData
     | AddRelic RelicData Point
     | AddPerson PersonData
-    | PickUpRelic RelicId PersonId
-    | DropRelic RelicId PersonId
-    | ActivateGenerosityTrap PersonId RelicId Int
+    | PickUpRelic Evergreen.V1.GameObjectIds.RelicId Evergreen.V1.GameObjectIds.PersonId
+    | DropRelic Evergreen.V1.GameObjectIds.RelicId Evergreen.V1.GameObjectIds.PersonId
+    | ActivateGenerosityTrap Evergreen.V1.GameObjectIds.PersonId Evergreen.V1.GameObjectIds.RelicId Int
+    | BatchAction (List ActionOnGamestate)
     | GameStateNoOp
