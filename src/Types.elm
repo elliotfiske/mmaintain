@@ -1,6 +1,6 @@
 module Types exposing (..)
 
-import Effect.Browser
+import Browser exposing (UrlRequest)
 import Effect.Browser.Navigation
 import Effect.Lamdera exposing (ClientId, SessionId)
 import Effect.Time
@@ -77,7 +77,7 @@ type BackendTrigger
 
 
 type FrontendMsg
-    = UrlClicked Effect.Browser.UrlRequest
+    = UrlClicked UrlRequest
     | UrlChanged Url
     | PerformAction ActionOnGamestate
     | ClickedPleaseMakeMeDirty

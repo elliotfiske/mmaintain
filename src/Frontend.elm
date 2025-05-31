@@ -2,7 +2,6 @@ port module Frontend exposing (..)
 
 import BaseUI as UI
 import Duration
-import Effect.Browser exposing (UrlRequest)
 import Effect.Browser.Dom
 import Effect.Browser.Events exposing (onKeyDown)
 import Effect.Browser.Navigation
@@ -18,7 +17,6 @@ import Html exposing (..)
 import Html.Attributes exposing (..)
 import Html.Events
 import Json.Decode as Decode
-import Json.Encode as Encode
 import Lamdera
 import MapRenderer
 import Material.Icons.Outlined as Outlined
@@ -26,7 +24,7 @@ import Material.Icons.Types as Coloring
 import Modals
 import PointUtil
 import RelicUtil
-import SeqDict exposing (SeqDict)
+import SeqDict
 import Types exposing (..)
 import Url
 import Util
@@ -421,7 +419,7 @@ initFrontendPlayingState { gameState, myId } =
         |> updateCameraPosition
 
 
-view : Model -> Effect.Browser.Document FrontendMsg
+view : Model -> { title : String, body : List (Html FrontendMsg) }
 view model =
     { title = "mmaintain"
     , body =
