@@ -59,6 +59,7 @@ port receiveElementSize : (Decode.Value -> msg) -> Sub msg
 subscriptions : Model -> Subscription FrontendOnly FrontendMsg
 subscriptions model =
     Subscription.batch
+        -- TODO: move key listening to the `main-map` element
         [ Effect.Browser.Events.onKeyDown (keyDecoder model)
         , maybeFireEveryTick model
         , Subscription.fromJs "receiveElementSize" receiveElementSize ReceivedMapSize

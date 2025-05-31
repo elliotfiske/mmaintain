@@ -38,6 +38,23 @@ tests =
                 ]
             )
         ]
+    , Effect.Test.start
+        "Check client desync behavior"
+        (Effect.Time.millisToPosix 0)
+        config
+        [ Effect.Test.connectFrontend
+            1000
+            (Effect.Lamdera.sessionIdFromString "sessionId0")
+            "/"
+            { width = 800, height = 600 }
+            (\client1 ->
+                [ client1.click 100 (Dom.id "add-dirt-button")
+                , client1.keyDown 100 (Dom.id "main-map") "`" []
+                , client1.keyDown 100 (Dom.id "main-map") "r" []
+                , client1.keyDown 100 (Dom.id "main-map") "`" []
+                ]
+            )
+        ]
     ]
 
 

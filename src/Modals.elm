@@ -81,6 +81,7 @@ renderVictoryActions : Html FrontendMsg
 renderVictoryActions =
     button
         [ class "btn btn-primary"
+        , id "add-dirt-button"
         , Html.Events.onClick ClickedPleaseMakeMeDirty
         ]
         [ text "I'M NOT DONE, ADD MORE DIRT!" ]
