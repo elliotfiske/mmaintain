@@ -62,8 +62,24 @@ subscriptions model =
         -- TODO: move key listening to the `main-map` element
         [ Effect.Browser.Events.onKeyDown (keyDecoder model)
         , maybeFireEveryTick model
-        , Subscription.fromJs "receiveElementSize" receiveElementSize ReceivedMapSize
+        , Subscription.fromJs "receiveElementSize"
+            receiveElementSize
+            (\value ->
+                case Decode.decodeValue mapSizeDecoder value of
+                    Ok size ->
+                        ReceivedMapSize size
+
+                    Err _ ->
+                        NoOpFrontendMsg
+            )
         ]
+
+
+mapSizeDecoder : Decode.Decoder { width : Float, height : Float }
+mapSizeDecoder =
+    Decode.map2 (\w h -> { width = w, height = h })
+        (Decode.field "width" Decode.float)
+        (Decode.field "height" Decode.float)
 
 
 maybeFireEveryTick : Model -> Subscription FrontendOnly FrontendMsg
@@ -208,22 +224,8 @@ update msg model =
         ToggleMobileRelicMenu ->
             ( modelUpdateIfPlaying toggleMobileRelicMenu model, Command.none )
 
-        ReceivedMapSize sizeValue ->
-            let
-                sizeResult =
-                    Decode.decodeValue
-                        (Decode.map2 (\w h -> { width = w, height = h })
-                            (Decode.field "width" Decode.float)
-                            (Decode.field "height" Decode.float)
-                        )
-                        sizeValue
-            in
-            case sizeResult of
-                Ok size ->
-                    ( modelUpdateIfPlaying (\state -> { state | mapSize = Just size } |> updateCameraPosition) model, Command.none )
-
-                Err _ ->
-                    ( { model | state = Error ("Failed to decode map size. Input: " ++ Encode.encode 0 sizeValue) }, Command.none )
+        ReceivedMapSize size ->
+            ( modelUpdateIfPlaying (\state -> { state | mapSize = Just size } |> updateCameraPosition) model, Command.none )
 
 
 toggleDebugStuff : FrontendPlayingState -> FrontendPlayingState

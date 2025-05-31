@@ -97,7 +97,7 @@ type FrontendMsg
     | Tick Effect.Time.Posix
     | ToggleDebugStuff
     | CloseModals
-    | ReceivedMapSize Decode.Value
+    | ReceivedMapSize { width : Float, height : Float }
     | ToggleMobileRelicMenu
     | NoOpFrontendMsg
 
