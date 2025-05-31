@@ -10,12 +10,12 @@ import SeqDict
 import Url
 
 
-type alias RealRelicDict =
+type alias RelicsById =
     SeqDict.SeqDict Evergreen.V1.GameObjectIds.RelicId Evergreen.V1.GameObjectTypes.RelicData
 
 
 type alias RelicsByLocation =
-    SeqDict.SeqDict Evergreen.V1.GameObjectTypes.RelicPosition RealRelicDict
+    SeqDict.SeqDict Evergreen.V1.GameObjectTypes.RelicPosition RelicsById
 
 
 type alias DirtByLocation =

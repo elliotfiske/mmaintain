@@ -1,26 +1,16 @@
 module Types exposing (..)
 
-import Dict exposing (Dict)
-import Effect.Browser exposing (UrlRequest)
-import Effect.Browser.Navigation exposing (Key)
+import Effect.Browser
+import Effect.Browser.Navigation
 import Effect.Lamdera exposing (ClientId, SessionId)
-import Effect.Time exposing (Posix)
+import Effect.Time
 import GameObjectIds exposing (..)
 import GameObjectTypes exposing (..)
-import Json.Decode as Decode
 import SeqDict exposing (SeqDict)
 import Url exposing (Url)
 
 
-
--- TODO: could probably generate Real*Dict with other generated dictionary code
-
-
-type alias RealPersonDict =
-    SeqDict PersonId PersonData
-
-
-type alias RealRelicDict =
+type alias RelicsById =
     SeqDict RelicId RelicData
 
 
@@ -29,7 +19,7 @@ type alias PersonWithRelics =
 
 
 type alias RelicsByLocation =
-    SeqDict GameObjectTypes.RelicPosition RealRelicDict
+    SeqDict GameObjectTypes.RelicPosition RelicsById
 
 
 type alias DirtByLocation =

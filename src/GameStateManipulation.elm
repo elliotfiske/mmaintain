@@ -12,7 +12,7 @@ import PersonUtil
 import RelicUtil
 import SeqDict exposing (SeqDict)
 import SeqSet exposing (SeqSet)
-import Types exposing (BackendTrigger(..), GameState, RealRelicDict, RelicsByLocation)
+import Types exposing (BackendTrigger(..), GameState, RelicsById, RelicsByLocation)
 import Util
 
 
@@ -42,7 +42,7 @@ pickUpRelic takerId relicId state =
             ( state, NoOpBackendTrigger )
 
 
-moveRelicFromFloorToPlayer : PersonData -> RelicData -> RealRelicDict -> GameState -> GameState
+moveRelicFromFloorToPlayer : PersonData -> RelicData -> RelicsById -> GameState -> GameState
 moveRelicFromFloorToPlayer taker relicData floorDictToRemoveFrom state =
     let
         newFloorRelicDict =
@@ -87,7 +87,7 @@ dropRelic dropperId relicId state =
             ( state, NoOpBackendTrigger )
 
 
-moveRelicFromPlayerToFloor : PersonData -> RelicData -> RealRelicDict -> GameState -> GameState
+moveRelicFromPlayerToFloor : PersonData -> RelicData -> RelicsById -> GameState -> GameState
 moveRelicFromPlayerToFloor dropper relicData heldDictToRemoveFrom state =
     let
         newHeldRelicDict =
@@ -541,13 +541,13 @@ xpMultiplierForPlayer state person =
             1
 
 
-getRelicsAtFloorPoint : Point -> GameState -> RealRelicDict
+getRelicsAtFloorPoint : Point -> GameState -> RelicsById
 getRelicsAtFloorPoint point state =
     SeqDict.get (GameObjectTypes.OnFloor point) state.relicsByLocation
         |> Maybe.withDefault SeqDict.empty
 
 
-getRelicsHeldByPlayer : PersonId -> GameState -> RealRelicDict
+getRelicsHeldByPlayer : PersonId -> GameState -> RelicsById
 getRelicsHeldByPlayer personId state =
     SeqDict.get (GameObjectTypes.HeldBy personId) state.relicsByLocation
         |> Maybe.withDefault SeqDict.empty
