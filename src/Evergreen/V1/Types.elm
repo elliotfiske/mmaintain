@@ -1,6 +1,6 @@
 module Evergreen.V1.Types exposing (..)
 
-import Effect.Browser
+import Browser
 import Effect.Browser.Navigation
 import Effect.Lamdera
 import Effect.Time
@@ -67,7 +67,7 @@ type alias BackendModel =
 
 
 type FrontendMsg
-    = UrlClicked Effect.Browser.UrlRequest
+    = UrlClicked Browser.UrlRequest
     | UrlChanged Url.Url
     | PerformAction Evergreen.V1.GameObjectTypes.ActionOnGamestate
     | ClickedPleaseMakeMeDirty
