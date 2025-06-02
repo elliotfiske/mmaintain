@@ -1,4 +1,45 @@
-module GameStateManipulation exposing (activateGenerosityTrap, activateRelicWithPersonData, addCleanStats, addOrModifyDirt, applyClean, applyRelicMiddleware, changeDirtAmount, cleanDirt, cleanStrengthForPlayer, combineBatchActionResult, createActionOnGameStateFromRelicActivation, destroyDirt, doClean, dropAndDoubleRelicBody, dropRelic, executeActionOnGameState, findSmallestAndLargestNearbyDirts, getRarestRelicAtLocation, getRelicsAtFloorPoint, getRelicsHeldByPlayer, handleActivateGenerosityTrap, handleBatchAction, handleDroppingDoubler, handleSplashBucket, incrementCleanCount, incrementClearCount, internalExecuteActionOnGameState, isRelicHeldByPerson, makeDirtSmaller, maybeActivateRelic, moveRelicFromFloorToPlayer, moveRelicFromPlayerToFloor, pickUpRelic, playerEarnsExperience, relicBody, relicMiddleware, relicsAtLocation, updatePersonDictWithExperience, updateRelicsByPositionWithExperience, xpMultiplierForPlayer)
+module GameStateManipulation exposing
+    ( activateGenerosityTrap
+    , activateRelicWithPersonData
+    , addCleanStats
+    , addOrModifyDirt
+    , applyClean
+    , applyRelicMiddleware
+    , changeDirtAmount
+    , cleanDirt
+    , cleanStrengthForPlayer
+    , combineBatchActionResult
+    , createActionOnGameStateFromRelicActivation
+    , destroyDirt
+    , doClean
+    , dropAndDoubleRelicBody
+    , dropRelic
+    , executeActionOnGameState
+    , findSmallestAndLargestNearbyDirts
+    , getRarestRelicAtLocation
+    , getRelicsAtFloorPoint
+    , getRelicsHeldByPlayer
+    , handleActivateGenerosityTrap
+    , handleBatchAction
+    , handleDroppingDoubler
+    , handleSplashBucket
+    , incrementCleanCount
+    , incrementClearCount
+    , internalExecuteActionOnGameState
+    , isRelicHeldByPerson
+    , makeDirtSmaller
+    , maybeActivateRelic
+    , moveRelicFromFloorToPlayer
+    , moveRelicFromPlayerToFloor
+    , pickUpRelic
+    , playerEarnsExperience
+    , relicBody
+    , relicMiddleware
+    , relicsAtLocation
+    , updatePersonDictWithExperience
+    , updateRelicsByPositionWithExperience
+    , xpMultiplierForPlayer
+    )
 
 import BackendTriggerUtil
 import DirtUtil

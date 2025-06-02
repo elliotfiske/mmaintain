@@ -826,7 +826,7 @@ pickUpButton relicId myId =
         , class "btn btn-sm btn-outline btn-square"
         , id "pickup-button"
         ]
-        [ Html.img [ src "/public/hand-pick-up.png", class "w-8 h-8 dark:invert" ] [] ]
+        [ Html.img [ src "hand-pick-up.png", class "w-8 h-8 dark:invert" ] [] ]
 
 
 tryCleaning : FrontendPlayingState -> ActionOnGamestate
