@@ -274,6 +274,34 @@ relicMiddleware action relic state =
                 _ ->
                     BackendTriggerUtil.withNoOp state
 
+        DiminishingPower { currentDirtPatch, currentPower } ->
+            case action of
+                Clean personId location ->
+                    if isRelicHeldByPerson state relic.id personId then
+                        let
+                            newPower =
+                                if currentDirtPatch == Just location then
+                                    -- Diminish power by 20% each time
+                                    currentPower * 0.8
+
+                                else
+                                    -- Reset to max power for new dirt patch
+                                    RelicUtil.diminishingPowerMultiplier relic location
+
+                            updatedRelic =
+                                { relic | relicType = DiminishingPower { currentDirtPatch = Just location, currentPower = newPower } }
+
+                            newState =
+                                RelicUtil.updateRelicAtLocation (HeldBy personId) updatedRelic state
+                        in
+                        ( newState, NoOpBackendTrigger )
+
+                    else
+                        BackendTriggerUtil.withNoOp state
+
+                _ ->
+                    BackendTriggerUtil.withNoOp state
+
 
 updateRelicsByPositionWithExperience : PersonId -> Int -> RelicsByLocation -> RelicsByLocation
 updateRelicsByPositionWithExperience personId totalXpEarned relicsByLocation =
@@ -642,6 +670,15 @@ relicBody state relic me =
                     ++ "."
                 )
 
+        DiminishingPower { currentDirtPatch, currentPower } ->
+            RelicUtil.simpleRelicBody
+                ("Cleaning power starts at x"
+                    ++ Util.readableStringFromFloat (RelicUtil.diminishingPowerMultiplier relic (Maybe.withDefault { x = 0, y = 0 } currentDirtPatch))
+                    ++ " but diminishes by 20% each time you clean the same dirt patch. Current power: x"
+                    ++ Util.readableStringFromFloat currentPower
+                    ++ "."
+                )
+
 
 dropAndDoubleRelicBody : Types.FrontendPlayingState -> RelicData -> PersonData -> List PersonId -> Bool -> List (Html.Html Types.FrontendMsg)
 dropAndDoubleRelicBody state relic me people heldByMe =
@@ -758,6 +795,9 @@ cleanStrengthForPlayer state person =
 
                     GuestBook holders ->
                         acc + toFloat (RelicUtil.guestBookStrength relic holders)
+
+                    DiminishingPower { currentPower } ->
+                        acc * currentPower
 
                     _ ->
                         acc

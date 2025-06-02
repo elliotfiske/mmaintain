@@ -54,6 +54,7 @@ type RelicType
     | DropAndDouble (List PersonId)
     | SplashBucket
     | GuestBook (SeqSet PersonId)
+    | DiminishingPower { currentDirtPatch : Maybe Point, currentPower : Float }
 
 
 type RelicRarity

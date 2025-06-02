@@ -29,6 +29,9 @@ relicName relicType =
         GuestBook _ ->
             "Guest Book"
 
+        DiminishingPower _ ->
+            "Diminishing Power"
+
 
 relicTextColor : RelicRarity -> String
 relicTextColor rarity =
@@ -491,3 +494,53 @@ lockedRelicSlots : Int -> List Int
 lockedRelicSlots level =
     relicSlotThreshholds
         |> List.filter (\x -> level < x)
+
+
+{-| Calculates the power multiplier for DiminishingPower relics based on rarity, level, and current power.
+-}
+diminishingPowerMultiplier : RelicData -> Point -> Float
+diminishingPowerMultiplier relicData targetDirtPatch =
+    let
+        level =
+            toFloat (relicLevelForExp relicData.rarity relicData.exp)
+
+        baseMultiplier =
+            case relicData.rarity of
+                Common ->
+                    2.0
+
+                Uncommon ->
+                    2.5
+
+                Rare ->
+                    3.0
+
+                Epic ->
+                    4.0
+
+                Legendary ->
+                    6.0
+
+        -- Scale linearly such that level 5 is 2x base
+        level5Multiplier =
+            baseMultiplier * 2.0
+
+        increasePerLevel =
+            (level5Multiplier - baseMultiplier) / 4.0
+
+        maxMultiplier =
+            baseMultiplier + (level - 1.0) * increasePerLevel
+
+        finalMultiplier =
+            case relicData.relicType of
+                DiminishingPower { currentDirtPatch, currentPower } ->
+                    if currentDirtPatch == Just targetDirtPatch then
+                        currentPower
+
+                    else
+                        maxMultiplier
+
+                _ ->
+                    maxMultiplier
+    in
+    finalMultiplier

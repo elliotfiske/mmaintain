@@ -335,7 +335,7 @@ debugAddRelic model =
         newRelic : GameObjectTypes.RelicData
         newRelic =
             { id = RelicId newId
-            , relicType = GameObjectTypes.GuestBook SeqSet.empty
+            , relicType = GameObjectTypes.DiminishingPower { currentDirtPatch = Nothing, currentPower = 1.0 }
             , rarity = GameObjectTypes.Legendary
             , exp = 0
             }
