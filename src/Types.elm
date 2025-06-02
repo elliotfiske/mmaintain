@@ -90,6 +90,7 @@ type FrontendMsg
     | ReceivedMapSize { width : Float, height : Float }
     | ToggleMobileRelicMenu
     | NoOpFrontendMsg
+    | NukeBackend
 
 
 type ToBackend
@@ -98,6 +99,7 @@ type ToBackend
     | PleaseMakeMeDirty
     | PleaseGenerateRelic
     | PleaseActivateRelic PersonId RelicId
+    | PleaseNukeBackend
 
 
 type BackendMsg

@@ -207,6 +207,9 @@ update msg model =
         DebugGenerateRelic ->
             ( model, Effect.Lamdera.sendToBackend PleaseGenerateRelic )
 
+        NukeBackend ->
+            ( model, Effect.Lamdera.sendToBackend PleaseNukeBackend )
+
         Tick _ ->
             moveMeTowardsMyTargetIfAny model
 

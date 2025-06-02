@@ -12,7 +12,6 @@ import List
 import PersonUtil
 import RelicUtil
 import SeqDict
-import SeqSet
 import Types exposing (..)
 import Util
 
@@ -195,6 +194,18 @@ updateFromFrontend sessionId clientId msg model =
 
         PleaseGenerateRelic ->
             debugAddRelic model
+
+        PleaseNukeBackend ->
+            let
+                emptyGameState =
+                    { personDict = model.gameState.personDict
+                    , relicsByLocation = SeqDict.empty
+                    , dirtByLocation = SeqDict.empty
+                    }
+            in
+            ( { model | gameState = emptyGameState }
+            , Effect.Lamdera.broadcast (UpdateFullState { gameState = emptyGameState, myId = model.sessionIdToPersonId |> SeqDict.values |> List.head |> Maybe.withDefault (PersonId 0) })
+            )
 
         PleaseActivateRelic personId relicId ->
             let

@@ -92,6 +92,7 @@ debugStuff state =
     if state.showingDebugStuff then
         Html.div [ class "flex flex-col" ]
             (Html.button [ Html.Events.onClick ClickedPleaseMakeMeDirty, class "btn btn-primary" ] [ text "Add Dirt" ]
+                :: Html.button [ Html.Events.onClick NukeBackend, class "btn btn-error" ] [ text "Nuke Backend" ]
                 :: debugDictsView state
             )
 
