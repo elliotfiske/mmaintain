@@ -846,11 +846,6 @@ tryCleaning state =
 performClean : PersonData -> FrontendPlayingState -> ActionOnGamestate
 performClean me state =
     -- TODO: You'll be back here when we implement "no dropping relics on dirt". Hello future me!
-    let
-        myRelicCount =
-            GameStateManipulation.getRelicsHeldByPlayer state.myId state.backendConfirmedGameState
-                |> SeqDict.size
-    in
     case SeqDict.get me.position state.backendConfirmedGameState.dirtByLocation of
         Nothing ->
             case GameStateManipulation.getRarestRelicAtLocation me.position state.backendConfirmedGameState of
@@ -858,11 +853,7 @@ performClean me state =
                     GameStateNoOp
 
                 Just relic ->
-                    if myRelicCount < RelicUtil.relicSlotsForLevel (Util.levelForExp me.experience) then
-                        PickUpRelic relic.id me.id
-
-                    else
-                        GameStateNoOp
+                    PickUpRelic relic.id me.id
 
         Just dirt ->
             Clean me.id dirt.position

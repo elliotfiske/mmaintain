@@ -70,14 +70,29 @@ pickUpRelic takerId relicId state =
 
         maybeTargetRelic =
             SeqDict.get relicId existingRelicsOnGround
+
+        hasEnoughSlots taker =
+            let
+                currentRelicCount =
+                    getRelicsHeldByPlayer taker.id state
+                        |> SeqDict.size
+
+                maxSlots =
+                    RelicUtil.relicSlotsForLevel (Util.levelForExp taker.experience)
+            in
+            currentRelicCount < maxSlots
     in
     case ( maybeTaker, maybeTargetRelic ) of
         ( Just taker, Just targetRelic ) ->
-            let
-                newState =
-                    moveRelicFromFloorToPlayer taker targetRelic existingRelicsOnGround state
-            in
-            ( newState, NoOpBackendTrigger )
+            if hasEnoughSlots taker then
+                let
+                    newState =
+                        moveRelicFromFloorToPlayer taker targetRelic existingRelicsOnGround state
+                in
+                ( newState, NoOpBackendTrigger )
+
+            else
+                ( state, NoOpBackendTrigger )
 
         _ ->
             ( state, NoOpBackendTrigger )
