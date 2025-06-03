@@ -48,11 +48,25 @@ type alias FrontendPlayingState =
     , mapSize : Maybe { width : Float, height : Float }
     , cameraPosition : Point
     , mobileRelicMenuOpen : Bool
+    , debugDirtParams :
+        { minX : Int
+        , maxX : Int
+        , minY : Int
+        , maxY : Int
+        }
     }
 
 
 type alias BackendToFrontendState =
-    { gameState : GameState, myId : PersonId }
+    { gameState : GameState
+    , myId : PersonId
+    , debugDirtParams :
+        { minX : Int
+        , maxX : Int
+        , minY : Int
+        , maxY : Int
+        }
+    }
 
 
 type FrontendState
@@ -67,6 +81,12 @@ type alias BackendModel =
     , sessionIdToPersonId : SeqDict SessionId PersonId
     , biggestId : Int
     , bigRandom : Int
+    , debugDirtParams :
+        { minX : Int
+        , maxX : Int
+        , minY : Int
+        , maxY : Int
+        }
     }
 
 
@@ -91,6 +111,7 @@ type FrontendMsg
     | ToggleMobileRelicMenu
     | NoOpFrontendMsg
     | NukeBackend
+    | UpdateDebugDirtParamsMsg { minX : Int, maxX : Int, minY : Int, maxY : Int }
 
 
 type ToBackend
@@ -100,6 +121,7 @@ type ToBackend
     | PleaseGenerateRelic
     | PleaseActivateRelic PersonId RelicId
     | PleaseNukeBackend
+    | UpdateDebugDirtParams { minX : Int, maxX : Int, minY : Int, maxY : Int }
 
 
 type BackendMsg

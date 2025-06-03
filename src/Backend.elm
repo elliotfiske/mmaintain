@@ -50,6 +50,12 @@ init =
       , gameState = GameState.empty
       , biggestId = 0
       , bigRandom = 46296
+      , debugDirtParams =
+            { minX = 5
+            , maxX = 10
+            , minY = 5
+            , maxY = 10
+            }
       }
     , Command.none
     )
@@ -84,6 +90,7 @@ handleClientConnected sessionId clientId model =
         newState =
             { gameState = updatedModel.gameState
             , myId = personId
+            , debugDirtParams = updatedModel.debugDirtParams
             }
 
         dumpStateToNewClientCmd =
@@ -204,7 +211,19 @@ updateFromFrontend sessionId clientId msg model =
                     }
             in
             ( { model | gameState = emptyGameState }
-            , Effect.Lamdera.broadcast (UpdateFullState { gameState = emptyGameState, myId = model.sessionIdToPersonId |> SeqDict.values |> List.head |> Maybe.withDefault (PersonId 0) })
+            , Effect.Lamdera.broadcast (UpdateFullState { gameState = emptyGameState, myId = model.sessionIdToPersonId |> SeqDict.values |> List.head |> Maybe.withDefault (PersonId 0), debugDirtParams = model.debugDirtParams })
+            )
+
+        UpdateDebugDirtParams params ->
+            let
+                newModel =
+                    { model | debugDirtParams = params }
+
+                newState =
+                    { gameState = newModel.gameState, myId = model.sessionIdToPersonId |> SeqDict.values |> List.head |> Maybe.withDefault (PersonId 0), debugDirtParams = params }
+            in
+            ( newModel
+            , Effect.Lamdera.broadcast (UpdateFullState newState)
             )
 
         PleaseActivateRelic personId relicId ->
@@ -365,10 +384,10 @@ addSomeDirt model =
     List.foldl andThenAddDirtToSpot
         ( model, Command.none )
         (Util.generateGridOfPoints
-            { minX = 5
-            , maxX = 10
-            , minY = 5
-            , maxY = 10
+            { minX = model.debugDirtParams.minX
+            , maxX = model.debugDirtParams.maxX
+            , minY = model.debugDirtParams.minY
+            , maxY = model.debugDirtParams.maxY
             }
         )
 

@@ -228,6 +228,11 @@ update msg model =
         ReceivedMapSize size ->
             ( modelUpdateIfPlaying (\state -> { state | mapSize = Just size } |> updateCameraPosition) model, Command.none )
 
+        UpdateDebugDirtParamsMsg params ->
+            ( model
+            , Effect.Lamdera.sendToBackend (UpdateDebugDirtParams params)
+            )
+
 
 toggleDebugStuff : FrontendPlayingState -> FrontendPlayingState
 toggleDebugStuff state =
@@ -405,11 +410,16 @@ updateFromBackend msg model =
 
 updatePlayingStateWithBackendStateDump : BackendToFrontendState -> FrontendPlayingState -> FrontendPlayingState
 updatePlayingStateWithBackendStateDump stateDump state =
-    { state | backendConfirmedGameState = stateDump.gameState, optimisticActions = [], myId = stateDump.myId }
+    { state
+        | backendConfirmedGameState = stateDump.gameState
+        , optimisticActions = []
+        , myId = stateDump.myId
+        , debugDirtParams = stateDump.debugDirtParams
+    }
 
 
 initFrontendPlayingState : BackendToFrontendState -> FrontendPlayingState
-initFrontendPlayingState { gameState, myId } =
+initFrontendPlayingState { gameState, myId, debugDirtParams } =
     { backendConfirmedGameState = gameState
     , myId = myId
     , optimisticActions = []
@@ -418,6 +428,7 @@ initFrontendPlayingState { gameState, myId } =
     , mapSize = Nothing
     , cameraPosition = { x = 0, y = 0 }
     , mobileRelicMenuOpen = False
+    , debugDirtParams = debugDirtParams
     }
         |> updateCameraPosition
 
