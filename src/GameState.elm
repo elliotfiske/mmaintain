@@ -26,4 +26,5 @@ empty =
     { personDict = SeqDict.empty
     , dirtByLocation = SeqDict.empty
     , relicsByLocation = SeqDict.empty
+    , relicIdToLocationIndex = SeqDict.empty
     }

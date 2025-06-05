@@ -32,6 +32,9 @@ relicName relicType =
         DiminishingPower _ ->
             "Diminishing Power"
 
+        HighFive ->
+            "High Five"
+
 
 relicTextColor : RelicRarity -> String
 relicTextColor rarity =

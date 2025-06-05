@@ -37,6 +37,7 @@ createPerson id name =
         { cleanCount = 0
         , clearCount = 0
         }
+    , bestHighFiveBoost = Nothing
     }
 
 

@@ -208,6 +208,7 @@ updateFromFrontend sessionId clientId msg model =
                     { personDict = model.gameState.personDict
                     , relicsByLocation = SeqDict.empty
                     , dirtByLocation = SeqDict.empty
+                    , relicIdToLocationIndex = SeqDict.empty
                     }
             in
             ( { model | gameState = emptyGameState }

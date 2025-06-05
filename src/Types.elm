@@ -30,6 +30,7 @@ type alias GameState =
     { personDict : SeqDict PersonId PersonData
     , relicsByLocation : RelicsByLocation
     , dirtByLocation : DirtByLocation
+    , relicIdToLocationIndex : SeqDict RelicId GameObjectTypes.RelicPosition
     }
 
 

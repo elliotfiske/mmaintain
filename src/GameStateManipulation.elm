@@ -1,26 +1,17 @@
 module GameStateManipulation exposing
-    ( activateGenerosityTrap
-    , activateRelicWithPersonData
-    , addCleanStats
-    , addOrModifyDirt
+    ( activateRelicWithPersonData
     , applyClean
-    , applyRelicMiddleware
-    , changeDirtAmount
     , cleanDirt
     , cleanStrengthForPlayer
-    , combineBatchActionResult
     , createActionOnGameStateFromRelicActivation
     , destroyDirt
     , doClean
     , dropAndDoubleRelicBody
-    , dropRelic
     , executeActionOnGameState
     , findSmallestAndLargestNearbyDirts
     , getRarestRelicAtLocation
     , getRelicsAtFloorPoint
     , getRelicsHeldByPlayer
-    , handleActivateGenerosityTrap
-    , handleBatchAction
     , handleDroppingDoubler
     , handleSplashBucket
     , incrementCleanCount
@@ -29,15 +20,11 @@ module GameStateManipulation exposing
     , isRelicHeldByPerson
     , makeDirtSmaller
     , maybeActivateRelic
-    , moveRelicFromFloorToPlayer
-    , moveRelicFromPlayerToFloor
     , pickUpRelic
     , playerEarnsExperience
     , relicBody
-    , relicMiddleware
     , relicsAtLocation
     , updatePersonDictWithExperience
-    , updateRelicsByPositionWithExperience
     , xpMultiplierForPlayer
     )
 
@@ -301,6 +288,60 @@ relicMiddleware action relic state =
 
                 _ ->
                     BackendTriggerUtil.withNoOp state
+
+        HighFive ->
+            case action of
+                MovePerson moverId direction ->
+                    -- let
+                    -- holderId =
+                    -- SeqDict.get (GameObjectTypes.HeldBy moverId) state.relicsByLocation
+                    -- in
+                    -- BackendTriggerUtil.withNoOp (handleHighFive relic personId direction state)
+                    BackendTriggerUtil.withNoOp state
+
+                _ ->
+                    BackendTriggerUtil.withNoOp state
+
+
+
+-- Check if we need to add any
+
+
+handleHighFive : RelicData -> PersonId -> Direction -> GameState -> GameState
+handleHighFive relic personId direction state =
+    let
+        maybePerson =
+            SeqDict.get personId state.personDict
+
+        maybeExistingBoost =
+            maybePerson
+                |> Maybe.map (\person -> person.bestHighFiveBoost)
+                |> Maybe.withDefault Nothing
+    in
+    case maybePerson of
+        Nothing ->
+            state
+
+        Just person ->
+            let
+                newPerson =
+                    { person | bestHighFiveBoost = newHighFiveBoost maybeExistingBoost { boost = 10, giver = personId } }
+            in
+            { state | personDict = SeqDict.insert personId newPerson state.personDict }
+
+
+newHighFiveBoost : Maybe HighFiveBoost -> HighFiveBoost -> Maybe HighFiveBoost
+newHighFiveBoost maybeCurrentBoost newBoost =
+    case maybeCurrentBoost of
+        Nothing ->
+            Just newBoost
+
+        Just currentBoost ->
+            if currentBoost.boost > newBoost.boost then
+                Just currentBoost
+
+            else
+                Just newBoost
 
 
 updateRelicsByPositionWithExperience : PersonId -> Int -> RelicsByLocation -> RelicsByLocation
@@ -678,6 +719,9 @@ relicBody state relic me =
                     ++ Util.readableStringFromFloat currentPower
                     ++ "."
                 )
+
+        HighFive ->
+            RelicUtil.simpleRelicBody "High Five"
 
 
 dropAndDoubleRelicBody : Types.FrontendPlayingState -> RelicData -> PersonData -> List PersonId -> Bool -> List (Html.Html Types.FrontendMsg)

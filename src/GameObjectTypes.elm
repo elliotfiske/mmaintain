@@ -26,12 +26,19 @@ type alias PersonStats =
     }
 
 
+type alias HighFiveBoost =
+    { boost : Int
+    , giver : PersonId
+    }
+
+
 type alias PersonData =
     { id : PersonId
     , name : String
     , experience : Int
     , position : Point
     , stats : PersonStats
+    , bestHighFiveBoost : Maybe HighFiveBoost
     }
 
 
@@ -55,6 +62,7 @@ type RelicType
     | SplashBucket
     | GuestBook (SeqSet PersonId)
     | DiminishingPower { currentDirtPatch : Maybe Point, currentPower : Float }
+    | HighFive
 
 
 type RelicRarity
