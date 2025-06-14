@@ -308,6 +308,21 @@ relicMiddleware action relic state =
                     BackendTriggerUtil.withNoOp state
 
 
+{-| Find all players at a given location, excluding one player.
+-}
+findPlayersAtDestination : Point -> PersonId -> SeqDict PersonId PersonData -> List PersonData
+findPlayersAtDestination location excludeId personDict =
+    personDict
+        |> SeqDict.values
+        |> List.filter
+            (\person ->
+                person.position
+                    == location
+                    && person.id
+                    /= excludeId
+            )
+
+
 {-| Each time a player moves, apply necessary high five boosts.
 
 Note this code will be run for ALL player movement, and will also be run once for each High Five Relic in the game.
@@ -320,24 +335,53 @@ If there are people, apply the boost to all players at the destination (besides 
 handleHighFive : RelicData -> PersonData -> Direction -> GameState -> GameState
 handleHighFive relic mover direction state =
     let
-        movingTo =
-            PointUtil.newPoint direction mover.position
-
         maybeRelicHolder =
             RelicUtil.getRelicHolderId relic.id state
 
-        
+        maybeHolderData =
+            maybeRelicHolder
+                |> Maybe.andThen (\holderId -> SeqDict.get holderId state.personDict)
     in
-    case maybePerson of
+    case maybeHolderData of
         Nothing ->
             state
 
-        Just person ->
-            let
-                newPerson =
-                    { person | bestHighFiveBoost = newHighFiveBoost maybeExistingBoost { boost = 10, giver = personId } }
-            in
-            { state | personDict = SeqDict.insert personId newPerson state.personDict }
+        Just holder ->
+            applyHighFiveBoost relic holder mover direction state
+
+
+{-| Apply high five boosts to players at the destination.
+-}
+applyHighFiveBoost : RelicData -> PersonData -> PersonData -> Direction -> GameState -> GameState
+applyHighFiveBoost relic holder mover direction state =
+    let
+        playerDictAfterMove =
+            PersonUtil.movePersonWithId mover.id direction state.personDict
+
+        destination =
+            PointUtil.newPoint direction mover.position
+
+        playersAtDestination =
+            findPlayersAtDestination destination holder.id playerDictAfterMove
+
+        newBoost =
+            HighFiveBoost
+                (RelicUtil.highFiveBoostStrength relic.rarity relic.exp)
+                holder.id
+
+        updatePlayerWithBoost person =
+            { person | bestHighFiveBoost = newHighFiveBoost person.bestHighFiveBoost newBoost }
+
+        updatedPlayers =
+            List.map updatePlayerWithBoost playersAtDestination
+
+        newPersonDict =
+            List.foldl
+                (\updatedPerson dict -> SeqDict.insert updatedPerson.id updatedPerson dict)
+                state.personDict
+                updatedPlayers
+    in
+    { state | personDict = newPersonDict }
 
 
 newHighFiveBoost : Maybe HighFiveBoost -> HighFiveBoost -> Maybe HighFiveBoost
@@ -734,7 +778,11 @@ relicBody state relic me =
                 )
 
         HighFive ->
-            RelicUtil.simpleRelicBody "High Five"
+            RelicUtil.simpleRelicBody
+                ("High five all players on your tile. Their clean strength is boosted by "
+                    ++ String.fromInt (RelicUtil.highFiveBoostStrength relic.rarity relic.exp)
+                    ++ ". Only the strongest high-five boost applies."
+                )
 
 
 dropAndDoubleRelicBody : Types.FrontendPlayingState -> RelicData -> PersonData -> List PersonId -> Bool -> List (Html.Html Types.FrontendMsg)

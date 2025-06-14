@@ -281,6 +281,20 @@ getRelicHolderId relicId state =
             )
 
 
+getRelicPositionOnFloor : RelicId -> GameState -> Maybe Point
+getRelicPositionOnFloor relicId state =
+    SeqDict.get relicId state.relicIdToLocationIndex
+        |> Maybe.andThen
+            (\location ->
+                case location of
+                    GameObjectTypes.HeldBy _ ->
+                        Nothing
+
+                    GameObjectTypes.OnFloor position ->
+                        Just position
+            )
+
+
 {-| Roll for the rarity of a relic.
 NOTE: this is also where we check if the player gets a relic at all. `Nothing` means no relic dropped.
 -}
@@ -567,3 +581,38 @@ diminishingPowerMultiplier relicData targetDirtPatch =
                     maxMultiplier
     in
     finalMultiplier
+
+
+{-| Calculates the boost strength for HighFive relics based on rarity and level.
+-}
+highFiveBoostStrength : RelicRarity -> Int -> Int
+highFiveBoostStrength rarity exp =
+    let
+        level =
+            toFloat (relicLevelForExp rarity exp)
+
+        baseStrength =
+            case rarity of
+                Common ->
+                    5
+
+                Uncommon ->
+                    10
+
+                Rare ->
+                    20
+
+                Epic ->
+                    40
+
+                Legendary ->
+                    80
+
+        -- Scale linearly such that level 5 is 2x base
+        level5Strength =
+            toFloat baseStrength * 2.0
+
+        increasePerLevel =
+            (level5Strength - toFloat baseStrength) / 4.0
+    in
+    round (toFloat baseStrength + (level - 1.0) * increasePerLevel)
