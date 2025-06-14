@@ -59,7 +59,8 @@ subscriptions model =
     Subscription.batch
         -- TODO: move key listening to the `main-map` element
         [ Effect.Browser.Events.onKeyDown (keyDecoder model)
-        , maybeFireEveryTick model
+        , maybeTargetMovementTick model
+        , animationTick
         , Subscription.fromJs "receiveElementSize"
             receiveElementSize
             (\value ->
@@ -80,8 +81,8 @@ mapSizeDecoder =
         (Decode.field "height" Decode.float)
 
 
-maybeFireEveryTick : Model -> Subscription FrontendOnly FrontendMsg
-maybeFireEveryTick model =
+maybeTargetMovementTick : Model -> Subscription FrontendOnly FrontendMsg
+maybeTargetMovementTick model =
     case model.state of
         Playing playingState ->
             case playingState.targetPosition of
@@ -93,6 +94,11 @@ maybeFireEveryTick model =
 
         _ ->
             Subscription.none
+
+
+animationTick : Subscription FrontendOnly FrontendMsg
+animationTick =
+    Effect.Time.every (Duration.milliseconds 20) AnimationTick
 
 
 keyDecoder : Model -> Decode.Decoder FrontendMsg
@@ -212,6 +218,9 @@ update msg model =
 
         Tick _ ->
             moveMeTowardsMyTargetIfAny model
+
+        AnimationTick currTime ->
+            ( modelUpdateIfPlaying (\state -> { state | currentTime = currTime }) model, Command.none )
 
         ClickTarget point ->
             ( modelUpdateTarget (Just point) model, Command.none )
@@ -429,6 +438,7 @@ initFrontendPlayingState { gameState, myId, debugDirtParams } =
     , cameraPosition = { x = 0, y = 0 }
     , mobileRelicMenuOpen = False
     , debugDirtParams = debugDirtParams
+    , currentTime = Effect.Time.millisToPosix 0
     }
         |> updateCameraPosition
 
@@ -709,7 +719,7 @@ renderOnThisSquare state me =
     Html.div [ class "order-3 md:order-none touch-manipulation overflow-y-scroll" ]
         [ case SeqDict.get me.position state.backendConfirmedGameState.dirtByLocation of
             Just dirt ->
-                renderDirtOnThisSquare me dirt
+                renderDirtOnThisSquare state me dirt
 
             Nothing ->
                 case GameStateManipulation.relicsAtLocation me.position state.backendConfirmedGameState of
@@ -721,18 +731,34 @@ renderOnThisSquare state me =
         ]
 
 
-renderDirtOnThisSquare : PersonData -> DirtData -> Html.Html FrontendMsg
-renderDirtOnThisSquare me dirt =
+renderDirtOnThisSquare : FrontendPlayingState -> PersonData -> DirtData -> Html.Html FrontendMsg
+renderDirtOnThisSquare state me dirt =
     Html.div [ class "prose" ]
         [ Html.h2 [ class "text-center" ]
-            [ Html.text ("Dirt here! Amount left: " ++ String.fromInt dirt.amount) ]
-        , Html.div [ class "flex justify-center px-8" ]
-            [ Html.button
+            [ Html.text ("Amount left: " ++ String.fromInt dirt.amount) ]
+        , Html.div [ class "flex flex-col justify-center px-8" ]
+            [ renderCleaningMinigame state me dirt
+            , Html.button
                 [ class "btn btn-primary w-full"
                 , Html.Events.onClick (PerformAction (Clean me.id dirt.position))
                 ]
                 [ text "Clean it!" ]
             ]
+        ]
+
+
+renderCleaningMinigame : FrontendPlayingState -> PersonData -> DirtData -> Html.Html FrontendMsg
+renderCleaningMinigame state me dirt =
+    let
+        baseOffset =
+            toFloat (Effect.Time.posixToMillis state.currentTime) / 600 |> sin
+    in
+    Html.div [ class "bg-blue-500 h-8 w-full relative" ]
+        [ Html.div
+            [ class "absolute"
+            , style "left" (String.fromFloat (((baseOffset * 0.5) + 0.5) * 100) ++ "%")
+            ]
+            [ Html.div [ class "bg-red-500 h-8 w-2 relative", style "left" "-50%" ] [] ]
         ]
 
 

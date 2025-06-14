@@ -55,6 +55,7 @@ type alias FrontendPlayingState =
         , minY : Int
         , maxY : Int
         }
+    , currentTime : Effect.Time.Posix
     }
 
 
@@ -106,6 +107,7 @@ type FrontendMsg
     | ActivatedRelic PersonId RelicId
     | ClickTarget Point
     | Tick Effect.Time.Posix
+    | AnimationTick Effect.Time.Posix
     | ToggleDebugStuff
     | CloseModals
     | ReceivedMapSize { width : Float, height : Float }
