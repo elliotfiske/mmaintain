@@ -888,8 +888,15 @@ cleanStrengthForPlayer state person =
                 |> Maybe.withDefault SeqDict.empty
                 |> SeqDict.values
 
-        baseXP =
+        baseCleanStrength =
             toFloat (10 + Util.levelForExp person.experience)
+                + (case person.bestHighFiveBoost of
+                    Nothing ->
+                        0
+
+                    Just boost ->
+                        toFloat boost.boost
+                  )
     in
     heldRelics
         |> List.foldl
@@ -907,7 +914,7 @@ cleanStrengthForPlayer state person =
                     _ ->
                         acc
             )
-            baseXP
+            baseCleanStrength
         |> round
 
 

@@ -534,10 +534,20 @@ renderCleanStrength state me =
     let
         strength =
             GameStateManipulation.cleanStrengthForPlayer state.backendConfirmedGameState me
+
+        highFiveText =
+            case me.bestHighFiveBoost of
+                Nothing ->
+                    Html.text ""
+
+                Just boost ->
+                    Html.h3 [ class "text-center text-base-content/70" ]
+                        [ Html.text ("High Five Boost: +" ++ String.fromInt boost.boost) ]
     in
     Html.div [ class "w-full prose" ]
         [ Html.h3 [ class "text-center" ]
             [ Html.text ("Clean Strength: " ++ String.fromInt strength) ]
+        , highFiveText
         ]
 
 

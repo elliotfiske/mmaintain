@@ -3022,6 +3022,10 @@ html {
   color: rgb(239 68 68 / var(--tw-text-opacity));
 }
 
+.text-base-content\/70 {
+  color: hsl(var(--bc) / 0.7);
+}
+
 .opacity-0 {
   opacity: 0;
 }
