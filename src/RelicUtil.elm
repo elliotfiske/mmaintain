@@ -2,11 +2,12 @@ module RelicUtil exposing (..)
 
 import GameObjectIds exposing (..)
 import GameObjectTypes exposing (..)
+import GameState
 import Html
 import Html.Attributes
 import Html.Events
 import Maybe
-import SeqDict exposing (SeqDict)
+import SeqDict
 import SeqSet exposing (SeqSet)
 import Types exposing (..)
 
@@ -259,8 +260,25 @@ updateRelicAtLocation location relic state =
 
                 Nothing ->
                     SeqDict.insert relic.id relic SeqDict.empty
+
+        newRelicsByLocation =
+            SeqDict.insert location newRelicDict state.relicsByLocation
     in
-    { state | relicsByLocation = SeqDict.insert location newRelicDict state.relicsByLocation }
+    GameState.updateRelicState newRelicsByLocation state
+
+
+getRelicHolderId : RelicId -> GameState -> Maybe PersonId
+getRelicHolderId relicId state =
+    SeqDict.get relicId state.relicIdToLocationIndex
+        |> Maybe.andThen
+            (\location ->
+                case location of
+                    GameObjectTypes.HeldBy personId ->
+                        Just personId
+
+                    _ ->
+                        Nothing
+            )
 
 
 {-| Roll for the rarity of a relic.

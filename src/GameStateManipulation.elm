@@ -37,6 +37,7 @@ import Html
 import List.Extra
 import Markdown
 import PersonUtil
+import PointUtil
 import RelicUtil
 import SeqDict exposing (SeqDict)
 import SeqSet exposing (SeqSet)
@@ -103,7 +104,7 @@ moveRelicFromFloorToPlayer taker relicData floorDictToRemoveFrom state =
                 |> SeqDict.insert (GameObjectTypes.HeldBy taker.id) newHeldRelics
                 |> SeqDict.insert (GameObjectTypes.OnFloor taker.position) newFloorRelicDict
     in
-    { state | relicsByLocation = newRelicsByPosition }
+    GameState.updateRelicState newRelicsByPosition state
 
 
 dropRelic : PersonId -> RelicId -> GameState -> ( GameState, Types.BackendTrigger )
@@ -148,7 +149,7 @@ moveRelicFromPlayerToFloor dropper relicData heldDictToRemoveFrom state =
                 |> SeqDict.insert (GameObjectTypes.HeldBy dropper.id) newHeldRelicDict
                 |> SeqDict.insert (GameObjectTypes.OnFloor dropper.position) newFloorRelics
     in
-    { state | relicsByLocation = newRelicsByPosition }
+    GameState.updateRelicState newRelicsByPosition state
 
 
 changeDirtAmount : Point -> Int -> Types.DirtByLocation -> Types.DirtByLocation
@@ -292,31 +293,40 @@ relicMiddleware action relic state =
         HighFive ->
             case action of
                 MovePerson moverId direction ->
-                    -- let
-                    -- holderId =
-                    -- SeqDict.get (GameObjectTypes.HeldBy moverId) state.relicsByLocation
-                    -- in
-                    -- BackendTriggerUtil.withNoOp (handleHighFive relic personId direction state)
-                    BackendTriggerUtil.withNoOp state
+                    let
+                        maybeMover =
+                            SeqDict.get moverId state.personDict
+                    in
+                    case maybeMover of
+                        Just mover ->
+                            BackendTriggerUtil.withNoOp (handleHighFive relic mover direction state)
+
+                        Nothing ->
+                            BackendTriggerUtil.withNoOp state
 
                 _ ->
                     BackendTriggerUtil.withNoOp state
 
 
+{-| Each time a player moves, apply necessary high five boosts.
 
--- Check if we need to add any
+Note this code will be run for ALL player movement, and will also be run once for each High Five Relic in the game.
 
+Check the target location for the relic holder (note this could be the same as the person moving).
+If there is a person at the target location with a high-five relic, look for any other people on the same tile.
+If there are people, apply the boost to all players at the destination (besides the holder).
 
-handleHighFive : RelicData -> PersonId -> Direction -> GameState -> GameState
-handleHighFive relic personId direction state =
+-}
+handleHighFive : RelicData -> PersonData -> Direction -> GameState -> GameState
+handleHighFive relic mover direction state =
     let
-        maybePerson =
-            SeqDict.get personId state.personDict
+        movingTo =
+            PointUtil.newPoint direction mover.position
 
-        maybeExistingBoost =
-            maybePerson
-                |> Maybe.map (\person -> person.bestHighFiveBoost)
-                |> Maybe.withDefault Nothing
+        maybeRelicHolder =
+            RelicUtil.getRelicHolderId relic.id state
+
+        
     in
     case maybePerson of
         Nothing ->
@@ -451,8 +461,11 @@ internalExecuteActionOnGameState action state =
 
                 newRelicDict =
                     SeqDict.insert relicData.id relicData existingRelicDict
+
+                newRelicsByLocation =
+                    SeqDict.insert (GameObjectTypes.OnFloor floorPoint) newRelicDict state.relicsByLocation
             in
-            BackendTriggerUtil.withNoOp { state | relicsByLocation = SeqDict.insert (GameObjectTypes.OnFloor floorPoint) newRelicDict state.relicsByLocation }
+            BackendTriggerUtil.withNoOp (GameState.updateRelicState newRelicsByLocation state)
 
         GameStateNoOp ->
             BackendTriggerUtil.withNoOp state
@@ -520,7 +533,7 @@ activateGenerosityTrap relicData personData numDoubles state =
         newState =
             playerEarnsExperience personData.id xpEarned state
     in
-    { newState | relicsByLocation = newRelicsByPosition }
+    GameState.updateRelicState newRelicsByPosition newState
 
 
 doClean : PersonId -> Point -> Int -> GameState -> ( GameState, Types.BackendTrigger )
