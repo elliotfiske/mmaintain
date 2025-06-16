@@ -748,16 +748,30 @@ relicBody state relic me =
     in
     case relic.relicType of
         CleanFast ->
-            RelicUtil.simpleRelicBody ("x" ++ Util.readableStringFromFloat (RelicUtil.cleanFastStrengthMultiplier relic) ++ " to Cleaning Strength.")
+            RelicUtil.simpleRelicBody
+                ("x"
+                    ++ Util.readableStringFromFloat
+                        (RelicUtil.cleanFastStrengthMultiplier relic)
+                    ++ " to Cleaning Strength."
+                )
 
         MoreXP ->
-            RelicUtil.simpleRelicBody ("x" ++ Util.readableStringFromFloat (RelicUtil.xpMultiplier relic.rarity relic.exp) ++ " to all XP earned.")
+            RelicUtil.simpleRelicBody
+                ("x"
+                    ++ Util.readableStringFromFloat
+                        (RelicUtil.xpMultiplier relic.rarity relic.exp)
+                    ++ " to all XP earned."
+                )
 
         DropAndDouble people ->
             dropAndDoubleRelicBody state relic me people heldByMe
 
         SplashBucket ->
-            RelicUtil.simpleRelicBody ("Also clean the dirt on adjacent squares at " ++ String.fromInt (RelicUtil.splashBucketStrength relic.rarity relic.exp) ++ " strength.")
+            RelicUtil.simpleRelicBody
+                ("Also clean the dirt on adjacent squares at "
+                    ++ String.fromInt (RelicUtil.splashBucketStrength relic.rarity relic.exp)
+                    ++ " strength."
+                )
 
         GuestBook peopleWhoHaveHeldIt ->
             RelicUtil.simpleRelicBody
@@ -771,7 +785,10 @@ relicBody state relic me =
         DiminishingPower { currentDirtPatch, currentPower } ->
             RelicUtil.simpleRelicBody
                 ("Cleaning power starts at x"
-                    ++ Util.readableStringFromFloat (RelicUtil.diminishingPowerMultiplier relic (Maybe.withDefault { x = 0, y = 0 } currentDirtPatch))
+                    ++ Util.readableStringFromFloat
+                        (RelicUtil.diminishingPowerMultiplier relic
+                            (Maybe.withDefault { x = 0, y = 0 } currentDirtPatch)
+                        )
                     ++ " but diminishes by 20% each time you clean the same dirt patch. Current power: x"
                     ++ Util.readableStringFromFloat currentPower
                     ++ "."

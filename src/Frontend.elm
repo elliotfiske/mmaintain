@@ -347,6 +347,7 @@ updateModelWithAction who actionOnGamestate model =
 
         Error _ ->
             -- TODO: action came down when the app was in an error state. handle this?
+            -- note we currently have no way to reach the Error state.
             model
 
 
