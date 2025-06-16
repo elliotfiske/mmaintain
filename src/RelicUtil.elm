@@ -486,10 +486,53 @@ splashBucketStrength rarity exp =
 guestBookStrength : RelicData -> SeqSet PersonId -> Int
 guestBookStrength relicData peopleWhoHaveHeldIt =
     let
+        numPeople =
+            SeqSet.size peopleWhoHaveHeldIt
+
+        baseStrengthByRarity =
+            case relicData.rarity of
+                Common ->
+                    guestBookStrengthForRarity [ 10, 30, 70, 90, 95 ] numPeople
+
+                Uncommon ->
+                    guestBookStrengthForRarity [ 20, 50, 105, 130, 140 ] numPeople
+
+                Rare ->
+                    guestBookStrengthForRarity [ 30, 65, 130, 155, 170 ] numPeople
+
+                Epic ->
+                    guestBookStrengthForRarity [ 40, 75, 145, 170, 190 ] numPeople
+
+                Legendary ->
+                    guestBookStrengthForRarity [ 50, 90, 160, 190, 210 ] numPeople
+
         level =
             relicLevelForExp relicData.rarity relicData.exp
+
+        -- Add a small level bonus (5% per level above 1)
+        levelMultiplier =
+            1.0 + (toFloat (level - 1) * 0.05)
     in
-    (10 + level) ^ SeqSet.size peopleWhoHaveHeldIt
+    round (toFloat baseStrengthByRarity * levelMultiplier)
+
+
+guestBookStrengthForRarity : List Int -> Int -> Int
+guestBookStrengthForRarity strengthTable numPeople =
+    if numPeople <= 0 then
+        0
+
+    else if numPeople <= List.length strengthTable then
+        strengthTable
+            |> List.drop (numPeople - 1)
+            |> List.head
+            |> Maybe.withDefault 0
+
+    else
+        -- For more than 5 people, use the last value (plateau effect)
+        strengthTable
+            |> List.reverse
+            |> List.head
+            |> Maybe.withDefault 0
 
 
 byRelicRarity : RelicData -> Int

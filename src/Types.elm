@@ -6,6 +6,7 @@ import Effect.Lamdera exposing (ClientId, SessionId)
 import Effect.Time
 import GameObjectIds exposing (..)
 import GameObjectTypes exposing (..)
+import Random
 import SeqDict exposing (SeqDict)
 import Url exposing (Url)
 
@@ -56,6 +57,8 @@ type alias FrontendPlayingState =
         , maxY : Int
         }
     , currentTime : Effect.Time.Posix
+    , stunnedUntil : Effect.Time.Posix
+    , cleaningRandom : Int
     }
 
 
@@ -102,6 +105,7 @@ type FrontendMsg
     = UrlClicked UrlRequest
     | UrlChanged Url
     | PerformAction ActionOnGamestate
+    | StunSelf
     | ClickedPleaseMakeMeDirty
     | DebugGenerateRelic
     | ActivatedRelic PersonId RelicId

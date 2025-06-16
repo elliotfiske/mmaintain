@@ -366,7 +366,7 @@ debugAddRelic model =
         newRelic : GameObjectTypes.RelicData
         newRelic =
             { id = RelicId newId
-            , relicType = GameObjectTypes.HighFive 
+            , relicType = GameObjectTypes.HighFive
             , rarity = GameObjectTypes.Legendary
             , exp = 0
             }
@@ -399,9 +399,15 @@ andThenAddDirtToSpot point ( model, msg ) =
         ( randomValue, newModel ) =
             getRandomValue model
 
+        extraBigOrSmall =
+            modBy 5 randomValue
+
         dirtAmount =
-            if modBy 4 randomValue == 0 then
+            if extraBigOrSmall == 0 then
                 modBy 10000 randomValue + 1000
+
+            else if extraBigOrSmall == 1 then
+                modBy 50 randomValue + 10
 
             else
                 modBy 800 randomValue + 300

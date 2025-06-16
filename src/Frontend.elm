@@ -23,6 +23,7 @@ import Material.Icons.Outlined as Outlined
 import Material.Icons.Types as Coloring
 import Modals
 import PointUtil
+import Random
 import RelicUtil
 import SeqDict
 import Types exposing (..)
@@ -154,7 +155,7 @@ handleKey state key =
                 NoOpFrontendMsg
 
         " " ->
-            PerformAction (tryCleaning state)
+            tryCleaning state
 
         "`" ->
             ToggleDebugStuff
@@ -181,12 +182,12 @@ update msg model =
         NoOpFrontendMsg ->
             ( model, Command.none )
 
-        UrlClicked _ ->
-            -- unhandled for now (may eventually use for stuff like "join my park" links, or logging in)
-            ( model, Command.none )
-
         UrlChanged _ ->
             -- also unhandled
+            ( model, Command.none )
+
+        UrlClicked _ ->
+            -- unhandled for now (may eventually use for stuff like "join my park" links, or logging in)
             ( model, Command.none )
 
         PerformAction action ->
@@ -196,12 +197,49 @@ update msg model =
                     Effect.Task.attempt (\_ -> NoOpFrontendMsg) (Effect.Browser.Dom.focus (Effect.Browser.Dom.id "main-map"))
 
                 newModel =
-                    model
-                        -- if the player hits any key, cancel moving to the clicked target
-                        |> modelUpdateTarget Nothing
-                        |> updateModelWithActionFromMyself action
+                    case ( action, model.state ) of
+                        ( Clean _ _, Playing state ) ->
+                            -- Advance the random number for the next target
+                            let
+                                nextRandom =
+                                    modBy 2301875097 (state.cleaningRandom * 348987 + 174039)
+
+                                -- Always update the local state with the Clean action
+                                updatedState =
+                                    updateStateWithAction (Client state.myId) action state
+                            in
+                            { model | state = Playing { updatedState | cleaningRandom = nextRandom } }
+
+                        _ ->
+                            model
+                                -- if the player hits any key, cancel moving to the clicked target
+                                |> modelUpdateTarget Nothing
+                                |> updateModelWithActionFromMyself action
             in
             ( newModel, Command.batch [ Effect.Lamdera.sendToBackend (ClientPerformsAction action), refocus ] )
+
+        StunSelf ->
+            let
+                -- Necessary otherwise the next "space" keypress will activate buttons unexpectedly
+                refocus =
+                    Effect.Task.attempt (\_ -> NoOpFrontendMsg) (Effect.Browser.Dom.focus (Effect.Browser.Dom.id "main-map"))
+
+                newModel =
+                    case model.state of
+                        Playing state ->
+                            let
+                                nextRandom =
+                                    modBy 2301875097 (state.cleaningRandom * 348987 + 174039)
+
+                                stunTime =
+                                    Effect.Time.millisToPosix (Effect.Time.posixToMillis state.currentTime + 2000)
+                            in
+                            { model | state = Playing { state | cleaningRandom = nextRandom, stunnedUntil = stunTime } }
+
+                        _ ->
+                            model
+            in
+            ( newModel, refocus )
 
         ActivatedRelic myId relicId ->
             -- todo: set "loading" state, since this is a backend-authoritative action and it could take time
@@ -430,17 +468,24 @@ updatePlayingStateWithBackendStateDump stateDump state =
 
 initFrontendPlayingState : BackendToFrontendState -> FrontendPlayingState
 initFrontendPlayingState { gameState, myId, debugDirtParams } =
-    { backendConfirmedGameState = gameState
-    , myId = myId
-    , optimisticActions = []
-    , targetPosition = Nothing
-    , showingDebugStuff = False
-    , mapSize = Nothing
-    , cameraPosition = { x = 0, y = 0 }
-    , mobileRelicMenuOpen = False
-    , debugDirtParams = debugDirtParams
-    , currentTime = Effect.Time.millisToPosix 0
-    }
+    let
+        initialState : FrontendPlayingState
+        initialState =
+            { backendConfirmedGameState = gameState
+            , myId = myId
+            , optimisticActions = []
+            , targetPosition = Nothing
+            , showingDebugStuff = False
+            , mapSize = Nothing
+            , cameraPosition = { x = 0, y = 0 }
+            , mobileRelicMenuOpen = False
+            , debugDirtParams = debugDirtParams
+            , currentTime = Effect.Time.millisToPosix 0
+            , cleaningRandom = 42
+            , stunnedUntil = Effect.Time.millisToPosix 0
+            }
+    in
+    initialState
         |> updateCameraPosition
 
 
@@ -739,27 +784,111 @@ renderDirtOnThisSquare state me dirt =
             [ Html.text ("Amount left: " ++ String.fromInt dirt.amount) ]
         , Html.div [ class "flex flex-col justify-center px-8" ]
             [ renderCleaningMinigame state me dirt
-            , Html.button
-                [ class "btn btn-primary w-full"
-                , Html.Events.onClick (PerformAction (Clean me.id dirt.position))
-                ]
-                [ text "Clean it!" ]
             ]
         ]
+
+
+calculateMarkerPosition : Effect.Time.Posix -> Float
+calculateMarkerPosition currentTime =
+    let
+        baseOffset =
+            toFloat (Effect.Time.posixToMillis currentTime) / 600 |> sin
+    in
+    ((baseOffset * 0.5) + 0.5) * 100
+
+
+calculateTargetPosition : Int -> Float
+calculateTargetPosition randomValue =
+    toFloat (modBy 100 randomValue)
+
+
+isInTargetZone : Float -> Float -> Bool
+isInTargetZone markerPosition targetPosition =
+    abs (markerPosition - targetPosition) < 10.0
+
+
+isPlayerStunned : FrontendPlayingState -> Bool
+isPlayerStunned state =
+    Effect.Time.posixToMillis state.currentTime < Effect.Time.posixToMillis state.stunnedUntil
+
+
+calculateMinigameState : FrontendPlayingState -> ( Float, Float, Bool )
+calculateMinigameState state =
+    let
+        markerPosition =
+            calculateMarkerPosition state.currentTime
+
+        targetPosition =
+            calculateTargetPosition state.cleaningRandom
+
+        inTargetZone =
+            isInTargetZone markerPosition targetPosition
+    in
+    ( markerPosition, targetPosition, inTargetZone )
 
 
 renderCleaningMinigame : FrontendPlayingState -> PersonData -> DirtData -> Html.Html FrontendMsg
 renderCleaningMinigame state me dirt =
     let
-        baseOffset =
-            toFloat (Effect.Time.posixToMillis state.currentTime) / 600 |> sin
+        ( markerPosition, targetPosition, inTargetZone ) =
+            calculateMinigameState state
+
+        isStunned =
+            isPlayerStunned state
+
+        targetZoneStyle =
+            style "left" (String.fromFloat (targetPosition - 5.0) ++ "%")
+
+        markerStyle =
+            style "left" (String.fromFloat markerPosition ++ "%")
+
+        buttonText =
+            if isStunned then
+                "Stunned!"
+
+            else if inTargetZone then
+                "Clean it!"
+
+            else
+                "Try to clean!"
+
+        buttonClass =
+            if isStunned then
+                "btn btn-disabled w-full"
+
+            else
+                "btn btn-primary w-full"
     in
-    Html.div [ class "bg-blue-500 h-8 w-full relative" ]
-        [ Html.div
-            [ class "absolute"
-            , style "left" (String.fromFloat (((baseOffset * 0.5) + 0.5) * 100) ++ "%")
+    Html.div [ class "flex flex-col gap-2" ]
+        [ Html.div [ class "bg-blue-500 h-8 w-full relative" ]
+            [ -- Target zone (green)
+              Html.div
+                [ class "absolute bg-green-500 h-8 w-[10%] opacity-50"
+                , targetZoneStyle
+                ]
+                []
+
+            -- Marker (red)
+            , Html.div
+                [ class "absolute"
+                , markerStyle
+                ]
+                [ Html.div [ class "bg-red-500 h-8 w-2 relative", style "left" "-50%" ] [] ]
             ]
-            [ Html.div [ class "bg-red-500 h-8 w-2 relative", style "left" "-50%" ] [] ]
+        , Html.button
+            [ class buttonClass
+            , Html.Events.onClick
+                (if isStunned then
+                    NoOpFrontendMsg
+
+                 else if inTargetZone then
+                    PerformAction (Clean me.id dirt.position)
+
+                 else
+                    StunSelf
+                )
+            ]
+            [ text buttonText ]
         ]
 
 
@@ -880,7 +1009,7 @@ pickUpButton relicId myId =
         [ Html.img [ src "hand-pick-up.png", class "w-8 h-8 dark:invert" ] [] ]
 
 
-tryCleaning : FrontendPlayingState -> ActionOnGamestate
+tryCleaning : FrontendPlayingState -> FrontendMsg
 tryCleaning state =
     let
         maybeMe =
@@ -888,23 +1017,35 @@ tryCleaning state =
     in
     case maybeMe of
         Nothing ->
-            GameStateNoOp
+            NoOpFrontendMsg
 
         Just me ->
-            performClean me state
+            tryCleaningWithMe me state
 
 
-performClean : PersonData -> FrontendPlayingState -> ActionOnGamestate
-performClean me state =
-    -- TODO: You'll be back here when we implement "no dropping relics on dirt". Hello future me!
-    case SeqDict.get me.position state.backendConfirmedGameState.dirtByLocation of
-        Nothing ->
-            case GameStateManipulation.getRarestRelicAtLocation me.position state.backendConfirmedGameState of
-                Nothing ->
-                    GameStateNoOp
+tryCleaningWithMe : PersonData -> FrontendPlayingState -> FrontendMsg
+tryCleaningWithMe me state =
+    -- Don't allow cleaning if player is stunned
+    if isPlayerStunned state then
+        NoOpFrontendMsg
 
-                Just relic ->
-                    PickUpRelic relic.id me.id
+    else
+        case SeqDict.get me.position state.backendConfirmedGameState.dirtByLocation of
+            Nothing ->
+                case GameStateManipulation.getRarestRelicAtLocation me.position state.backendConfirmedGameState of
+                    Nothing ->
+                        NoOpFrontendMsg
 
-        Just dirt ->
-            Clean me.id dirt.position
+                    Just relic ->
+                        PerformAction (PickUpRelic relic.id me.id)
+
+            Just dirt ->
+                let
+                    ( _, _, inTargetZone ) =
+                        calculateMinigameState state
+                in
+                if inTargetZone then
+                    PerformAction (Clean me.id dirt.position)
+
+                else
+                    StunSelf
