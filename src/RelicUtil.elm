@@ -326,11 +326,12 @@ rarityRoll rawRandomValue =
 relicWeights : List ( Int, GameObjectTypes.RelicType )
 relicWeights =
     [ ( 60, GameObjectTypes.CleanFast )
-    , ( 5, GameObjectTypes.DropAndDouble [] )
+    , ( 10, GameObjectTypes.DropAndDouble [] )
     , ( 30, GameObjectTypes.MoreXP )
-    , ( 5, GameObjectTypes.SplashBucket )
+    , ( 10, GameObjectTypes.SplashBucket )
     , ( 5, GameObjectTypes.GuestBook SeqSet.empty )
     , ( 5, GameObjectTypes.DiminishingPower { currentDirtPatch = Nothing, currentPower = 0.0 } )
+    , ( 5, GameObjectTypes.HighFive )
     ]
 
 

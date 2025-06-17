@@ -162,13 +162,14 @@ renderRelicTooltipBody state me relicData =
     let
         cardTitle =
             [ Html.div [ class "flex justify-between w-full" ]
-                [ Html.text (RelicUtil.relicName relicData.relicType) ]
+                [ Html.span [ class ("dark:text-black font-semibold px-2 py-1 rounded-md " ++ RelicUtil.relicBgColor relicData.rarity) ]
+                    [ Html.text (RelicUtil.relicName relicData.relicType) ]
+                ]
             ]
     in
     UI.card "h-auto"
         cardTitle
-        [ relicRarityBadge relicData.rarity
-        , Html.div
+        [ Html.div
             [ class "flex flex-col justify-between" ]
             (GameStateManipulation.relicBody state relicData me)
         ]

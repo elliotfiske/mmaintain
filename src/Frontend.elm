@@ -963,8 +963,7 @@ heldRelicView : FrontendPlayingState -> PersonData -> GameObjectTypes.RelicData 
 heldRelicView state me relicData =
     UI.card ""
         [ relicCardTitle state me relicData ]
-        [ relicRarityBadge relicData.rarity
-        , relicLevelProgressBar relicData
+        [ relicLevelProgressBar relicData
         , Html.div
             [ class "flex flex-col justify-between" ]
             (GameStateManipulation.relicBody state relicData me)
@@ -978,7 +977,7 @@ relicCardTitle state me relicData =
             GameStateManipulation.isRelicHeldByPerson state.backendConfirmedGameState relicData.id me.id
     in
     Html.div [ class "flex justify-between items-center w-full" ]
-        [ Html.span []
+        [ Html.span [ class ("dark:text-black font-semibold px-2 py-1 rounded-md " ++ RelicUtil.relicBgColor relicData.rarity) ]
             [ Html.text (RelicUtil.relicName relicData.relicType)
             ]
         , if isHeldByMe then
