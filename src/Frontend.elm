@@ -272,6 +272,9 @@ update msg model =
         ToggleMobileRelicMenu ->
             ( modelUpdateIfPlaying toggleMobileRelicMenu model, Command.none )
 
+        ToggleSkillTreeMenu ->
+            ( modelUpdateIfPlaying toggleSkillTreeMenu model, Command.none )
+
         ReceivedMapSize size ->
             ( modelUpdateIfPlaying (\state -> { state | mapSize = Just size } |> updateCameraPosition) model, Command.none )
 
@@ -288,12 +291,17 @@ toggleDebugStuff state =
 
 closeModals : FrontendPlayingState -> FrontendPlayingState
 closeModals state =
-    { state | showingDebugStuff = False, mobileRelicMenuOpen = False }
+    { state | showingDebugStuff = False, mobileRelicMenuOpen = False, skillTreeMenuOpen = False }
 
 
 toggleMobileRelicMenu : FrontendPlayingState -> FrontendPlayingState
 toggleMobileRelicMenu state =
     { state | mobileRelicMenuOpen = not state.mobileRelicMenuOpen }
+
+
+toggleSkillTreeMenu : FrontendPlayingState -> FrontendPlayingState
+toggleSkillTreeMenu state =
+    { state | skillTreeMenuOpen = not state.skillTreeMenuOpen }
 
 
 modelUpdateIfPlaying : (FrontendPlayingState -> FrontendPlayingState) -> Model -> Model
@@ -479,6 +487,7 @@ initFrontendPlayingState { gameState, myId, debugDirtParams } =
             , mapSize = Nothing
             , cameraPosition = { x = 0, y = 0 }
             , mobileRelicMenuOpen = False
+            , skillTreeMenuOpen = False
             , debugDirtParams = debugDirtParams
             , currentTime = Effect.Time.millisToPosix 0
             , cleaningRandom = 42
@@ -537,7 +546,7 @@ renderPlayingStateWithMe state me =
                 ("grid h-full justify-end "
                     -- mobile layout: 3 rows (HUD, map, on-this-square)
                     ++ "grid-rows-[200px_1fr_150px] grid-cols-1 "
-                    -- desktop layout: 2 rows (map takes up 2 columns), and a fixed Relics sidebar (takes up 2 rows)
+                    -- desktop layout: 2 rows (map takes up 2 columns), and a fixed Relics sidebar
                     ++ "md:grid-rows-[1fr_200px] md:grid-cols-[1fr_1fr_300px] "
                 )
             ]
@@ -545,6 +554,7 @@ renderPlayingStateWithMe state me =
             , renderHeldRelics state me
             , renderMyHUD state me
             , renderOnThisSquare state me
+            , renderSkillTree state me
             ]
         ]
 
@@ -557,6 +567,7 @@ renderMyHUD state me =
         , renderCleanStrength state me
         , renderXPMultiplier state me
         , renderMobileRelicsButton state me
+        , renderOpenSkillTreeButton state me
         ]
 
 
@@ -661,6 +672,25 @@ renderRelicContent state me =
     ]
 
 
+renderSkillTreeContainer : FrontendPlayingState -> PersonData -> List (Html.Html FrontendMsg)
+renderSkillTreeContainer state me =
+    [ Html.div [ class "prose mt-8" ]
+        [ Html.h2 [ class "text-center" ]
+            [ Html.text "Skill Tree:" ]
+        ]
+    , Html.div [ class "flex flex-col gap-4 p-4 not-prose" ]
+        [ Html.div [ class "text-center" ]
+            [ Html.text ("Current Level: " ++ String.fromInt (Util.levelForExp me.experience)) ]
+        , renderSkillTreeContent state me
+        ]
+    ]
+
+
+renderSkillTreeContent : FrontendPlayingState -> PersonData -> Html.Html FrontendMsg
+renderSkillTreeContent state me =
+    Html.div [] []
+
+
 renderMobileRelicsButton : FrontendPlayingState -> PersonData -> Html.Html FrontendMsg
 renderMobileRelicsButton state me =
     let
@@ -680,6 +710,19 @@ renderMobileRelicsButton state me =
         , Html.Events.onClick ToggleMobileRelicMenu
         ]
         [ "Relics: " ++ numHeldRelics ++ "/" ++ totalUnlockedSlots |> Html.text ]
+
+
+renderOpenSkillTreeButton : FrontendPlayingState -> PersonData -> Html.Html FrontendMsg
+renderOpenSkillTreeButton state me =
+    let
+        myLevel =
+            Util.levelForExp me.experience
+    in
+    Html.button
+        [ class "btn btn-outline btn-ghost md:hidden fixed top-16 right-4 z-50"
+        , Html.Events.onClick ToggleSkillTreeMenu
+        ]
+        [ "Skills: Lvl " ++ String.fromInt myLevel |> Html.text ]
 
 
 renderMobileRelicDialog : FrontendPlayingState -> PersonData -> Html.Html FrontendMsg
@@ -702,6 +745,26 @@ renderMobileRelicDialog state me =
         text ""
 
 
+renderMobileSkillTreeDialog : FrontendPlayingState -> PersonData -> Html.Html FrontendMsg
+renderMobileSkillTreeDialog state me =
+    if state.skillTreeMenuOpen then
+        UI.basicDialog
+            (Html.div
+                [ class "flex flex-col h-full" ]
+                [ Html.div [ class "flex-grow overflow-y-auto" ]
+                    (renderSkillTreeContainer state me)
+                , button
+                    [ class "btn btn-primary w-full"
+                    , Html.Events.onClick ToggleSkillTreeMenu
+                    ]
+                    [ text "Close" ]
+                ]
+            )
+
+    else
+        text ""
+
+
 renderDesktopRelicSidebar : FrontendPlayingState -> PersonData -> Html.Html FrontendMsg
 renderDesktopRelicSidebar state me =
     Html.div [ class "w-full flex flex-col overflow-scroll order-4 md:order-none hidden md:block row-span-2" ]
@@ -710,8 +773,9 @@ renderDesktopRelicSidebar state me =
 
 renderHeldRelics : FrontendPlayingState -> PersonData -> Html.Html FrontendMsg
 renderHeldRelics state me =
-    Html.div [ class "order-4 md:order-none md:row-span-2 md:overflow-y-auto" ]
+    Html.div [ class "order-4 md:order-none md:overflow-y-auto" ]
         [ renderMobileRelicDialog state me
+        , renderMobileSkillTreeDialog state me
         , renderDesktopRelicSidebar state me
         ]
 
@@ -889,6 +953,17 @@ renderCleaningMinigame state me dirt =
                 )
             ]
             [ text buttonText ]
+        ]
+
+
+renderSkillTree : FrontendPlayingState -> PersonData -> Html.Html FrontendMsg
+renderSkillTree state me =
+    Html.div [ class "order-4 md:order-none md:overflow-y-auto hidden md:flex items-center justify-center w-full h-full" ]
+        [ Html.button
+            [ class "btn btn-outline btn-ghost"
+            , Html.Events.onClick ToggleSkillTreeMenu
+            ]
+            [ Html.text "Skills" ]
         ]
 
 
