@@ -26,6 +26,8 @@ import PointUtil
 import Random
 import RelicUtil
 import SeqDict
+import Svg
+import Svg.Attributes
 import Types exposing (..)
 import Url
 import Util
@@ -688,7 +690,92 @@ renderSkillTreeContainer state me =
 
 renderSkillTreeContent : FrontendPlayingState -> PersonData -> Html.Html FrontendMsg
 renderSkillTreeContent state me =
-    Html.div [] []
+    Html.div
+        [ class "relative w-full h-96 bg-base-100 rounded-lg border border-base-300" ]
+        [ skillTreeConnectionLines
+
+        -- Skill nodes
+        , skillNode "center" "Core" "🔥" True
+        , skillNode "top" "Power Strike" "⚡" False
+        , skillNode "bottom-left" "Shield Mastery" "🛡️" False
+        , skillNode "bottom-right" "Swift Cleaning" "💨" False
+        ]
+
+
+skillTreeConnectionLines : Svg.Svg FrontendMsg
+skillTreeConnectionLines =
+    Svg.svg
+        [ Svg.Attributes.viewBox "0 0 400 384"
+        , Svg.Attributes.preserveAspectRatio "xMidYMid meet"
+        , Svg.Attributes.width "100%"
+        , Svg.Attributes.height "100%"
+        ]
+        [ skillConnectionLine "200" "192" "200" "96" -- center to top
+        , skillConnectionLine "200" "192" "120" "288" -- center to bottom-left
+        , skillConnectionLine "200" "192" "280" "288" -- center to bottom-right
+        ]
+
+
+skillConnectionLine : String -> String -> String -> String -> Svg.Svg FrontendMsg
+skillConnectionLine x1 y1 x2 y2 =
+    Svg.line
+        ([ Svg.Attributes.x1 x1
+         , Svg.Attributes.y1 y1
+         , Svg.Attributes.x2 x2
+         , Svg.Attributes.y2 y2
+         ]
+            ++ skillLineAttributes
+        )
+        []
+
+
+skillLineAttributes : List (Svg.Attribute msg)
+skillLineAttributes =
+    [ Svg.Attributes.stroke "#6b7280"
+    , Svg.Attributes.strokeWidth "2"
+    , Svg.Attributes.strokeDasharray "5,5"
+    ]
+
+
+skillNode : String -> String -> String -> Bool -> Html.Html FrontendMsg
+skillNode position name icon isUnlocked =
+    let
+        positionClasses =
+            case position of
+                "center" ->
+                    "absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-10"
+
+                "top" ->
+                    "absolute top-6 left-1/2 transform -translate-x-1/2 z-10"
+
+                "bottom-left" ->
+                    "absolute bottom-6 left-16 transform -translate-x-1/2 z-10"
+
+                "bottom-right" ->
+                    "absolute bottom-6 right-16 transform translate-x-1/2 z-10"
+
+                _ ->
+                    "z-10"
+
+        buttonClasses =
+            if isUnlocked then
+                "btn btn-primary btn-circle w-16 h-16 text-2xl shadow-lg"
+
+            else
+                "btn btn-outline btn-circle w-16 h-16 text-2xl shadow-lg opacity-60 cursor-not-allowed"
+    in
+    Html.div
+        [ class (positionClasses ++ " flex flex-col items-center gap-2") ]
+        [ Html.button
+            [ class buttonClasses
+            , Html.Attributes.disabled (not isUnlocked)
+            , Html.Attributes.title name
+            ]
+            [ Html.text icon ]
+        , Html.div
+            [ class "text-xs text-center font-medium px-2 py-1 bg-base-200 rounded border max-w-20" ]
+            [ Html.text name ]
+        ]
 
 
 renderMobileRelicsButton : FrontendPlayingState -> PersonData -> Html.Html FrontendMsg
