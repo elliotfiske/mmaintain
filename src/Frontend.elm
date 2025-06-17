@@ -691,90 +691,105 @@ renderSkillTreeContainer state me =
 renderSkillTreeContent : FrontendPlayingState -> PersonData -> Html.Html FrontendMsg
 renderSkillTreeContent state me =
     Html.div
-        [ class "relative w-full h-96 bg-base-100 rounded-lg border border-base-300" ]
-        [ skillTreeConnectionLines
+        [ class "w-full h-96 bg-base-100 rounded-lg border border-base-300 overflow-auto" ]
+        [ Html.map (\msg -> msg) <|
+            Svg.svg
+                [ Svg.Attributes.viewBox "0 0 800 600"
+                , Svg.Attributes.width "800"
+                , Svg.Attributes.height "600"
+                ]
+                [ -- Connection lines
+                  skillConnectionLine "400" "300" "400" "200" -- center to top
+                , skillConnectionLine "400" "300" "250" "450" -- center to bottom-left
+                , skillConnectionLine "400" "300" "550" "450" -- center to bottom-right
 
-        -- Skill nodes
-        , skillNode "center" "Core" "🔥" True
-        , skillNode "top" "Power Strike" "⚡" False
-        , skillNode "bottom-left" "Shield Mastery" "🛡️" False
-        , skillNode "bottom-right" "Swift Cleaning" "💨" False
-        ]
-
-
-skillTreeConnectionLines : Svg.Svg FrontendMsg
-skillTreeConnectionLines =
-    Svg.svg
-        [ Svg.Attributes.viewBox "0 0 400 384"
-        , Svg.Attributes.preserveAspectRatio "xMidYMid meet"
-        , Svg.Attributes.width "100%"
-        , Svg.Attributes.height "100%"
-        ]
-        [ skillConnectionLine "200" "192" "200" "96" -- center to top
-        , skillConnectionLine "200" "192" "120" "288" -- center to bottom-left
-        , skillConnectionLine "200" "192" "280" "288" -- center to bottom-right
+                -- Skill nodes
+                , skillNodeSvg "400" "300" "Core" "🔥" True
+                , skillNodeSvg "400" "200" "Power Strike" "⚡" False
+                , skillNodeSvg "250" "450" "Shield Mastery" "🛡️" False
+                , skillNodeSvg "550" "450" "Swift Cleaning" "💨" False
+                ]
         ]
 
 
 skillConnectionLine : String -> String -> String -> String -> Svg.Svg FrontendMsg
 skillConnectionLine x1 y1 x2 y2 =
     Svg.line
-        ([ Svg.Attributes.x1 x1
-         , Svg.Attributes.y1 y1
-         , Svg.Attributes.x2 x2
-         , Svg.Attributes.y2 y2
-         ]
-            ++ skillLineAttributes
-        )
+        [ Svg.Attributes.x1 x1
+        , Svg.Attributes.y1 y1
+        , Svg.Attributes.x2 x2
+        , Svg.Attributes.y2 y2
+        , Svg.Attributes.stroke "#6b7280"
+        , Svg.Attributes.strokeWidth "2"
+        , Svg.Attributes.strokeDasharray "5,5"
+        ]
         []
 
 
-skillLineAttributes : List (Svg.Attribute msg)
-skillLineAttributes =
-    [ Svg.Attributes.stroke "#6b7280"
-    , Svg.Attributes.strokeWidth "2"
-    , Svg.Attributes.strokeDasharray "5,5"
-    ]
-
-
-skillNode : String -> String -> String -> Bool -> Html.Html FrontendMsg
-skillNode position name icon isUnlocked =
+skillNodeSvg : String -> String -> String -> String -> Bool -> Svg.Svg FrontendMsg
+skillNodeSvg x y name icon isUnlocked =
     let
-        positionClasses =
-            case position of
-                "center" ->
-                    "absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-10"
+        nodeRadius =
+            "32"
 
-                "top" ->
-                    "absolute top-6 left-1/2 transform -translate-x-1/2 z-10"
-
-                "bottom-left" ->
-                    "absolute bottom-6 left-16 transform -translate-x-1/2 z-10"
-
-                "bottom-right" ->
-                    "absolute bottom-6 right-16 transform translate-x-1/2 z-10"
-
-                _ ->
-                    "z-10"
-
-        buttonClasses =
+        fillColor =
             if isUnlocked then
-                "btn btn-primary btn-circle w-16 h-16 text-2xl shadow-lg"
+                "#3b82f6"
+                -- Blue (primary)
 
             else
-                "btn btn-outline btn-circle w-16 h-16 text-2xl shadow-lg opacity-60 cursor-not-allowed"
+                "transparent"
+
+        strokeColor =
+            if isUnlocked then
+                "#3b82f6"
+                -- Blue
+
+            else
+                "#6b7280"
+
+        -- Gray
+        opacity =
+            if isUnlocked then
+                "1"
+
+            else
+                "0.6"
     in
-    Html.div
-        [ class (positionClasses ++ " flex flex-col items-center gap-2") ]
-        [ Html.button
-            [ class buttonClasses
-            , Html.Attributes.disabled (not isUnlocked)
-            , Html.Attributes.title name
+    Svg.g []
+        [ -- Node circle
+          Svg.circle
+            [ Svg.Attributes.cx x
+            , Svg.Attributes.cy y
+            , Svg.Attributes.r nodeRadius
+            , Svg.Attributes.fill fillColor
+            , Svg.Attributes.stroke strokeColor
+            , Svg.Attributes.strokeWidth "2"
+            , Svg.Attributes.opacity opacity
+            , Svg.Attributes.style "cursor: pointer;"
             ]
-            [ Html.text icon ]
-        , Html.div
-            [ class "text-xs text-center font-medium px-2 py-1 bg-base-200 rounded border max-w-20" ]
-            [ Html.text name ]
+            []
+
+        -- Icon text
+        , Svg.text_
+            [ Svg.Attributes.x x
+            , Svg.Attributes.y (String.fromInt (String.toInt y |> Maybe.withDefault 0 |> (+) 6))
+            , Svg.Attributes.textAnchor "middle"
+            , Svg.Attributes.fontSize "24"
+            , Svg.Attributes.opacity opacity
+            ]
+            [ Svg.text icon ]
+
+        -- Name label
+        , Svg.text_
+            [ Svg.Attributes.x x
+            , Svg.Attributes.y (String.fromInt (String.toInt y |> Maybe.withDefault 0 |> (+) 50))
+            , Svg.Attributes.textAnchor "middle"
+            , Svg.Attributes.fontSize "12"
+            , Svg.Attributes.fill "#374151"
+            , Svg.Attributes.opacity opacity
+            ]
+            [ Svg.text name ]
         ]
 
 
