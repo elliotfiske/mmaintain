@@ -23,8 +23,8 @@ import Material.Icons.Outlined as Outlined
 import Material.Icons.Types as Coloring
 import Modals
 import PointUtil
-import Random
 import RelicUtil
+import Scroll
 import SeqDict
 import Svg
 import Svg.Attributes
@@ -691,24 +691,24 @@ renderSkillTreeContainer state me =
 renderSkillTreeContent : FrontendPlayingState -> PersonData -> Html.Html FrontendMsg
 renderSkillTreeContent state me =
     Html.div
-        [ class "w-full h-96 bg-base-100 rounded-lg border border-base-300 overflow-auto" ]
-        [ Html.map (\msg -> msg) <|
-            Svg.svg
-                [ Svg.Attributes.viewBox "0 0 800 600"
-                , Svg.Attributes.width "800"
-                , Svg.Attributes.height "600"
-                ]
-                [ -- Connection lines
-                  skillConnectionLine "400" "300" "400" "200" -- center to top
-                , skillConnectionLine "400" "300" "250" "450" -- center to bottom-left
-                , skillConnectionLine "400" "300" "550" "450" -- center to bottom-right
+        [ class "w-full h-96 bg-base-100 rounded-lg border border-base-300 overflow-auto", id "skill-tree-svg-container" ]
+        [ Svg.svg
+            [ Svg.Attributes.viewBox "0 0 800 600"
+            , Svg.Attributes.width "800"
+            , Svg.Attributes.height "600"
+            , Svg.Attributes.id "skill-tree-svg"
+            ]
+            [ -- Connection lines
+              skillConnectionLine "400" "300" "400" "200" -- center to top
+            , skillConnectionLine "400" "300" "250" "450" -- center to bottom-left
+            , skillConnectionLine "400" "300" "550" "450" -- center to bottom-right
 
-                -- Skill nodes
-                , skillNodeSvg "400" "300" "Core" "🔥" True
-                , skillNodeSvg "400" "200" "Power Strike" "⚡" False
-                , skillNodeSvg "250" "450" "Shield Mastery" "🛡️" False
-                , skillNodeSvg "550" "450" "Swift Cleaning" "💨" False
-                ]
+            -- Skill nodes
+            , skillNodeSvg "400" "300" "Core" "🔥" True
+            , skillNodeSvg "400" "200" "Power Strike" "⚡" False
+            , skillNodeSvg "250" "450" "Shield Mastery" "🛡️" False
+            , skillNodeSvg "550" "450" "Swift Cleaning" "💨" False
+            ]
         ]
 
 

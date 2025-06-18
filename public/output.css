@@ -2253,6 +2253,12 @@ html {
   background-color: #0f0b25;
 }
 
+.mockup-phone .display {
+  overflow: hidden;
+  border-radius: 40px;
+  margin-top: -25px;
+}
+
 .mockup-browser .mockup-browser-toolbar .input {
   position: relative;
   margin-left: auto;
@@ -2866,6 +2872,10 @@ html {
 
 .mt-8 {
   margin-top: 2rem;
+}
+
+.block {
+  display: block;
 }
 
 .flex {
