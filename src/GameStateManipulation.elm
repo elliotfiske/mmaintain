@@ -3,7 +3,6 @@ module GameStateManipulation exposing
     , applyClean
     , cleanDirt
     , cleanStrengthForPlayer
-    , createActionOnGameStateFromRelicActivation
     , destroyDirt
     , doClean
     , dropAndDoubleRelicBody
@@ -443,8 +442,8 @@ playerEarnsExperience personId xpEarned state =
                 |> GameState.updateGameStateRelicDict newRelicsByPosition
 
 
-handleActivateGenerosityTrap : PersonId -> RelicId -> Int -> GameState -> ( GameState, Types.BackendTrigger )
-handleActivateGenerosityTrap personId relicId numDoubles state =
+handleActivateGenerosityTrap : PersonId -> RelicId -> GameState -> ( GameState, Types.BackendTrigger )
+handleActivateGenerosityTrap personId relicId state =
     let
         maybeRelic =
             SeqDict.get (GameObjectTypes.HeldBy personId) state.relicsByLocation
@@ -457,8 +456,8 @@ handleActivateGenerosityTrap personId relicId numDoubles state =
     case ( maybeRelic, maybeFella ) of
         ( Just relicData, Just fella ) ->
             case relicData.relicType of
-                DropAndDouble _ ->
-                    BackendTriggerUtil.withNoOp (activateGenerosityTrap relicData fella numDoubles state)
+                DropAndDouble people ->
+                    BackendTriggerUtil.withNoOp (activateGenerosityTrap relicData fella (List.length people) state)
 
                 _ ->
                     -- User tried to activate Generosity on a relic that wasn't Generosity. Cheating???
@@ -517,8 +516,8 @@ internalExecuteActionOnGameState action state =
         GameStateNoOp ->
             BackendTriggerUtil.withNoOp state
 
-        ActivateGenerosityTrap personId relicId numDoubles ->
-            handleActivateGenerosityTrap personId relicId numDoubles state
+        ActivateGenerosityTrap personId relicId ->
+            handleActivateGenerosityTrap personId relicId state
 
         BatchAction actions ->
             handleBatchAction actions state
@@ -564,21 +563,21 @@ executeActionOnGameState who actionOnGamestate state =
 activateGenerosityTrap : RelicData -> PersonData -> Int -> GameState -> GameState
 activateGenerosityTrap relicData personData numDoubles state =
     let
-        relicsHeldByPlayer =
-            getRelicsHeldByPlayer personData.id state
-
-        newRelicDict =
-            SeqDict.remove relicData.id relicsHeldByPlayer
-
-        newRelicsByPosition =
-            state.relicsByLocation
-                |> SeqDict.insert (GameObjectTypes.HeldBy personData.id) newRelicDict
-
         xpEarned =
             RelicUtil.dropDoubleCurrentExperience relicData.rarity relicData.exp numDoubles
 
         newState =
             playerEarnsExperience personData.id xpEarned state
+
+        relicsHeldByPlayer =
+            getRelicsHeldByPlayer personData.id newState
+
+        newRelicDict =
+            SeqDict.remove relicData.id relicsHeldByPlayer
+
+        newRelicsByPosition =
+            newState.relicsByLocation
+                |> SeqDict.insert (GameObjectTypes.HeldBy personData.id) newRelicDict
     in
     GameState.updateRelicState newRelicsByPosition newState
 
@@ -862,28 +861,6 @@ dropAndDoubleRelicBody state relic me people heldByMe =
             else
                 []
            )
-
-
-createActionOnGameStateFromRelicActivation : PersonId -> RelicId -> GameState -> ActionOnGamestate
-createActionOnGameStateFromRelicActivation activatorId relicId state =
-    let
-        maybeRelic =
-            RelicUtil.getRelicAtLocation (GameObjectTypes.HeldBy activatorId) relicId state
-
-        maybePerson =
-            SeqDict.get activatorId state.personDict
-    in
-    case ( maybeRelic, maybePerson ) of
-        ( Just relic, Just person ) ->
-            case relic.relicType of
-                DropAndDouble people ->
-                    ActivateGenerosityTrap activatorId relicId (List.length people)
-
-                _ ->
-                    GameStateNoOp
-
-        _ ->
-            GameStateNoOp
 
 
 maybeActivateRelic : PersonId -> RelicId -> GameState -> ( GameState, Types.BackendTrigger )

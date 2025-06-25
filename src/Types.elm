@@ -109,7 +109,6 @@ type FrontendMsg
     | StunSelf
     | ClickedPleaseMakeMeDirty
     | DebugGenerateRelic
-    | ActivatedRelic PersonId RelicId
     | ClickTarget Point
     | Tick Effect.Time.Posix
     | AnimationTick Effect.Time.Posix
@@ -128,7 +127,6 @@ type ToBackend
     | ClientPerformsAction ActionWithMetadata
     | PleaseMakeMeDirty
     | PleaseGenerateRelic
-    | PleaseActivateRelic PersonId RelicId
     | PleaseNukeBackend
     | UpdateDebugDirtParams { minX : Int, maxX : Int, minY : Int, maxY : Int }
 

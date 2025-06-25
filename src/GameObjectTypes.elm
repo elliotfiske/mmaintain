@@ -104,6 +104,6 @@ type ActionOnGamestate
     | AddPerson PersonData
     | PickUpRelic RelicId PersonId
     | DropRelic RelicId PersonId
-    | ActivateGenerosityTrap PersonId RelicId Int
+    | ActivateGenerosityTrap PersonId RelicId
     | BatchAction (List ActionOnGamestate)
     | GameStateNoOp

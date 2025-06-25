@@ -230,24 +230,6 @@ updateFromFrontend sessionId clientId msg model =
             , Effect.Lamdera.broadcast (UpdateFullState newState)
             )
 
-        PleaseActivateRelic personId relicId ->
-            let
-                actionsFromActivation =
-                    GameStateManipulation.createActionOnGameStateFromRelicActivation personId relicId model.gameState
-
-                ( newModel, relicBackendTriggers ) =
-                    executeActionOnModel (Client personId) model actionsFromActivation
-
-                ( newModel2, actionsFromTrigger ) =
-                    executeBackendTrigger (Client personId) relicBackendTriggers newModel
-            in
-            ( newModel2
-            , Command.batch
-                [ Effect.Lamdera.broadcast (ServerAction Server actionsFromActivation)
-                , Effect.Lamdera.broadcast (ServerAction Server actionsFromTrigger)
-                ]
-            )
-
 
 {-| Given a backend trigger, update the model and return the action that should be performed on the gamestate.
 
@@ -369,7 +351,7 @@ debugAddRelic model =
         newRelic : GameObjectTypes.RelicData
         newRelic =
             { id = RelicId newId
-            , relicType = GameObjectTypes.SplashBucket
+            , relicType = GameObjectTypes.DropAndDouble []
             , rarity = GameObjectTypes.Legendary
             , exp = 0
             }

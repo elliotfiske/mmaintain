@@ -251,10 +251,6 @@ update msg model =
             in
             ( newModel, refocus )
 
-        ActivatedRelic myId relicId ->
-            -- todo: set "loading" state, since this is a backend-authoritative action and it could take time
-            ( model, Effect.Lamdera.sendToBackend (PleaseActivateRelic myId relicId) )
-
         ClickedPleaseMakeMeDirty ->
             ( model, Effect.Lamdera.sendToBackend PleaseMakeMeDirty )
 

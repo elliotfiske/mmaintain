@@ -129,7 +129,7 @@ dropAndDoubleActivationButton myId droppers relicId =
     else
         Html.button
             [ Html.Attributes.class "btn btn-sm btn-primary"
-            , Html.Events.onClick (ActivatedRelic myId relicId)
+            , Html.Events.onClick (PerformAction (ActivateGenerosityTrap myId relicId))
             ]
             [ Html.text "Claim XP" ]
 
