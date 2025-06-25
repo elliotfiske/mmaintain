@@ -60,7 +60,7 @@ subscriptions : Model -> Subscription FrontendOnly FrontendMsg
 subscriptions model =
     Subscription.batch
         [ maybeTargetMovementTick model
-        , animationTick
+        , maybeAnimationTick model
         , Subscription.fromJs "receiveElementSize"
             receiveElementSize
             (\value ->
@@ -96,9 +96,19 @@ maybeTargetMovementTick model =
             Subscription.none
 
 
-animationTick : Subscription FrontendOnly FrontendMsg
-animationTick =
-    Effect.Time.every (Duration.milliseconds 20) AnimationTick
+maybeAnimationTick : Model -> Subscription FrontendOnly FrontendMsg
+maybeAnimationTick model =
+    case model.state of
+        Playing playingState ->
+            extractMyself playingState
+                |> Maybe.andThen (\me -> getDisplayStateDirtByLocation me.position playingState)
+                |> Maybe.map (\_ -> Effect.Time.every (Duration.milliseconds 20) AnimationTick)
+                |> Maybe.withDefault Subscription.none
+
+        _ ->
+            Subscription.none
+
+
 
 
 
