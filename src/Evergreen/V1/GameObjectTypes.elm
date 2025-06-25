@@ -95,3 +95,14 @@ type ActionOnGamestate
     | ActivateGenerosityTrap Evergreen.V1.GameObjectIds.PersonId Evergreen.V1.GameObjectIds.RelicId Int
     | BatchAction (List ActionOnGamestate)
     | GameStateNoOp
+
+
+type ActionId
+    = ActionId Int
+
+
+type alias ActionWithMetadata =
+    { action : ActionOnGamestate
+    , performer : Evergreen.V1.GameObjectIds.PersonId
+    , id : ActionId
+    }

@@ -32,7 +32,7 @@ type alias GameState =
 
 type alias FrontendPlayingState =
     { backendConfirmedGameState : GameState
-    , optimisticActions : List Evergreen.V1.GameObjectTypes.ActionOnGamestate
+    , optimisticActions : List Evergreen.V1.GameObjectTypes.ActionWithMetadata
     , myId : Evergreen.V1.GameObjectIds.PersonId
     , targetPosition : Maybe Evergreen.V1.GameObjectTypes.Point
     , showingDebugStuff : Bool
@@ -53,6 +53,7 @@ type alias FrontendPlayingState =
     , currentTime : Effect.Time.Posix
     , stunnedUntil : Effect.Time.Posix
     , cleaningRandom : Int
+    , nextActionId : Int
     }
 
 
@@ -114,7 +115,7 @@ type FrontendMsg
 
 type ToBackend
     = NoOpToBackend
-    | ClientPerformsAction Evergreen.V1.GameObjectTypes.ActionOnGamestate
+    | ClientPerformsAction Evergreen.V1.GameObjectTypes.ActionWithMetadata
     | PleaseMakeMeDirty
     | PleaseGenerateRelic
     | PleaseActivateRelic Evergreen.V1.GameObjectIds.PersonId Evergreen.V1.GameObjectIds.RelicId
@@ -152,5 +153,6 @@ type alias BackendToFrontendState =
 
 type ToFrontend
     = NoOpToFrontend
-    | OtherClientPerformedAction ActionPerformer Evergreen.V1.GameObjectTypes.ActionOnGamestate
+    | ServerAction ActionPerformer Evergreen.V1.GameObjectTypes.ActionOnGamestate
+    | ActionConfirmed Evergreen.V1.GameObjectTypes.ActionWithMetadata
     | UpdateFullState BackendToFrontendState
