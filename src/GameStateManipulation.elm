@@ -225,7 +225,10 @@ lets relics modify the GameState in response to actions.
 relicMiddleware : ActionOnGamestate -> RelicData -> GameState -> ( GameState, BackendTrigger )
 relicMiddleware action relic state =
     case relic.relicType of
-        CleanFast ->
+        Broom ->
+            BackendTriggerUtil.withNoOp state
+
+        Mop ->
             BackendTriggerUtil.withNoOp state
 
         MoreXP ->
@@ -762,11 +765,18 @@ relicBody state relic me =
             isRelicHeldByPerson state.backendConfirmedGameState relic.id state.myId
     in
     case relic.relicType of
-        CleanFast ->
+        Broom ->
+            RelicUtil.simpleRelicBody
+                ("+"
+                    ++ String.fromInt (RelicUtil.broomStrengthBonus relic)
+                    ++ " to Cleaning Strength."
+                )
+
+        Mop ->
             RelicUtil.simpleRelicBody
                 ("x"
                     ++ Util.readableStringFromFloat
-                        (RelicUtil.cleanFastStrengthMultiplier relic)
+                        (RelicUtil.mopStrengthMultiplier relic)
                     ++ " to Cleaning Strength."
                 )
 
@@ -790,9 +800,9 @@ relicBody state relic me =
 
         GuestBook peopleWhoHaveHeldIt ->
             RelicUtil.simpleRelicBody
-                ("Gets more powerful for each person who has held it. Currently increases clean strength by "
+                ("Gets more powerful for each person who has held it. Currently increases clean strength by +"
                     ++ String.fromInt (RelicUtil.guestBookStrength relic peopleWhoHaveHeldIt)
-                    ++ ". List of IDs who have held it: "
+                    ++ "%. List of IDs who have held it: "
                     ++ String.join ", " (List.map personIdToString (SeqSet.toList peopleWhoHaveHeldIt))
                     ++ "."
                 )
@@ -930,24 +940,42 @@ cleanStrengthForPlayer state person =
                         toFloat boost.boost
                   )
     in
-    heldRelics
-        |> List.foldl
-            (\relic acc ->
-                case relic.relicType of
-                    CleanFast ->
-                        acc * RelicUtil.cleanFastStrengthMultiplier relic
+    let
+        -- First apply additive bonuses (Broom only)
+        strengthAfterAdditive =
+            heldRelics
+                |> List.foldl
+                    (\relic acc ->
+                        case relic.relicType of
+                            Broom ->
+                                acc + toFloat (RelicUtil.broomStrengthBonus relic)
 
-                    GuestBook holders ->
-                        acc + toFloat (RelicUtil.guestBookStrength relic holders)
+                            _ ->
+                                acc
+                    )
+                    baseCleanStrength
 
-                    DiminishingPower { currentPower } ->
-                        acc * currentPower
+        -- Then apply multiplicative bonuses (Mop, GuestBook, DiminishingPower)
+        strengthAfterMultiplicative =
+            heldRelics
+                |> List.foldl
+                    (\relic acc ->
+                        case relic.relicType of
+                            Mop ->
+                                acc * RelicUtil.mopStrengthMultiplier relic
 
-                    _ ->
-                        acc
-            )
-            baseCleanStrength
-        |> round
+                            GuestBook holders ->
+                                acc * (1.0 + toFloat (RelicUtil.guestBookStrength relic holders) / 100.0)
+
+                            DiminishingPower { currentPower } ->
+                                acc * currentPower
+
+                            _ ->
+                                acc
+                    )
+                    strengthAfterAdditive
+    in
+    round strengthAfterMultiplicative
 
 
 findSmallestAndLargestNearbyDirts : Point -> GameState -> Maybe ( DirtData, DirtData )

@@ -15,8 +15,11 @@ import Types exposing (..)
 relicName : RelicType -> String
 relicName relicType =
     case relicType of
-        CleanFast ->
-            "Clean Fast!"
+        Broom ->
+            "Broom"
+
+        Mop ->
+            "Mop"
 
         MoreXP ->
             "More XP!"
@@ -131,10 +134,45 @@ dropAndDoubleActivationButton myId droppers relicId =
             [ Html.text "Claim XP" ]
 
 
-{-| Calculates the strength multiplier for CleanFast relics based on rarity and level.
+{-| Calculates the additive strength bonus for Broom relics based on rarity and level.
 -}
-cleanFastStrengthMultiplier : RelicData -> Float
-cleanFastStrengthMultiplier relicData =
+broomStrengthBonus : RelicData -> Int
+broomStrengthBonus relicData =
+    let
+        level =
+            toFloat (relicLevelForExp relicData.rarity relicData.exp)
+
+        baseBonus =
+            case relicData.rarity of
+                Common ->
+                    5.0
+
+                Uncommon ->
+                    15.0
+
+                Rare ->
+                    30.0
+
+                Epic ->
+                    50.0
+
+                Legendary ->
+                    100.0
+
+        -- Scale linearly such that level 5 is 3x base
+        level5Bonus =
+            baseBonus * 3.0
+
+        increasePerLevel =
+            (level5Bonus - baseBonus) / 4.0
+    in
+    round (baseBonus + (level - 1.0) * increasePerLevel)
+
+
+{-| Calculates the strength multiplier for Mop relics based on rarity and level.
+-}
+mopStrengthMultiplier : RelicData -> Float
+mopStrengthMultiplier relicData =
     let
         level =
             toFloat (relicLevelForExp relicData.rarity relicData.exp)
@@ -142,19 +180,19 @@ cleanFastStrengthMultiplier relicData =
         baseMultiplier =
             case relicData.rarity of
                 Common ->
-                    1.3
+                    1.2
 
                 Uncommon ->
-                    1.8
+                    1.5
 
                 Rare ->
-                    2.2
+                    1.8
 
                 Epic ->
-                    3.0
+                    2.5
 
                 Legendary ->
-                    5.0
+                    4.0
 
         -- Scale linearly such that level 5 is 3x base
         level5Multiplier =
@@ -325,9 +363,10 @@ rarityRoll rawRandomValue =
 
 relicWeights : List ( Int, GameObjectTypes.RelicType )
 relicWeights =
-    [ ( 60, GameObjectTypes.CleanFast )
+    [ ( 50, GameObjectTypes.Broom )
+    , ( 20, GameObjectTypes.Mop )
     , ( 10, GameObjectTypes.DropAndDouble [] )
-    , ( 30, GameObjectTypes.MoreXP )
+    , ( 20, GameObjectTypes.MoreXP )
     , ( 10, GameObjectTypes.SplashBucket )
     , ( 5, GameObjectTypes.GuestBook SeqSet.empty )
     , ( 5, GameObjectTypes.DiminishingPower { currentDirtPatch = Nothing, currentPower = 0.0 } )
@@ -352,7 +391,7 @@ relicTypeRoll rawRandomValue =
             else
                 ( acc, chosenRelicType )
         )
-        ( 0, GameObjectTypes.CleanFast )
+        ( 0, GameObjectTypes.Broom )
         relicWeights
         |> Tuple.second
 

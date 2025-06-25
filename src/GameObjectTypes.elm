@@ -56,7 +56,8 @@ type RelicPosition
 
 
 type RelicType
-    = CleanFast
+    = Broom
+    | Mop
     | MoreXP
     | DropAndDouble (List PersonId)
     | SplashBucket
