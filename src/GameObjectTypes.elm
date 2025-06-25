@@ -84,8 +84,15 @@ type Direction
     | DownRight
 
 
+type ActionId
+    = ActionId Int
 
--- TODO: Incorporate `ActionPerformer` straight into this type instead of passing it in parallel everywhere
+
+type alias ActionWithMetadata =
+    { action : ActionOnGamestate
+    , performer : PersonId
+    , id : ActionId
+    }
 
 
 type ActionOnGamestate

@@ -13,6 +13,26 @@ import Types exposing (..)
 import Util
 
 
+{-| Compute the display state by applying optimistic actions on top of backend confirmed state.
+This duplicates logic from Frontend to avoid import cycles.
+-}
+computeDisplayState : FrontendPlayingState -> GameState
+computeDisplayState state =
+    List.foldl
+        (\actionWithMetadata currentState ->
+            let
+                ( newState, _ ) =
+                    GameStateManipulation.executeActionOnGameState
+                        (Client actionWithMetadata.performer)
+                        actionWithMetadata.action
+                        currentState
+            in
+            newState
+        )
+        state.backendConfirmedGameState
+        state.optimisticActions
+
+
 render : FrontendPlayingState -> PersonData -> Html.Html FrontendMsg
 render state me =
     renderPeople state
@@ -25,7 +45,11 @@ render state me =
 
 renderPeople : FrontendPlayingState -> List (Html.Html FrontendMsg)
 renderPeople state =
-    SeqDict.values state.backendConfirmedGameState.personDict
+    let
+        displayState =
+            computeDisplayState state
+    in
+    SeqDict.values displayState.personDict
         |> List.map (personView state.cameraPosition)
 
 
@@ -43,6 +67,10 @@ isDirtVisible cameraPosition position viewportWidth viewportHeight =
 
 getVisibleDirt : FrontendPlayingState -> List DirtData
 getVisibleDirt state =
+    let
+        displayState =
+            computeDisplayState state
+    in
     case state.mapSize of
         Just mapSize ->
             let
@@ -52,11 +80,11 @@ getVisibleDirt state =
                 isVisible dirt =
                     isDirtVisible state.cameraPosition dirt.position viewportSize.x viewportSize.y
             in
-            SeqDict.values state.backendConfirmedGameState.dirtByLocation
+            SeqDict.values displayState.dirtByLocation
                 |> List.filter isVisible
 
         Nothing ->
-            SeqDict.values state.backendConfirmedGameState.dirtByLocation
+            SeqDict.values displayState.dirtByLocation
 
 
 renderDirt : FrontendPlayingState -> List (Html.Html FrontendMsg)
@@ -218,7 +246,11 @@ floorRelicView camera ( floorPosition, relicData ) =
 
 relicsOnFloor : FrontendPlayingState -> List ( GameObjectTypes.Point, List GameObjectTypes.RelicData )
 relicsOnFloor state =
-    SeqDict.toList state.backendConfirmedGameState.relicsByLocation
+    let
+        displayState =
+            computeDisplayState state
+    in
+    SeqDict.toList displayState.relicsByLocation
         |> List.filterMap
             (\( position, relicData ) ->
                 case position of

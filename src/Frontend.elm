@@ -11,7 +11,7 @@ import Effect.Subscription as Subscription exposing (Subscription)
 import Effect.Task
 import Effect.Time
 import GameObjectIds exposing (..)
-import GameObjectTypes exposing (ActionOnGamestate(..), Direction(..), DirtData, PersonData)
+import GameObjectTypes exposing (ActionOnGamestate(..), ActionWithMetadata, Direction(..), DirtData, PersonData)
 import GameStateManipulation
 import Html exposing (..)
 import Html.Attributes exposing (..)
@@ -205,9 +205,9 @@ update msg model =
                                 nextRandom =
                                     modBy 2301875097 (state.cleaningRandom * 348987 + 174039)
 
-                                -- Always update the local state with the Clean action
+                                -- Always update the local state with the Clean action using optimistic update
                                 updatedState =
-                                    updateStateWithAction (Client state.myId) action state
+                                    addOptimisticAction action state
                             in
                             { model | state = Playing { updatedState | cleaningRandom = nextRandom } }
 
@@ -398,7 +398,7 @@ moveMeTowardsMyTargetIfAny model =
 
 moveMeTowardsTargetPoint : FrontendPlayingState -> ( FrontendPlayingState, Command FrontendOnly ToBackend FrontendMsg )
 moveMeTowardsTargetPoint state =
-    case ( state.targetPosition, SeqDict.get state.myId state.backendConfirmedGameState.personDict ) of
+    case ( state.targetPosition, getDisplayStatePersonData state.myId state ) of
         ( Just target, Just me ) ->
             let
                 direction =
@@ -407,12 +407,16 @@ moveMeTowardsTargetPoint state =
             case direction of
                 Just dir ->
                     let
-                        ( newState, action ) =
-                            ( updateStateWithAction (Client state.myId) (MovePerson state.myId dir) state
-                            , Effect.Lamdera.sendToBackend (ClientPerformsAction (MovePerson state.myId dir))
-                            )
+                        moveAction =
+                            MovePerson state.myId dir
+
+                        newState =
+                            addOptimisticAction moveAction state
+
+                        backendCommand =
+                            Effect.Lamdera.sendToBackend (ClientPerformsAction moveAction)
                     in
-                    ( newState, action )
+                    ( newState, backendCommand )
 
                 Nothing ->
                     -- we're already at the target
@@ -426,7 +430,7 @@ updateModelWithActionFromMyself : ActionOnGamestate -> Model -> Model
 updateModelWithActionFromMyself actionOnGamestate model =
     case model.state of
         Playing playingState ->
-            updateModelWithAction (Client playingState.myId) actionOnGamestate model
+            { model | state = Playing (addOptimisticAction actionOnGamestate playingState) }
 
         _ ->
             model
@@ -448,6 +452,101 @@ updateModelWithAction who actionOnGamestate model =
             -- TODO: action came down when the app was in an error state. handle this?
             -- note we currently have no way to reach the Error state.
             model
+
+
+createActionWithId : ActionOnGamestate -> FrontendPlayingState -> ( ActionWithMetadata, FrontendPlayingState )
+createActionWithId action state =
+    let
+        actionWithMetadata =
+            { action = action
+            , performer = state.myId
+            , id = GameObjectTypes.ActionId state.nextActionId
+            }
+
+        updatedState =
+            { state | nextActionId = state.nextActionId + 1 }
+    in
+    ( actionWithMetadata, updatedState )
+
+
+addOptimisticAction : ActionOnGamestate -> FrontendPlayingState -> FrontendPlayingState
+addOptimisticAction action state =
+    let
+        ( actionWithMetadata, updatedState ) =
+            createActionWithId action state
+    in
+    { updatedState | optimisticActions = updatedState.optimisticActions ++ [ actionWithMetadata ] }
+        |> updateCameraPosition
+
+
+computeDisplayState : FrontendPlayingState -> GameState
+computeDisplayState state =
+    List.foldl
+        (\actionWithMetadata currentState ->
+            let
+                ( newState, _ ) =
+                    GameStateManipulation.executeActionOnGameState
+                        (Client actionWithMetadata.performer)
+                        actionWithMetadata.action
+                        currentState
+            in
+            newState
+        )
+        state.backendConfirmedGameState
+        state.optimisticActions
+
+
+getDisplayStatePersonData : PersonId -> FrontendPlayingState -> Maybe PersonData
+getDisplayStatePersonData personId state =
+    SeqDict.get personId (computeDisplayState state).personDict
+
+
+getDisplayStateCleanStrength : FrontendPlayingState -> PersonData -> Int
+getDisplayStateCleanStrength state person =
+    GameStateManipulation.cleanStrengthForPlayer (computeDisplayState state) person
+
+
+getDisplayStateXpMultiplier : FrontendPlayingState -> PersonData -> Float
+getDisplayStateXpMultiplier state person =
+    GameStateManipulation.xpMultiplierForPlayer (computeDisplayState state) person
+
+
+getDisplayStateRelicsHeldByPlayer : PersonId -> FrontendPlayingState -> RelicsById
+getDisplayStateRelicsHeldByPlayer personId state =
+    GameStateManipulation.getRelicsHeldByPlayer personId (computeDisplayState state)
+
+
+getDisplayStateFindSmallestAndLargestNearbyDirts : GameObjectTypes.Point -> FrontendPlayingState -> Maybe ( DirtData, DirtData )
+getDisplayStateFindSmallestAndLargestNearbyDirts position state =
+    GameStateManipulation.findSmallestAndLargestNearbyDirts position (computeDisplayState state)
+
+
+getDisplayStateDirtByLocation : GameObjectTypes.Point -> FrontendPlayingState -> Maybe DirtData
+getDisplayStateDirtByLocation position state =
+    SeqDict.get position (computeDisplayState state).dirtByLocation
+
+
+getDisplayStateRelicsAtLocation : GameObjectTypes.Point -> FrontendPlayingState -> List GameObjectTypes.RelicData
+getDisplayStateRelicsAtLocation position state =
+    GameStateManipulation.relicsAtLocation position (computeDisplayState state)
+
+
+getDisplayStateRarestRelicAtLocation : GameObjectTypes.Point -> FrontendPlayingState -> Maybe GameObjectTypes.RelicData
+getDisplayStateRarestRelicAtLocation position state =
+    GameStateManipulation.getRarestRelicAtLocation position (computeDisplayState state)
+
+
+getDisplayStateIsRelicHeldByPerson : RelicId -> PersonId -> FrontendPlayingState -> Bool
+getDisplayStateIsRelicHeldByPerson relicId personId state =
+    GameStateManipulation.isRelicHeldByPerson (computeDisplayState state) relicId personId
+
+
+{-| Helper function for MapRenderer to get the computed display state.
+This is the main entry point for MapRenderer to access the optimistic state.
+-}
+getDisplayStateForMapRenderer : FrontendPlayingState -> GameState
+getDisplayStateForMapRenderer state =
+    computeDisplayState state
 
 
 updateStateWithAction : ActionPerformer -> ActionOnGamestate -> FrontendPlayingState -> FrontendPlayingState
@@ -545,6 +644,7 @@ initFrontendPlayingState { gameState, myId, debugDirtParams } =
             , currentTime = Effect.Time.millisToPosix 0
             , cleaningRandom = 42
             , stunnedUntil = Effect.Time.millisToPosix 0
+            , nextActionId = 1
             }
     in
     initialState
@@ -577,7 +677,7 @@ renderModel model =
 
 extractMyself : FrontendPlayingState -> Maybe PersonData
 extractMyself state =
-    SeqDict.get state.myId state.backendConfirmedGameState.personDict
+    getDisplayStatePersonData state.myId state
 
 
 renderPlayingState : FrontendPlayingState -> Html.Html FrontendMsg
@@ -653,7 +753,7 @@ renderCleanStrength : FrontendPlayingState -> PersonData -> Html.Html FrontendMs
 renderCleanStrength state me =
     let
         strength =
-            GameStateManipulation.cleanStrengthForPlayer state.backendConfirmedGameState me
+            getDisplayStateCleanStrength state me
 
         highFiveText =
             case me.bestHighFiveBoost of
@@ -692,7 +792,7 @@ renderXPMultiplier : FrontendPlayingState -> PersonData -> Html.Html FrontendMsg
 renderXPMultiplier state me =
     let
         xpMultiplier =
-            GameStateManipulation.xpMultiplierForPlayer state.backendConfirmedGameState me
+            getDisplayStateXpMultiplier state me
     in
     if xpMultiplier == 1 then
         Html.text ""
@@ -708,7 +808,7 @@ renderRelicContent : FrontendPlayingState -> PersonData -> List (Html.Html Front
 renderRelicContent state me =
     let
         myRelics =
-            GameStateManipulation.getRelicsHeldByPlayer state.myId state.backendConfirmedGameState
+            getDisplayStateRelicsHeldByPlayer state.myId state
                 |> SeqDict.values
     in
     [ Html.div [ class "prose mt-8" ]
@@ -848,7 +948,7 @@ renderMobileRelicsButton : FrontendPlayingState -> PersonData -> Html.Html Front
 renderMobileRelicsButton state me =
     let
         numHeldRelics =
-            GameStateManipulation.getRelicsHeldByPlayer state.myId state.backendConfirmedGameState
+            getDisplayStateRelicsHeldByPlayer state.myId state
                 |> SeqDict.size
                 |> String.fromInt
 
@@ -935,7 +1035,7 @@ renderHeldRelics state me =
 
 renderEmptySquareWithNearestDirt : FrontendPlayingState -> PersonData -> Html.Html FrontendMsg
 renderEmptySquareWithNearestDirt state me =
-    case GameStateManipulation.findSmallestAndLargestNearbyDirts me.position state.backendConfirmedGameState of
+    case getDisplayStateFindSmallestAndLargestNearbyDirts me.position state of
         Just ( lowDirt, highDirt ) ->
             Html.div [ class "prose" ]
                 [ Html.h2 [ class "text-center" ]
@@ -980,12 +1080,12 @@ renderRelicsOnSquare state me relics =
 renderOnThisSquare : FrontendPlayingState -> PersonData -> Html.Html FrontendMsg
 renderOnThisSquare state me =
     Html.div [ class "order-3 md:order-none touch-manipulation overflow-y-scroll" ]
-        [ case SeqDict.get me.position state.backendConfirmedGameState.dirtByLocation of
+        [ case getDisplayStateDirtByLocation me.position state of
             Just dirt ->
                 renderDirtOnThisSquare state me dirt
 
             Nothing ->
-                case GameStateManipulation.relicsAtLocation me.position state.backendConfirmedGameState of
+                case getDisplayStateRelicsAtLocation me.position state of
                     [] ->
                         renderEmptySquareWithNearestDirt state me
 
@@ -1202,7 +1302,7 @@ relicCardTitle : FrontendPlayingState -> PersonData -> GameObjectTypes.RelicData
 relicCardTitle state me relicData =
     let
         isHeldByMe =
-            GameStateManipulation.isRelicHeldByPerson state.backendConfirmedGameState relicData.id me.id
+            getDisplayStateIsRelicHeldByPerson relicData.id me.id state
     in
     Html.div [ class "flex justify-between items-center w-full" ]
         [ Html.span [ class ("dark:text-black font-semibold px-2 py-1 rounded-md " ++ RelicUtil.relicBgColor relicData.rarity) ]
@@ -1257,9 +1357,9 @@ tryCleaningWithMe me state =
         NoOpFrontendMsg
 
     else
-        case SeqDict.get me.position state.backendConfirmedGameState.dirtByLocation of
+        case getDisplayStateDirtByLocation me.position state of
             Nothing ->
-                case GameStateManipulation.getRarestRelicAtLocation me.position state.backendConfirmedGameState of
+                case getDisplayStateRarestRelicAtLocation me.position state of
                     Nothing ->
                         NoOpFrontendMsg
 

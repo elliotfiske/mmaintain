@@ -42,7 +42,7 @@ type alias FrontendModel =
 
 type alias FrontendPlayingState =
     { backendConfirmedGameState : GameState
-    , optimisticActions : List ActionOnGamestate
+    , optimisticActions : List ActionWithMetadata
     , myId : PersonId
     , targetPosition : Maybe Point
     , showingDebugStuff : Bool
@@ -59,6 +59,7 @@ type alias FrontendPlayingState =
     , currentTime : Effect.Time.Posix
     , stunnedUntil : Effect.Time.Posix
     , cleaningRandom : Int
+    , nextActionId : Int
     }
 
 
