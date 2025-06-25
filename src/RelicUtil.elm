@@ -369,7 +369,7 @@ relicWeights =
     , ( 20, GameObjectTypes.MoreXP )
     , ( 10, GameObjectTypes.SplashBucket )
     , ( 5, GameObjectTypes.GuestBook SeqSet.empty )
-    , ( 5, GameObjectTypes.DiminishingPower { currentDirtPatch = Nothing, currentPower = 0.0 } )
+    , ( 0, GameObjectTypes.DiminishingPower { currentDirtPatch = Nothing, currentPower = 0.0 } )
     , ( 5, GameObjectTypes.HighFive )
     ]
 
