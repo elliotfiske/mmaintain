@@ -59,9 +59,7 @@ port receiveElementSize : (Decode.Value -> msg) -> Sub msg
 subscriptions : Model -> Subscription FrontendOnly FrontendMsg
 subscriptions model =
     Subscription.batch
-        -- TODO: move key listening to the `main-map` element
-        [ Effect.Browser.Events.onKeyDown (keyDecoder model)
-        , maybeTargetMovementTick model
+        [ maybeTargetMovementTick model
         , animationTick
         , Subscription.fromJs "receiveElementSize"
             receiveElementSize
@@ -102,70 +100,6 @@ animationTick : Subscription FrontendOnly FrontendMsg
 animationTick =
     Effect.Time.every (Duration.milliseconds 20) AnimationTick
 
-
-keyDecoder : Model -> Decode.Decoder FrontendMsg
-keyDecoder model =
-    Decode.map (msgFromKey model) (Decode.field "key" Decode.string)
-
-
-msgFromKey : Model -> String -> FrontendMsg
-msgFromKey model str =
-    case model.state of
-        Loading ->
-            NoOpFrontendMsg
-
-        Error _ ->
-            NoOpFrontendMsg
-
-        Playing playingState ->
-            handleKey playingState str
-
-
-handleKey : FrontendPlayingState -> String -> FrontendMsg
-handleKey state key =
-    case key of
-        "w" ->
-            PerformAction (MovePerson state.myId Up)
-
-        "s" ->
-            PerformAction (MovePerson state.myId Down)
-
-        "a" ->
-            PerformAction (MovePerson state.myId Left)
-
-        "d" ->
-            PerformAction (MovePerson state.myId Right)
-
-        "ArrowUp" ->
-            PerformAction (MovePerson state.myId Up)
-
-        "ArrowDown" ->
-            PerformAction (MovePerson state.myId Down)
-
-        "ArrowLeft" ->
-            PerformAction (MovePerson state.myId Left)
-
-        "ArrowRight" ->
-            PerformAction (MovePerson state.myId Right)
-
-        "r" ->
-            if state.showingDebugStuff then
-                DebugGenerateRelic
-
-            else
-                NoOpFrontendMsg
-
-        " " ->
-            tryCleaning state
-
-        "`" ->
-            ToggleDebugStuff
-
-        "Escape" ->
-            CloseModals
-
-        _ ->
-            NoOpFrontendMsg
 
 
 init : Url.Url -> Effect.Browser.Navigation.Key -> ( Model, Command restriction toMsg FrontendMsg )
@@ -1401,43 +1335,3 @@ pickUpButton relicId myId =
         [ Html.img [ src "hand-pick-up.png", class "w-8 h-8 dark:invert" ] [] ]
 
 
-tryCleaning : FrontendPlayingState -> FrontendMsg
-tryCleaning state =
-    let
-        maybeMe =
-            extractMyself state
-    in
-    case maybeMe of
-        Nothing ->
-            NoOpFrontendMsg
-
-        Just me ->
-            tryCleaningWithMe me state
-
-
-tryCleaningWithMe : PersonData -> FrontendPlayingState -> FrontendMsg
-tryCleaningWithMe me state =
-    -- Don't allow cleaning if player is stunned
-    if isPlayerStunned state then
-        NoOpFrontendMsg
-
-    else
-        case getDisplayStateDirtByLocation me.position state of
-            Nothing ->
-                case getDisplayStateRarestRelicAtLocation me.position state of
-                    Nothing ->
-                        NoOpFrontendMsg
-
-                    Just relic ->
-                        PerformAction (PickUpRelic relic.id me.id)
-
-            Just dirt ->
-                let
-                    ( _, _, inTargetZone ) =
-                        calculateMinigameState state
-                in
-                if inTargetZone then
-                    PerformAction (Clean me.id dirt.position)
-
-                else
-                    StunSelf

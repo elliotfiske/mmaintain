@@ -7,6 +7,7 @@ import GameStateManipulation
 import Html exposing (..)
 import Html.Attributes exposing (..)
 import Html.Events
+import KeyboardInput
 import RelicUtil
 import SeqDict exposing (SeqDict)
 import Types exposing (..)
@@ -40,7 +41,7 @@ render state me =
         ++ renderFloorRelics state
         ++ renderClickableLayer state
         ++ renderTooltipLayer state me
-        |> Html.div [ class "order-2 md:order-none md:col-span-2 bg-green-800 relative overflow-hidden", id "main-map", tabindex 0 ]
+        |> Html.div [ class "order-2 md:order-none md:col-span-2 bg-green-800 relative overflow-hidden", id "main-map", tabindex 0, Html.Events.on "keydown" (KeyboardInput.keyDecoder state) ]
 
 
 renderPeople : FrontendPlayingState -> List (Html.Html FrontendMsg)
