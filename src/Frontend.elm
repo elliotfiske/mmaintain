@@ -24,7 +24,6 @@ import Material.Icons.Types as Coloring
 import Modals
 import PointUtil
 import RelicUtil
-import Scroll
 import SeqDict
 import Svg
 import Svg.Attributes
@@ -275,7 +274,27 @@ update msg model =
             ( modelUpdateIfPlaying toggleMobileRelicMenu model, Command.none )
 
         ToggleSkillTreeMenu ->
-            ( modelUpdateIfPlaying toggleSkillTreeMenu model, Command.none )
+            let
+                updatedModel =
+                    modelUpdateIfPlaying toggleSkillTreeMenu model
+
+                -- Scroll to center of the skill tree
+                scrollCommand =
+                    Effect.Task.attempt (\_ -> NoOpFrontendMsg)
+                        (scrollElementToCenter
+                            "skill-tree-svg-container"
+                            "skill-tree-svg"
+                            0.5
+                            -- outerXPos (center)
+                            0.5
+                            -- innerXPos (center)
+                            0.5
+                            -- outerYPos (center)
+                            0.5
+                         -- innerYPos (center)
+                        )
+            in
+            ( updatedModel, scrollCommand )
 
         ReceivedMapSize size ->
             ( modelUpdateIfPlaying (\state -> { state | mapSize = Just size } |> updateCameraPosition) model, Command.none )
@@ -299,6 +318,38 @@ closeModals state =
 toggleMobileRelicMenu : FrontendPlayingState -> FrontendPlayingState
 toggleMobileRelicMenu state =
     { state | mobileRelicMenuOpen = not state.mobileRelicMenuOpen }
+
+
+scrollElementToCenter : String -> String -> Float -> Float -> Float -> Float -> Effect.Task.Task FrontendOnly Effect.Browser.Dom.Error ()
+scrollElementToCenter outerId innerId outerXPos innerXPos outerYPos innerYPos =
+    Effect.Task.map3
+        (\outerVp outerE innerE ->
+            Effect.Browser.Dom.setViewportOf (Effect.Browser.Dom.id outerId)
+                (outerVp.viewport.x
+                    + innerE.element.x
+                    + innerXPos
+                    * innerE.element.width
+                    - outerE.element.x
+                    - outerXPos
+                    * outerVp.viewport.width
+                    |> round
+                    |> toFloat
+                )
+                (outerVp.viewport.y
+                    + innerE.element.y
+                    + innerYPos
+                    * innerE.element.height
+                    - outerE.element.y
+                    - outerYPos
+                    * outerVp.viewport.height
+                    |> round
+                    |> toFloat
+                )
+        )
+        (Effect.Browser.Dom.getViewportOf (Effect.Browser.Dom.id outerId))
+        (Effect.Browser.Dom.getElement (Effect.Browser.Dom.id outerId))
+        (Effect.Browser.Dom.getElement (Effect.Browser.Dom.id innerId))
+        |> Effect.Task.andThen identity
 
 
 toggleSkillTreeMenu : FrontendPlayingState -> FrontendPlayingState
