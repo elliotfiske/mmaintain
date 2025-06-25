@@ -109,9 +109,6 @@ maybeAnimationTick model =
             Subscription.none
 
 
-
-
-
 init : Url.Url -> Effect.Browser.Navigation.Key -> ( Model, Command restriction toMsg FrontendMsg )
 init _ key =
     ( { key = key
@@ -520,8 +517,8 @@ removeConfirmedActionFromOptimisticList confirmedAction state =
                 (\actionWithMetadata ->
                     actionWithMetadata.id
                         /= confirmedAction.id
-                        && actionWithMetadata.performer
-                        == confirmedAction.performer
+                        || actionWithMetadata.performer
+                        /= confirmedAction.performer
                 )
                 state.optimisticActions
 
@@ -1343,5 +1340,3 @@ pickUpButton relicId myId =
         , id "pickup-button"
         ]
         [ Html.img [ src "hand-pick-up.png", class "w-8 h-8 dark:invert" ] [] ]
-
-
