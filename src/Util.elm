@@ -46,26 +46,47 @@ renderOffsetMultiplier =
 
 expForLevel : Int -> Int
 expForLevel level =
-    case Dict.get level levelTable of
-        Nothing ->
-            4000
+    if level <= 20 then
+        case Dict.get level levelTable of
+            Nothing ->
+                4000
 
-        Just exp ->
-            exp
+            Just exp ->
+                exp
+
+    else
+        -- For levels > 20, each level requires 1000 XP past level 20
+        -- Level 21 = 6500 + 1000 = 7500
+        -- Level 22 = 6500 + 2000 = 8500, etc.
+        6500 + ((level - 20) * 1000)
 
 
 levelForExp : Int -> Int
 levelForExp xp =
-    List.foldl
-        (\( level, exp ) acc ->
-            if xp >= exp then
-                level
+    if xp < 6500 then
+        -- Use the original level table for levels 0-20
+        List.foldl
+            (\( level, exp ) acc ->
+                if xp >= exp then
+                    level
 
-            else
-                acc
-        )
-        0
-        levelList
+                else
+                    acc
+            )
+            0
+            levelList
+
+    else
+        -- For XP >= 6500, calculate infinite levels past 20
+        -- Each level past 20 requires 1000 XP
+        let
+            xpPastLevel20 =
+                xp - 6500
+
+            additionalLevels =
+                xpPastLevel20 // 1000
+        in
+        20 + additionalLevels
 
 
 levelList : List ( Int, Int )
