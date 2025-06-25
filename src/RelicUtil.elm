@@ -451,37 +451,37 @@ relicLevelProgress rarity xp =
 -- Calculate the splash bucket cleaning strength based on rarity and experience
 
 
-splashBucketStrength : RelicRarity -> Int -> Int
+splashBucketStrength : RelicRarity -> Int -> Float
 splashBucketStrength rarity exp =
     let
-        baseStrength =
+        basePercentage =
             case rarity of
                 Common ->
-                    5
+                    5.0
 
                 Uncommon ->
-                    10
+                    10.0
 
                 Rare ->
-                    20
+                    25.0
 
                 Epic ->
-                    40
+                    50.0
 
                 Legendary ->
-                    80
+                    100.0
 
         level =
             toFloat (relicLevelForExp rarity exp)
 
         -- Scale linearly such that level 5 is 2x base
-        level5Strength =
-            toFloat baseStrength * 2.0
+        level5Percentage =
+            basePercentage * 2.0
 
         increasePerLevel =
-            (level5Strength - toFloat baseStrength) / 4.0
+            (level5Percentage - basePercentage) / 4.0
     in
-    round (toFloat baseStrength + (level - 1.0) * increasePerLevel)
+    basePercentage + (level - 1.0) * increasePerLevel
 
 
 guestBookStrength : RelicData -> SeqSet PersonId -> Int

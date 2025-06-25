@@ -668,8 +668,23 @@ handleSplashBucket location relic personId state =
             , { x = location.x, y = location.y - 1 }
             ]
 
+        maybePlayer =
+            SeqDict.get personId state.personDict
+
         splashStrength =
-            RelicUtil.splashBucketStrength relic.rarity relic.exp
+            case maybePlayer of
+                Just player ->
+                    let
+                        playerCleanStrength =
+                            cleanStrengthForPlayer state player
+
+                        splashPercentage =
+                            RelicUtil.splashBucketStrength relic.rarity relic.exp
+                    in
+                    ceiling (toFloat playerCleanStrength * splashPercentage / 100.0)
+
+                Nothing ->
+                    1
     in
     List.foldl
         (applyClean personId splashStrength)
@@ -769,8 +784,8 @@ relicBody state relic me =
         SplashBucket ->
             RelicUtil.simpleRelicBody
                 ("Also clean the dirt on adjacent squares at "
-                    ++ String.fromInt (RelicUtil.splashBucketStrength relic.rarity relic.exp)
-                    ++ " strength."
+                    ++ Util.readableStringFromFloat (RelicUtil.splashBucketStrength relic.rarity relic.exp)
+                    ++ "% of your clean strength."
                 )
 
         GuestBook peopleWhoHaveHeldIt ->

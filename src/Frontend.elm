@@ -1242,6 +1242,16 @@ renderCleaningMinigame state me dirt =
 
             else
                 "btn btn-primary w-full"
+
+        cleaningButtonAction =
+            if isStunned then
+                NoOpFrontendMsg
+
+            else if inTargetZone then
+                PerformAction (Clean me.id dirt.position)
+
+            else
+                StunSelf
     in
     Html.div [ class "flex flex-col gap-2" ]
         [ Html.div [ class "bg-blue-500 h-8 w-full relative" ]
@@ -1261,16 +1271,8 @@ renderCleaningMinigame state me dirt =
             ]
         , Html.button
             [ class buttonClass
-            , Html.Events.onClick
-                (if isStunned then
-                    NoOpFrontendMsg
-
-                 else if inTargetZone then
-                    PerformAction (Clean me.id dirt.position)
-
-                 else
-                    StunSelf
-                )
+            , Html.Events.onMouseDown cleaningButtonAction
+            , Html.Events.on "touchstart" (Decode.succeed cleaningButtonAction)
             ]
             [ text buttonText ]
         ]

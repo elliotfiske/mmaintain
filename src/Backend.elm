@@ -369,7 +369,7 @@ debugAddRelic model =
         newRelic : GameObjectTypes.RelicData
         newRelic =
             { id = RelicId newId
-            , relicType = GameObjectTypes.HighFive
+            , relicType = GameObjectTypes.SplashBucket
             , rarity = GameObjectTypes.Legendary
             , exp = 0
             }
