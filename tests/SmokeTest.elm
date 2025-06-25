@@ -49,8 +49,8 @@ tests =
             "/"
             { width = 800, height = 600 }
             (\client1 ->
-                [ client1.keyDown 100 (Dom.id "main-map") "`" []
-                , client1.click 0 (Dom.id "add-dirt-button")
+                [ client1.click 100 (Dom.id "add-dirt-button")
+                , client1.keyDown 0 (Dom.id "main-map") "`" []
                 , client1.keyDown 0 (Dom.id "main-map") "r" []
                 , client1.keyDown 0 (Dom.id "main-map") "`" []
                 , Effect.Test.connectFrontend

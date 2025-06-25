@@ -169,7 +169,7 @@ debugStuff state =
                         ]
                     ]
                 ]
-            , Html.button [ Html.Events.onClick ClickedPleaseMakeMeDirty, class "btn btn-primary", id "add-dirt-button" ] [ text "Add Dirt" ]
+            , Html.button [ Html.Events.onClick ClickedPleaseMakeMeDirty, class "btn btn-primary", id "debug-add-dirt-button" ] [ text "Add Dirt" ]
             , Html.button [ Html.Events.onClick NukeBackend, class "btn btn-error" ] [ text "Nuke Backend" ]
             , Html.div [] (debugDictsView state)
             ]
