@@ -8,6 +8,7 @@ import Effect.Lamdera
 import Effect.Subscription as Subscription
 import Effect.Test exposing (FileUpload(..), HttpResponse(..), MultipleFilesUpload(..))
 import Effect.Time
+import Expect
 import Frontend
 import Html
 import Test exposing (describe)
@@ -48,10 +49,54 @@ tests =
             "/"
             { width = 800, height = 600 }
             (\client1 ->
-                [ client1.click 100 (Dom.id "add-dirt-button")
-                , client1.keyDown 100 (Dom.id "main-map") "`" []
-                , client1.keyDown 100 (Dom.id "main-map") "r" []
-                , client1.keyDown 100 (Dom.id "main-map") "`" []
+                [ client1.keyDown 100 (Dom.id "main-map") "`" []
+                , client1.click 0 (Dom.id "add-dirt-button")
+                , client1.keyDown 0 (Dom.id "main-map") "r" []
+                , client1.keyDown 0 (Dom.id "main-map") "`" []
+                , Effect.Test.connectFrontend
+                    0
+                    (Effect.Lamdera.sessionIdFromString "sessionId1")
+                    "/"
+                    { width = 800, height = 600 }
+                    (\client2 ->
+                        [ -- Both clients should see the relic initially
+                          client1.checkView 100 (Test.Html.Query.has [ Test.Html.Selector.class "sprite", Test.Html.Selector.class "relic" ])
+                        , client2.checkView 0 (Test.Html.Query.has [ Test.Html.Selector.class "sprite", Test.Html.Selector.class "relic" ])
+
+                        -- Both clients move to the relic position (1 space up and left from start)
+                        , client1.keyDown 0 (Dom.id "main-map") "ArrowLeft" []
+                        , client1.keyDown 0 (Dom.id "main-map") "ArrowUp" []
+                        , client2.keyDown 0 (Dom.id "main-map") "ArrowLeft" []
+                        , client2.keyDown 0 (Dom.id "main-map") "ArrowUp" []
+
+                        -- Both clients attempt to pick up the relic at the same time (spacebar)
+                        , client1.keyDown 300 (Dom.id "main-map") " " []
+                        , client2.keyDown 0 (Dom.id "main-map") " " []
+
+                        -- Both clients should now see the relic in their inventory (due to optimistic update)
+                        , client1.checkView 0 (Test.Html.Query.has [ Test.Html.Selector.id "drop-button" ])
+                        , client2.checkView 0 (Test.Html.Query.has [ Test.Html.Selector.id "drop-button" ])
+
+                        -- Wait for backend to process actions and resolve the conflict
+                        , Effect.Test.andThen 1000
+                            (\_ ->
+                                [ -- The first client should now have the relic in their inventory
+                                  client1.checkView 0
+                                    (Test.Html.Query.has [ Test.Html.Selector.id "drop-button" ])
+
+                                -- The second client should not have the relic in their inventory
+                                , client2.checkView 0 (Test.Html.Query.hasNot [ Test.Html.Selector.id "drop-button" ])
+
+                                -- The relic should no longer be visible on the map for either client
+                                , client1.checkView 0 (Test.Html.Query.hasNot [ Test.Html.Selector.class "sprite", Test.Html.Selector.class "relic" ])
+                                , client2.checkView 0 (Test.Html.Query.hasNot [ Test.Html.Selector.class "sprite", Test.Html.Selector.class "relic" ])
+
+                                -- The first client should have a relic in their inventory
+                                , client1.checkView 0 (Test.Html.Query.has [ Test.Html.Selector.id "drop-button" ])
+                                ]
+                            )
+                        ]
+                    )
                 ]
             )
         ]
