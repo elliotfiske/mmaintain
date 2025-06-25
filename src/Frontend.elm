@@ -197,7 +197,7 @@ update msg model =
                 refocus =
                     Effect.Task.attempt (\_ -> NoOpFrontendMsg) (Effect.Browser.Dom.focus (Effect.Browser.Dom.id "main-map"))
 
-                newModel =
+                ( actionWithMetadata, newModel ) =
                     case ( action, model.state ) of
                         ( Clean _ _, Playing state ) ->
                             -- Advance the random number for the next target
@@ -205,19 +205,28 @@ update msg model =
                                 nextRandom =
                                     modBy 2301875097 (state.cleaningRandom * 348987 + 174039)
 
-                                -- Always update the local state with the Clean action using optimistic update
-                                updatedState =
-                                    addOptimisticAction action state
+                                ( metadata, updatedState ) =
+                                    addOptimisticActionAndReturnMetadata action state
                             in
-                            { model | state = Playing { updatedState | cleaningRandom = nextRandom } }
+                            ( metadata, { model | state = Playing { updatedState | cleaningRandom = nextRandom } } )
+
+                        ( _, Playing state ) ->
+                            let
+                                ( metadata, updatedState ) =
+                                    addOptimisticActionAndReturnMetadata action state
+
+                                modelWithUpdatedState =
+                                    { model | state = Playing updatedState }
+                                        -- if the player hits any key, cancel moving to the clicked target
+                                        |> modelUpdateTarget Nothing
+                            in
+                            ( metadata, modelWithUpdatedState )
 
                         _ ->
-                            model
-                                -- if the player hits any key, cancel moving to the clicked target
-                                |> modelUpdateTarget Nothing
-                                |> updateModelWithActionFromMyself action
+                            -- Non-playing states - this shouldn't happen, but handle gracefully
+                            ( { action = action, performer = PersonId 0, id = GameObjectTypes.ActionId 0 }, model )
             in
-            ( newModel, Command.batch [ Effect.Lamdera.sendToBackend (ClientPerformsAction action), refocus ] )
+            ( newModel, Command.batch [ Effect.Lamdera.sendToBackend (ClientPerformsAction actionWithMetadata), refocus ] )
 
         StunSelf ->
             let
@@ -410,11 +419,11 @@ moveMeTowardsTargetPoint state =
                         moveAction =
                             MovePerson state.myId dir
 
-                        newState =
-                            addOptimisticAction moveAction state
+                        ( actionWithMetadata, newState ) =
+                            addOptimisticActionAndReturnMetadata moveAction state
 
                         backendCommand =
-                            Effect.Lamdera.sendToBackend (ClientPerformsAction moveAction)
+                            Effect.Lamdera.sendToBackend (ClientPerformsAction actionWithMetadata)
                     in
                     ( newState, backendCommand )
 
@@ -477,6 +486,19 @@ addOptimisticAction action state =
     in
     { updatedState | optimisticActions = updatedState.optimisticActions ++ [ actionWithMetadata ] }
         |> updateCameraPosition
+
+
+addOptimisticActionAndReturnMetadata : ActionOnGamestate -> FrontendPlayingState -> ( ActionWithMetadata, FrontendPlayingState )
+addOptimisticActionAndReturnMetadata action state =
+    let
+        ( actionWithMetadata, updatedState ) =
+            createActionWithId action state
+
+        finalState =
+            { updatedState | optimisticActions = updatedState.optimisticActions ++ [ actionWithMetadata ] }
+                |> updateCameraPosition
+    in
+    ( actionWithMetadata, finalState )
 
 
 computeDisplayState : FrontendPlayingState -> GameState
@@ -549,9 +571,37 @@ getDisplayStateForMapRenderer state =
     computeDisplayState state
 
 
+removeConfirmedActionFromOptimisticList : ActionWithMetadata -> FrontendPlayingState -> FrontendPlayingState
+removeConfirmedActionFromOptimisticList confirmedAction state =
+    let
+        updatedOptimisticActions =
+            -- Remove the action from the optimistic list. We only remove the action if it's the same performer and id.
+            List.filter
+                (\actionWithMetadata ->
+                    actionWithMetadata.id
+                        /= confirmedAction.id
+                        && actionWithMetadata.performer
+                        == confirmedAction.performer
+                )
+                state.optimisticActions
+
+        -- If we removed an optimistic action, update the camera position since
+        -- the computed display state may have changed
+        stateWithUpdatedActions =
+            { state | optimisticActions = updatedOptimisticActions }
+    in
+    if List.length updatedOptimisticActions /= List.length state.optimisticActions then
+        -- We removed an action, update camera position
+        updateCameraPosition stateWithUpdatedActions
+
+    else
+        -- No action was removed (this ActionId wasn't in our optimistic list,
+        -- probably from another player), so no need to update camera
+        stateWithUpdatedActions
+
+
 updateStateWithAction : ActionPerformer -> ActionOnGamestate -> FrontendPlayingState -> FrontendPlayingState
 updateStateWithAction who action prevState =
-    -- UP NEXT: Instead of modifying the state here, add to the list of "optimistic actions".
     let
         ( newState, _ ) =
             GameStateManipulation.executeActionOnGameState who action prevState.backendConfirmedGameState
@@ -612,8 +662,25 @@ updateFromBackend msg model =
             in
             ( { model | state = newState }, Command.none )
 
-        OtherClientPerformedAction who action ->
+        ServerAction who action ->
             ( updateModelWithAction who action model, Command.none )
+
+        ActionConfirmed actionWithMetadata ->
+            case model.state of
+                Playing playingState ->
+                    let
+                        -- First, update the backend confirmed state with the confirmed action
+                        stateWithConfirmedAction =
+                            updateStateWithAction (Client actionWithMetadata.performer) actionWithMetadata.action playingState
+
+                        -- Then, remove the action from optimistic list if it's there
+                        finalState =
+                            removeConfirmedActionFromOptimisticList actionWithMetadata stateWithConfirmedAction
+                    in
+                    ( { model | state = Playing finalState }, Command.none )
+
+                _ ->
+                    ( model, Command.none )
 
 
 updatePlayingStateWithBackendStateDump : BackendToFrontendState -> FrontendPlayingState -> FrontendPlayingState

@@ -4,7 +4,7 @@ import Effect.Command as Command exposing (BackendOnly, Command)
 import Effect.Lamdera
 import Effect.Subscription as Subscription exposing (Subscription)
 import GameObjectIds exposing (..)
-import GameObjectTypes exposing (ActionOnGamestate(..))
+import GameObjectTypes exposing (ActionOnGamestate(..), ActionWithMetadata)
 import GameState
 import GameStateManipulation exposing (executeActionOnGameState)
 import Lamdera
@@ -147,31 +147,34 @@ createDirt args model =
         ( finalModel, _ ) =
             executeActionOnModel Server incrementedModel (AddDirt newDirt)
     in
-    ( finalModel, Effect.Lamdera.broadcast (OtherClientPerformedAction Server (AddDirt newDirt)) )
+    ( finalModel, Effect.Lamdera.broadcast (ServerAction Server (AddDirt newDirt)) )
 
 
-handleClientPerformedAction : PersonId -> Effect.Lamdera.ClientId -> ActionOnGamestate -> Model -> ( Model, Command BackendOnly ToFrontend BackendMsg )
-handleClientPerformedAction personId clientId actionOnGamestate model =
+handleClientPerformedAction : PersonId -> ActionWithMetadata -> Model -> ( Model, Command BackendOnly ToFrontend BackendMsg )
+handleClientPerformedAction personId actionWithMetadata model =
     let
         ( newGameState, trigger ) =
             model.gameState
-                |> executeActionOnGameState (Client personId) actionOnGamestate
+                |> executeActionOnGameState (Client personId) actionWithMetadata.action
 
         newModel =
             { model | gameState = newGameState }
 
         -- Updates model with the triggered "Backend Triggers" and potentially send a new action to send back to the client.
         ( newerModel, actionFromTrigger ) =
-            -- todo: "Server" is incorrect here (placeholder)
             executeBackendTrigger (Client personId) trigger newModel
     in
     ( newerModel
     , Command.batch
-        [ -- "everyone but me" needs to know about the action "I" performed
-          forwardToEveryoneButMe actionOnGamestate (Client personId) clientId model
+        [ -- Send confirmation of the action to all clients
+          Effect.Lamdera.broadcast (ActionConfirmed actionWithMetadata)
 
-        -- but even "I" need to know about the backend trigger fired by "my" action
-        , Effect.Lamdera.broadcast (OtherClientPerformedAction Server actionFromTrigger)
+        -- Send any server-triggered actions that resulted from this player action
+        , if actionFromTrigger /= GameStateNoOp then
+            Effect.Lamdera.broadcast (ServerAction Server actionFromTrigger)
+
+          else
+            Command.none
         ]
     )
 
@@ -184,7 +187,7 @@ updateFromFrontend sessionId clientId msg model =
         NoOpToBackend ->
             ( model, Command.none )
 
-        ClientPerformsAction actionOnGamestate ->
+        ClientPerformsAction actionWithMetadata ->
             let
                 maybePersonId =
                     SeqDict.get sessionId model.sessionIdToPersonId
@@ -194,7 +197,7 @@ updateFromFrontend sessionId clientId msg model =
                     ( model, Command.none )
 
                 Just personId ->
-                    handleClientPerformedAction personId clientId actionOnGamestate model
+                    handleClientPerformedAction personId actionWithMetadata model
 
         PleaseMakeMeDirty ->
             addSomeDirt model
@@ -240,8 +243,8 @@ updateFromFrontend sessionId clientId msg model =
             in
             ( newModel2
             , Command.batch
-                [ Effect.Lamdera.broadcast (OtherClientPerformedAction Server actionsFromActivation)
-                , Effect.Lamdera.broadcast (OtherClientPerformedAction Server actionsFromTrigger)
+                [ Effect.Lamdera.broadcast (ServerAction Server actionsFromActivation)
+                , Effect.Lamdera.broadcast (ServerAction Server actionsFromTrigger)
                 ]
             )
 
@@ -377,7 +380,7 @@ debugAddRelic model =
         ( newModel, _ ) =
             executeActionOnModel Server incModel action
     in
-    ( newModel, Effect.Lamdera.broadcast (OtherClientPerformedAction Server action) )
+    ( newModel, Effect.Lamdera.broadcast (ServerAction Server action) )
 
 
 addSomeDirt : Model -> ( Model, Command BackendOnly ToFrontend BackendMsg )
@@ -428,7 +431,7 @@ forwardToEveryoneButMe : ActionOnGamestate -> ActionPerformer -> Effect.Lamdera.
 forwardToEveryoneButMe action performer myClientId model =
     model.connectedClients
         |> List.filter (\c -> c /= myClientId)
-        |> List.map (\id -> Effect.Lamdera.sendToFrontend id (OtherClientPerformedAction performer action))
+        |> List.map (\id -> Effect.Lamdera.sendToFrontend id (ServerAction performer action))
         |> Command.batch
 
 

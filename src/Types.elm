@@ -125,7 +125,7 @@ type FrontendMsg
 
 type ToBackend
     = NoOpToBackend
-    | ClientPerformsAction ActionOnGamestate
+    | ClientPerformsAction ActionWithMetadata
     | PleaseMakeMeDirty
     | PleaseGenerateRelic
     | PleaseActivateRelic PersonId RelicId
@@ -146,5 +146,6 @@ type ActionPerformer
 
 type ToFrontend
     = NoOpToFrontend
-    | OtherClientPerformedAction ActionPerformer ActionOnGamestate
+    | ServerAction ActionPerformer ActionOnGamestate
+    | ActionConfirmed ActionWithMetadata
     | UpdateFullState BackendToFrontendState
