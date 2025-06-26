@@ -6,6 +6,7 @@ module GameStateManipulation exposing
     , getRelicsHeldByPlayer
     , isRelicHeldByPerson
     , relicBody
+    , relicRarityBoostForPlayer
     , relicsAtLocation
     , xpMultiplierForPlayer
     )
@@ -291,6 +292,10 @@ relicMiddleware action relic state =
 
                 _ ->
                     BackendTriggerUtil.withNoOp state
+
+        MetalDetector ->
+            -- Metal Detector is passive - only affects relic find boost calculation
+            BackendTriggerUtil.withNoOp state
 
 
 {-| Find all players at a given location, excluding one player.
@@ -732,6 +737,39 @@ xpMultiplierForPlayer state person =
             1
 
 
+relicRarityBoostForPlayer : GameState -> PersonData -> Int
+relicRarityBoostForPlayer state person =
+    let
+        -- Check for skill-based boosts
+        skillBoost =
+            if person.skillTree.relicHunter then
+                10
+
+            else
+                0
+
+        -- Check for relic-based boosts
+        heldRelics =
+            SeqDict.get (GameObjectTypes.HeldBy person.id) state.relicsByLocation
+                |> Maybe.withDefault SeqDict.empty
+                |> SeqDict.values
+
+        relicBoost =
+            heldRelics
+                |> List.foldl
+                    (\relic acc ->
+                        case relic.relicType of
+                            MetalDetector ->
+                                acc + RelicUtil.metalDetectorBoost relic.rarity relic.exp
+
+                            _ ->
+                                acc
+                    )
+                    0
+    in
+    skillBoost + relicBoost
+
+
 getRelicsAtFloorPoint : Point -> GameState -> RelicsById
 getRelicsAtFloorPoint point state =
     SeqDict.get (GameObjectTypes.OnFloor point) state.relicsByLocation
@@ -815,6 +853,13 @@ relicBody state relic me =
                 ("High five all players on your tile. Their clean strength is boosted by "
                     ++ String.fromInt (RelicUtil.highFiveBoostStrength relic.rarity relic.exp)
                     ++ ". Only the strongest high-five boost applies."
+                )
+
+        MetalDetector ->
+            RelicUtil.simpleRelicBody
+                ("Improves your chances of finding better relics when clearing dirt. Currently provides +"
+                    ++ String.fromInt (RelicUtil.metalDetectorBoost relic.rarity relic.exp)
+                    ++ " boost to relic rarity rolls."
                 )
 
 
@@ -1023,6 +1068,9 @@ unlockSkill personId skill state =
 
                         GameObjectTypes.CleaningFundamentals ->
                             { skillTree | cleaningFundamentals = True }
+
+                        GameObjectTypes.RelicHunter ->
+                            { skillTree | relicHunter = True }
             in
             { person | skillTree = newSkillTree }
 

@@ -19,6 +19,7 @@ import NoExposingEverything
 import NoImportingEverything
 import NoMissingTypeAnnotation
 import NoMissingTypeAnnotationInLetIn
+import NoMissingTypeConstructor
 import NoMissingTypeExpose
 import NoPrematureLetComputation
 import NoSimpleLetBody
@@ -37,6 +38,7 @@ config : List Rule
 config =
     [ Docs.ReviewAtDocs.rule
     , NoConfusingPrefixOperator.rule
+    , NoMissingTypeConstructor.rule
 
     -- , NoDebug.Log.rule
     -- , NoDebug.TodoOrToString.rule
@@ -53,11 +55,12 @@ config =
     -- , NoUnused.Dependencies.rule
     , NoUnused.Exports.rule
         |> Rule.ignoreErrorsForDirectories [ "generated/", "Evergreen/" ]
-    , NoUnused.Parameters.rule
-        |> Rule.ignoreErrorsForDirectories [ "generated/", "Evergreen/" ]
-    , NoUnused.Patterns.rule
-        |> Rule.ignoreErrorsForDirectories [ "generated/", "Evergreen/" ]
-    , NoUnused.Variables.rule
-        |> Rule.ignoreErrorsForDirectories [ "generated/", "Evergreen/" ]
+
+    -- , NoUnused.Parameters.rule
+    -- |> Rule.ignoreErrorsForDirectories [ "generated/", "Evergreen/" ]
+    -- , NoUnused.Patterns.rule
+    -- |> Rule.ignoreErrorsForDirectories [ "generated/", "Evergreen/" ]
+    -- , NoUnused.Variables.rule
+    -- |> Rule.ignoreErrorsForDirectories [ "generated/", "Evergreen/" ]
     , Simplify.rule Simplify.defaults
     ]

@@ -22,8 +22,8 @@ render state me =
 
     else
         case state.skillTreeModalState of
-            SkillDetailOpen skillId ->
-                renderSkillModal me skillId
+            SkillDetailOpen skill ->
+                renderSkillModal me skill
 
             _ ->
                 text ""
@@ -198,31 +198,31 @@ debugDictsView { backendConfirmedGameState, myId } =
         )
 
 
-renderSkillModal : PersonData -> String -> Html FrontendMsg
-renderSkillModal me skillId =
+renderSkillModal : PersonData -> GameObjectTypes.Skill -> Html FrontendMsg
+renderSkillModal me skill =
     Html.div []
         [ UI.dialog
-            { title = UI.simpleTitle (getSkillName skillId)
-            , body = renderSkillModalBody me skillId
-            , actions = renderSkillModalActions me skillId
+            { title = UI.simpleTitle (getSkillName skill)
+            , body = renderSkillModalBody me skill
+            , actions = renderSkillModalActions me skill
             }
         ]
 
 
-renderSkillModalBody : PersonData -> String -> Html FrontendMsg
-renderSkillModalBody me skillId =
+renderSkillModalBody : PersonData -> GameObjectTypes.Skill -> Html FrontendMsg
+renderSkillModalBody me skill =
     let
         skillPoints =
             calculateSkillPoints me
 
         isUnlocked =
-            isSkillUnlockedFromString me.skillTree skillId
+            isSkillUnlocked me.skillTree skill
 
         canUnlock =
-            canUnlockSkill me skillId
+            canUnlockSkill me skill
 
         description =
-            getSkillDescription skillId
+            getSkillDescription skill
     in
     Html.div [ class "space-y-4" ]
         [ Html.div [ class "prose" ]
@@ -241,14 +241,14 @@ renderSkillModalBody me skillId =
         ]
 
 
-renderSkillModalActions : PersonData -> String -> Html FrontendMsg
-renderSkillModalActions me skillId =
+renderSkillModalActions : PersonData -> GameObjectTypes.Skill -> Html FrontendMsg
+renderSkillModalActions me skill =
     let
         isUnlocked =
-            isSkillUnlockedFromString me.skillTree skillId
+            isSkillUnlocked me.skillTree skill
 
         canUnlock =
-            canUnlockSkill me skillId
+            canUnlockSkill me skill
     in
     Html.div [ class "flex justify-end space-x-2" ]
         [ button [ class "btn btn-ghost", Html.Events.onClick CloseSkillTreeModal ] [ text "Back" ]
@@ -256,7 +256,7 @@ renderSkillModalActions me skillId =
             text ""
 
           else if canUnlock then
-            button [ class "btn btn-primary", Html.Events.onClick (UnlockSkill skillId) ] [ text "Unlock Skill" ]
+            button [ class "btn btn-primary", Html.Events.onClick (UnlockSkill skill) ] [ text "Unlock Skill" ]
 
           else
             button [ class "btn btn-disabled" ] [ text "Cannot Unlock" ]
@@ -267,42 +267,42 @@ renderSkillModalActions me skillId =
 -- Helper functions
 
 
-getSkillName : String -> String
-getSkillName skillId =
-    case skillId of
-        "root" ->
+getSkillName : Skill -> String
+getSkillName skill =
+    case skill of
+        GameObjectTypes.Root ->
             "Root"
 
-        "learned" ->
+        GameObjectTypes.Learned ->
             "Learned"
 
-        "swiftCleaning" ->
+        GameObjectTypes.SwiftCleaning ->
             "Swift Cleaning"
 
-        "cleaningFundamentals" ->
+        GameObjectTypes.CleaningFundamentals ->
             "Cleaning Fundamentals"
 
-        _ ->
-            "Unknown Skill"
+        GameObjectTypes.RelicHunter ->
+            "Relic Hunter"
 
 
-getSkillDescription : String -> String
-getSkillDescription skillId =
-    case skillId of
-        "root" ->
+getSkillDescription : Skill -> String
+getSkillDescription skill =
+    case skill of
+        GameObjectTypes.Root ->
             "Introduces you to the skill tree. Grants +5 cleaning power."
 
-        "learned" ->
+        GameObjectTypes.Learned ->
             "Increases the base EXP from a clean by 5xp."
 
-        "swiftCleaning" ->
+        GameObjectTypes.SwiftCleaning ->
             "Increases cleaning by 1.1x."
 
-        "cleaningFundamentals" ->
+        GameObjectTypes.CleaningFundamentals ->
             "Grants +10 cleaning power."
 
-        _ ->
-            "Unknown skill."
+        GameObjectTypes.RelicHunter ->
+            "Improves your chances of finding better relics when clearing dirt. Provides +10 boost to relic rarity rolls."
 
 
 calculateSkillPoints : PersonData -> Int
@@ -312,16 +312,13 @@ calculateSkillPoints person =
             Util.levelForExp person.experience
 
         unlockedSkillsCount =
-            [ person.skillTree.root
-            , person.skillTree.learned
-            , person.skillTree.swiftCleaning
-            , person.skillTree.cleaningFundamentals
-            ]
+            GameObjectTypes.allSkills
+                |> List.map (isSkillUnlocked person.skillTree)
                 |> List.filter identity
                 |> List.length
 
         totalSkills =
-            4
+            List.length GameObjectTypes.allSkills
 
         unlockableSkillsRemaining =
             totalSkills - unlockedSkillsCount
@@ -330,25 +327,6 @@ calculateSkillPoints person =
             playerLevel - unlockedSkillsCount
     in
     Basics.min uncappedSkillPoints unlockableSkillsRemaining
-
-
-stringToSkill : String -> Maybe GameObjectTypes.Skill
-stringToSkill skillString =
-    case skillString of
-        "root" ->
-            Just GameObjectTypes.Root
-
-        "learned" ->
-            Just GameObjectTypes.Learned
-
-        "swiftCleaning" ->
-            Just GameObjectTypes.SwiftCleaning
-
-        "cleaningFundamentals" ->
-            Just GameObjectTypes.CleaningFundamentals
-
-        _ ->
-            Nothing
 
 
 isSkillUnlocked : SkillTree -> GameObjectTypes.Skill -> Bool
@@ -366,42 +344,35 @@ isSkillUnlocked skillTree skill =
         GameObjectTypes.CleaningFundamentals ->
             skillTree.cleaningFundamentals
 
-
-isSkillUnlockedFromString : SkillTree -> String -> Bool
-isSkillUnlockedFromString skillTree skillString =
-    case stringToSkill skillString of
-        Just skill ->
-            isSkillUnlocked skillTree skill
-
-        Nothing ->
-            False
+        GameObjectTypes.RelicHunter ->
+            skillTree.relicHunter
 
 
-canUnlockSkill : PersonData -> String -> Bool
-canUnlockSkill person skillId =
+canUnlockSkill : PersonData -> Skill -> Bool
+canUnlockSkill person skill =
     let
         hasSkillPoints =
             calculateSkillPoints person > 0
 
         skillUnlocked =
-            isSkillUnlockedFromString person.skillTree skillId
+            isSkillUnlocked person.skillTree skill
 
         hasPrerequisites =
-            case skillId of
-                "root" ->
+            case skill of
+                GameObjectTypes.Root ->
+                    -- Always can unlock root
                     True
 
-                -- Always can unlock root
-                "learned" ->
+                GameObjectTypes.Learned ->
                     person.skillTree.root
 
-                "swiftCleaning" ->
+                GameObjectTypes.SwiftCleaning ->
                     person.skillTree.root
 
-                "cleaningFundamentals" ->
+                GameObjectTypes.CleaningFundamentals ->
                     person.skillTree.root
 
-                _ ->
-                    False
+                GameObjectTypes.RelicHunter ->
+                    person.skillTree.learned
     in
     hasSkillPoints && not skillUnlocked && hasPrerequisites

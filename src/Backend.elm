@@ -142,7 +142,7 @@ createDirt args model =
 
         newDirt : GameObjectTypes.DirtData
         newDirt =
-            { position = args.point, amount = args.amount, id = DirtId newId }
+            { position = args.point, amount = args.amount, maxAmount = args.amount, id = DirtId newId }
 
         ( finalModel, _ ) =
             executeActionOnModel Server incrementedModel (AddDirt newDirt)
@@ -290,8 +290,8 @@ processSingleTrigger performer batchedTrigger ( accModel, accActions ) =
     )
 
 
-getRandomRelicRarityAndType : PersonId -> Model -> ( Maybe GameObjectTypes.RelicRarity, GameObjectTypes.RelicType, Model )
-getRandomRelicRarityAndType who model =
+getRandomRelicRarityAndType : PersonId -> GameObjectTypes.DirtData -> Model -> ( Maybe GameObjectTypes.RelicRarity, GameObjectTypes.RelicType, Model )
+getRandomRelicRarityAndType who killedDirt model =
     let
         ( randomRarity, newModel ) =
             getRandomValue model
@@ -305,8 +305,22 @@ getRandomRelicRarityAndType who model =
         maybeFinder =
             SeqDict.get who model.gameState.personDict
 
+        playerBoost =
+            case maybeFinder of
+                Just person ->
+                    GameStateManipulation.relicRarityBoostForPlayer model.gameState person
+
+                Nothing ->
+                    0
+
+        dirtBoost =
+            RelicUtil.dirtSizeBoostForAmount killedDirt.maxAmount
+
+        totalBoost =
+            playerBoost + dirtBoost
+
         maybeRarity =
-            RelicUtil.rarityRoll randomRarity
+            RelicUtil.rarityRoll randomRarity totalBoost
     in
     ( maybeRarity, randomType, newModel2 )
 
@@ -315,7 +329,7 @@ doRelicRoll : PersonId -> GameObjectTypes.DirtData -> Model -> ( Model, ActionOn
 doRelicRoll who killedDirt model =
     let
         ( randomRarity, randomType, newModel ) =
-            getRandomRelicRarityAndType who model
+            getRandomRelicRarityAndType who killedDirt model
     in
     case randomRarity of
         Nothing ->

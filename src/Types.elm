@@ -39,7 +39,7 @@ type alias FrontendModel =
 type SkillTreeModalState
     = Closed
     | SkillTreeOpen
-    | SkillDetailOpen String
+    | SkillDetailOpen GameObjectTypes.Skill
 
 
 type alias FrontendPlayingState =
@@ -119,9 +119,9 @@ type FrontendMsg
     | ReceivedMapSize { width : Float, height : Float }
     | ToggleMobileRelicMenu
     | ToggleSkillTreeMenu
-    | ClickedSkillNode String
+    | ClickedSkillNode GameObjectTypes.Skill
     | CloseSkillTreeModal
-    | UnlockSkill String
+    | UnlockSkill GameObjectTypes.Skill
     | NoOpFrontendMsg
     | NukeBackend
     | UpdateDebugDirtParamsMsg { minX : Int, maxX : Int, minY : Int, maxY : Int }

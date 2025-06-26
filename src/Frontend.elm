@@ -10,7 +10,7 @@ import Effect.Subscription as Subscription exposing (Subscription)
 import Effect.Task
 import Effect.Time
 import GameObjectIds exposing (..)
-import GameObjectTypes exposing (ActionOnGamestate(..), ActionWithMetadata, DirtData, PersonData, SkillTree)
+import GameObjectTypes exposing (ActionOnGamestate(..), ActionWithMetadata, DirtData, PersonData, Skill(..), SkillTree)
 import GameStateManipulation
 import Html exposing (..)
 import Html.Attributes exposing (..)
@@ -241,18 +241,13 @@ update msg model =
                 _ ->
                     ( model, Command.none )
 
-        UnlockSkill skillId ->
+        UnlockSkill skill ->
             let
                 myId =
                     getMyId model
 
                 unlockSkillAction =
-                    case stringToSkill skillId of
-                        Just skill ->
-                            UnlockSkillAction myId skill
-
-                        Nothing ->
-                            GameStateNoOp
+                    UnlockSkillAction myId skill
             in
             ( modelUpdateIfPlaying (\state -> { state | skillTreeModalState = SkillTreeOpen }) model
             , Command.batch
@@ -874,49 +869,16 @@ renderSkillTreeContent state me =
               skillConnectionLine "400" "300" "300" "200" -- root to learned
             , skillConnectionLine "400" "300" "200" "400" -- root to swift cleaning
             , skillConnectionLine "400" "300" "600" "400" -- root to cleaning fundamentals
+            , skillConnectionLine "300" "200" "300" "100" -- learned to relic hunter
 
             -- Skill nodes
-            , skillNodeSvg "400" "300" "Root" "root" (isSkillUnlockedFromString me.skillTree "root")
-            , skillNodeSvg "300" "200" "Learned" "learned" (isSkillUnlockedFromString me.skillTree "learned")
-            , skillNodeSvg "200" "400" "Swift Cleaning" "swiftCleaning" (isSkillUnlockedFromString me.skillTree "swiftCleaning")
-            , skillNodeSvg "600" "400" "Cleaning Fundamentals" "cleaningFundamentals" (isSkillUnlockedFromString me.skillTree "cleaningFundamentals")
+            , skillNodeSvg "400" "300" "Root" GameObjectTypes.Root (isSkillUnlocked me.skillTree GameObjectTypes.Root)
+            , skillNodeSvg "300" "200" "Learned" GameObjectTypes.Learned (isSkillUnlocked me.skillTree GameObjectTypes.Learned)
+            , skillNodeSvg "200" "400" "Swift Cleaning" GameObjectTypes.SwiftCleaning (isSkillUnlocked me.skillTree GameObjectTypes.SwiftCleaning)
+            , skillNodeSvg "600" "400" "Cleaning Fundamentals" GameObjectTypes.CleaningFundamentals (isSkillUnlocked me.skillTree GameObjectTypes.CleaningFundamentals)
+            , skillNodeSvg "300" "100" "Relic Hunter" GameObjectTypes.RelicHunter (isSkillUnlocked me.skillTree GameObjectTypes.RelicHunter)
             ]
         ]
-
-
-stringToSkill : String -> Maybe GameObjectTypes.Skill
-stringToSkill skillString =
-    case skillString of
-        "root" ->
-            Just GameObjectTypes.Root
-
-        "learned" ->
-            Just GameObjectTypes.Learned
-
-        "swiftCleaning" ->
-            Just GameObjectTypes.SwiftCleaning
-
-        "cleaningFundamentals" ->
-            Just GameObjectTypes.CleaningFundamentals
-
-        _ ->
-            Nothing
-
-
-skillToString : GameObjectTypes.Skill -> String
-skillToString skill =
-    case skill of
-        GameObjectTypes.Root ->
-            "root"
-
-        GameObjectTypes.Learned ->
-            "learned"
-
-        GameObjectTypes.SwiftCleaning ->
-            "swiftCleaning"
-
-        GameObjectTypes.CleaningFundamentals ->
-            "cleaningFundamentals"
 
 
 isSkillUnlocked : SkillTree -> GameObjectTypes.Skill -> Bool
@@ -934,15 +896,8 @@ isSkillUnlocked skillTree skill =
         GameObjectTypes.CleaningFundamentals ->
             skillTree.cleaningFundamentals
 
-
-isSkillUnlockedFromString : SkillTree -> String -> Bool
-isSkillUnlockedFromString skillTree skillString =
-    case stringToSkill skillString of
-        Just skill ->
-            isSkillUnlocked skillTree skill
-
-        Nothing ->
-            False
+        GameObjectTypes.RelicHunter ->
+            skillTree.relicHunter
 
 
 calculateSkillPoints : PersonData -> Int
@@ -952,16 +907,13 @@ calculateSkillPoints person =
             Util.levelForExp person.experience
 
         unlockedSkillsCount =
-            [ person.skillTree.root
-            , person.skillTree.learned
-            , person.skillTree.swiftCleaning
-            , person.skillTree.cleaningFundamentals
-            ]
+            GameObjectTypes.allSkills
+                |> List.map (isSkillUnlocked person.skillTree)
                 |> List.filter identity
                 |> List.length
 
         totalSkills =
-            4
+            List.length GameObjectTypes.allSkills
 
         unlockableSkillsRemaining =
             totalSkills - unlockedSkillsCount
@@ -986,8 +938,8 @@ skillConnectionLine x1 y1 x2 y2 =
         []
 
 
-skillNodeSvg : String -> String -> String -> String -> Bool -> Svg.Svg FrontendMsg
-skillNodeSvg x y name skillId isUnlocked =
+skillNodeSvg : String -> String -> String -> GameObjectTypes.Skill -> Bool -> Svg.Svg FrontendMsg
+skillNodeSvg x y name skill isUnlocked =
     let
         -- Calculate text dimensions (rough estimate)
         textWidth =
@@ -1036,7 +988,7 @@ skillNodeSvg x y name skillId isUnlocked =
             else
                 "0.6"
     in
-    Svg.g [ Html.Events.onClick (ClickedSkillNode skillId) ]
+    Svg.g [ Html.Events.onClick (ClickedSkillNode skill) ]
         [ -- Rounded rectangle background
           Svg.rect
             [ Svg.Attributes.x rectX

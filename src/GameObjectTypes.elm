@@ -37,6 +37,17 @@ type Skill
     | Learned
     | SwiftCleaning
     | CleaningFundamentals
+    | RelicHunter
+
+
+allSkills : List Skill
+allSkills =
+    [ Root
+    , Learned
+    , SwiftCleaning
+    , CleaningFundamentals
+    , RelicHunter
+    ]
 
 
 type alias SkillTree =
@@ -60,7 +71,7 @@ type alias PersonData =
 
 
 type alias DirtData =
-    { id : DirtId, amount : Int, position : Point }
+    { id : DirtId, amount : Int, maxAmount : Int, position : Point }
 
 
 type alias RelicData =
@@ -81,6 +92,7 @@ type RelicType
     | GuestBook (SeqSet PersonId)
     | DiminishingPower { currentDirtPatch : Maybe Point, currentPower : Float }
     | HighFive
+    | MetalDetector
 
 
 type RelicRarity

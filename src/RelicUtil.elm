@@ -39,6 +39,9 @@ relicName relicType =
         HighFive ->
             "High Five"
 
+        MetalDetector ->
+            "Metal Detector"
+
 
 relicRarityToCssClass : RelicRarity -> String
 relicRarityToCssClass rarity =
@@ -278,25 +281,29 @@ getRelicHolderId relicId state =
 {-| Roll for the rarity of a relic.
 NOTE: this is also where we check if the player gets a relic at all. `Nothing` means no relic dropped.
 -}
-rarityRoll : Int -> Maybe GameObjectTypes.RelicRarity
-rarityRoll rawRandomValue =
+rarityRoll : Int -> Int -> Maybe GameObjectTypes.RelicRarity
+rarityRoll rawRandomValue boost =
     let
         randomValue =
-            modBy 100 rawRandomValue
+            modBy 1000 rawRandomValue
+
+        -- Apply boost by subtracting from random value, ensuring it stays in valid range
+        adjustedValue =
+            Basics.max 0 (Basics.min 999 (randomValue - boost))
     in
-    if randomValue < 2 then
+    if adjustedValue < 20 then
         Just GameObjectTypes.Legendary
 
-    else if randomValue < 10 then
+    else if adjustedValue < 100 then
         Just GameObjectTypes.Epic
 
-    else if randomValue < 20 then
+    else if adjustedValue < 200 then
         Just GameObjectTypes.Rare
 
-    else if randomValue < 50 then
+    else if adjustedValue < 500 then
         Just GameObjectTypes.Uncommon
 
-    else if randomValue < 70 then
+    else if adjustedValue < 700 then
         Just GameObjectTypes.Common
 
     else
@@ -313,6 +320,7 @@ relicWeights =
     , ( 5, GameObjectTypes.GuestBook SeqSet.empty )
     , ( 0, GameObjectTypes.DiminishingPower { currentDirtPatch = Nothing, currentPower = 0.0 } )
     , ( 5, GameObjectTypes.HighFive )
+    , ( 5, GameObjectTypes.MetalDetector )
     ]
 
 
@@ -641,3 +649,71 @@ highFiveBoostStrength rarity exp =
             (level5Strength - toFloat baseStrength) / 4.0
     in
     round (toFloat baseStrength + (level - 1.0) * increasePerLevel)
+
+
+{-| Calculates the relic find boost for MetalDetector relics based on rarity and level.
+Common: Level 1 = +1, Level 5 = +11
+Legendary: Level 1 = +50, Level 5 = +60
+-}
+metalDetectorBoost : RelicRarity -> Int -> Int
+metalDetectorBoost rarity exp =
+    let
+        level =
+            toFloat (relicLevelForExp rarity exp)
+
+        baseBoost =
+            case rarity of
+                Common ->
+                    1.0
+
+                Uncommon ->
+                    10.0
+
+                Rare ->
+                    20.0
+
+                Epic ->
+                    35.0
+
+                Legendary ->
+                    50.0
+
+        level5Boost =
+            case rarity of
+                Common ->
+                    11.0
+
+                Uncommon ->
+                    25.0
+
+                Rare ->
+                    35.0
+
+                Epic ->
+                    45.0
+
+                Legendary ->
+                    60.0
+
+        increasePerLevel =
+            (level5Boost - baseBoost) / 4.0
+    in
+    round (baseBoost + (level - 1.0) * increasePerLevel)
+
+
+{-| Calculates relic find boost based on the original size of a dirt patch.
+Bigger dirt patches provide better relic drop chances.
+-}
+dirtSizeBoostForAmount : Int -> Int
+dirtSizeBoostForAmount originalAmount =
+    if originalAmount > 10000 then
+        100
+
+    else if originalAmount > 1000 then
+        50
+
+    else if originalAmount > 100 then
+        10
+
+    else
+        0
