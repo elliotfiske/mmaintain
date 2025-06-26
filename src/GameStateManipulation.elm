@@ -1,6 +1,5 @@
 module GameStateManipulation exposing
-    ( activateRelicWithPersonData
-    , applyClean
+    ( applyClean
     , cleanDirt
     , cleanStrengthForPlayer
     , destroyDirt
@@ -918,6 +917,7 @@ calculateBaseXPForCleaning personId baseAmount state =
         Just person ->
             if person.skillTree.learned then
                 baseAmount + 5
+
             else
                 baseAmount
 
@@ -957,8 +957,18 @@ cleanStrengthForPlayer state person =
                 |> (\acc ->
                         -- Add skill-based additive bonuses
                         acc
-                            + (if person.skillTree.root then 5.0 else 0.0)
-                            + (if person.skillTree.cleaningFundamentals then 10.0 else 0.0)
+                            + (if person.skillTree.root then
+                                5.0
+
+                               else
+                                0.0
+                              )
+                            + (if person.skillTree.cleaningFundamentals then
+                                10.0
+
+                               else
+                                0.0
+                              )
                    )
 
         -- Then apply multiplicative bonuses (Mop, GuestBook, DiminishingPower, Skills)
@@ -984,6 +994,7 @@ cleanStrengthForPlayer state person =
                         -- Add skill-based multiplicative bonuses
                         if person.skillTree.swiftCleaning then
                             acc * 1.1
+
                         else
                             acc
                    )
