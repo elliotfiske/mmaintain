@@ -607,28 +607,17 @@ updateFromBackend msg model =
         ActionConfirmed actionWithMetadata ->
             case model.state of
                 Playing playingState ->
-                    -- Check if this action was performed by the current client
-                    if actionWithMetadata.performer == playingState.myId then
-                        -- This is our own action being confirmed - just remove it from optimistic list
-                        -- Don't apply it again since we already applied it optimistically
-                        let
-                            finalState =
-                                removeConfirmedActionFromOptimisticList actionWithMetadata playingState
-                        in
-                        ( { model | state = Playing finalState }, Command.none )
+                    -- This is another player's action - apply it and remove from optimistic list if present
+                    let
+                        -- First, update the backend confirmed state with the confirmed action
+                        stateWithConfirmedAction =
+                            updateStateWithAction (Client actionWithMetadata.performer) actionWithMetadata.action playingState
 
-                    else
-                        -- This is another player's action - apply it and remove from optimistic list if present
-                        let
-                            -- First, update the backend confirmed state with the confirmed action
-                            stateWithConfirmedAction =
-                                updateStateWithAction (Client actionWithMetadata.performer) actionWithMetadata.action playingState
-
-                            -- Then, remove the action from optimistic list if it's there
-                            finalState =
-                                removeConfirmedActionFromOptimisticList actionWithMetadata stateWithConfirmedAction
-                        in
-                        ( { model | state = Playing finalState }, Command.none )
+                        -- Then, remove the action from optimistic list if it's there
+                        finalState =
+                            removeConfirmedActionFromOptimisticList actionWithMetadata stateWithConfirmedAction
+                    in
+                    ( { model | state = Playing finalState }, Command.none )
 
                 _ ->
                     ( model, Command.none )
