@@ -22,6 +22,14 @@ type alias HighFiveBoost =
     }
 
 
+type alias SkillTree =
+    { root : Bool
+    , learned : Bool
+    , swiftCleaning : Bool
+    , cleaningFundamentals : Bool
+    }
+
+
 type alias PersonData =
     { id : Evergreen.V1.GameObjectIds.PersonId
     , name : String
@@ -29,6 +37,7 @@ type alias PersonData =
     , position : Point
     , stats : PersonStats
     , bestHighFiveBoost : Maybe HighFiveBoost
+    , skillTree : SkillTree
     }
 
 
@@ -38,7 +47,8 @@ type RelicPosition
 
 
 type RelicType
-    = CleanFast
+    = Broom
+    | Mop
     | MoreXP
     | DropAndDouble (List Evergreen.V1.GameObjectIds.PersonId)
     | SplashBucket
@@ -92,7 +102,8 @@ type ActionOnGamestate
     | AddPerson PersonData
     | PickUpRelic Evergreen.V1.GameObjectIds.RelicId Evergreen.V1.GameObjectIds.PersonId
     | DropRelic Evergreen.V1.GameObjectIds.RelicId Evergreen.V1.GameObjectIds.PersonId
-    | ActivateGenerosityTrap Evergreen.V1.GameObjectIds.PersonId Evergreen.V1.GameObjectIds.RelicId Int
+    | ActivateGenerosityTrap Evergreen.V1.GameObjectIds.PersonId Evergreen.V1.GameObjectIds.RelicId
+    | UnlockSkillAction Evergreen.V1.GameObjectIds.PersonId String
     | BatchAction (List ActionOnGamestate)
     | GameStateNoOp
 

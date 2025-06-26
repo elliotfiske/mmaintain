@@ -30,6 +30,12 @@ type alias GameState =
     }
 
 
+type SkillTreeModalState
+    = Closed
+    | SkillTreeOpen
+    | SkillDetailOpen String
+
+
 type alias FrontendPlayingState =
     { backendConfirmedGameState : GameState
     , optimisticActions : List Evergreen.V1.GameObjectTypes.ActionWithMetadata
@@ -43,7 +49,7 @@ type alias FrontendPlayingState =
             }
     , cameraPosition : Evergreen.V1.GameObjectTypes.Point
     , mobileRelicMenuOpen : Bool
-    , skillTreeMenuOpen : Bool
+    , skillTreeModalState : SkillTreeModalState
     , debugDirtParams :
         { minX : Int
         , maxX : Int
@@ -91,7 +97,6 @@ type FrontendMsg
     | StunSelf
     | ClickedPleaseMakeMeDirty
     | DebugGenerateRelic
-    | ActivatedRelic Evergreen.V1.GameObjectIds.PersonId Evergreen.V1.GameObjectIds.RelicId
     | ClickTarget Evergreen.V1.GameObjectTypes.Point
     | Tick Effect.Time.Posix
     | AnimationTick Effect.Time.Posix
@@ -103,6 +108,9 @@ type FrontendMsg
         }
     | ToggleMobileRelicMenu
     | ToggleSkillTreeMenu
+    | ClickedSkillNode String
+    | CloseSkillTreeModal
+    | UnlockSkill String
     | NoOpFrontendMsg
     | NukeBackend
     | UpdateDebugDirtParamsMsg
@@ -118,7 +126,6 @@ type ToBackend
     | ClientPerformsAction Evergreen.V1.GameObjectTypes.ActionWithMetadata
     | PleaseMakeMeDirty
     | PleaseGenerateRelic
-    | PleaseActivateRelic Evergreen.V1.GameObjectIds.PersonId Evergreen.V1.GameObjectIds.RelicId
     | PleaseNukeBackend
     | UpdateDebugDirtParams
         { minX : Int
