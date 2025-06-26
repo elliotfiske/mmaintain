@@ -33,7 +33,7 @@ type alias GameState =
 type SkillTreeModalState
     = Closed
     | SkillTreeOpen
-    | SkillDetailOpen String
+    | SkillDetailOpen Evergreen.V1.GameObjectTypes.Skill
 
 
 type alias FrontendPlayingState =
@@ -108,9 +108,9 @@ type FrontendMsg
         }
     | ToggleMobileRelicMenu
     | ToggleSkillTreeMenu
-    | ClickedSkillNode String
+    | ClickedSkillNode Evergreen.V1.GameObjectTypes.Skill
     | CloseSkillTreeModal
-    | UnlockSkill String
+    | UnlockSkill Evergreen.V1.GameObjectTypes.Skill
     | NoOpFrontendMsg
     | NukeBackend
     | UpdateDebugDirtParamsMsg

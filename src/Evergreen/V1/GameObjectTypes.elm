@@ -27,6 +27,7 @@ type alias SkillTree =
     , learned : Bool
     , swiftCleaning : Bool
     , cleaningFundamentals : Bool
+    , relicHunter : Bool
     }
 
 
@@ -58,6 +59,7 @@ type RelicType
         , currentPower : Float
         }
     | HighFive
+    | MetalDetector
 
 
 type RelicRarity
@@ -79,6 +81,7 @@ type alias RelicData =
 type alias DirtData =
     { id : Evergreen.V1.GameObjectIds.DirtId
     , amount : Int
+    , maxAmount : Int
     , position : Point
     }
 
@@ -94,6 +97,14 @@ type Direction
     | DownRight
 
 
+type Skill
+    = Root
+    | Learned
+    | SwiftCleaning
+    | CleaningFundamentals
+    | RelicHunter
+
+
 type ActionOnGamestate
     = MovePerson Evergreen.V1.GameObjectIds.PersonId Direction
     | Clean Evergreen.V1.GameObjectIds.PersonId Point
@@ -103,7 +114,7 @@ type ActionOnGamestate
     | PickUpRelic Evergreen.V1.GameObjectIds.RelicId Evergreen.V1.GameObjectIds.PersonId
     | DropRelic Evergreen.V1.GameObjectIds.RelicId Evergreen.V1.GameObjectIds.PersonId
     | ActivateGenerosityTrap Evergreen.V1.GameObjectIds.PersonId Evergreen.V1.GameObjectIds.RelicId
-    | UnlockSkillAction Evergreen.V1.GameObjectIds.PersonId String
+    | UnlockSkillAction Evergreen.V1.GameObjectIds.PersonId Skill
     | BatchAction (List ActionOnGamestate)
     | GameStateNoOp
 
