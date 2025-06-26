@@ -565,20 +565,8 @@ removeConfirmedActionFromOptimisticList confirmedAction state =
                         /= confirmedAction.performer
                 )
                 state.optimisticActions
-
-        -- If we removed an optimistic action, update the camera position since
-        -- the computed display state may have changed
-        stateWithUpdatedActions =
-            { state | optimisticActions = updatedOptimisticActions }
     in
-    if List.length updatedOptimisticActions /= List.length state.optimisticActions then
-        -- We removed an action, update camera position
-        updateCameraPosition stateWithUpdatedActions
-
-    else
-        -- No action was removed (this ActionId wasn't in our optimistic list,
-        -- probably from another player), so no need to update camera
-        stateWithUpdatedActions
+    { state | optimisticActions = updatedOptimisticActions }
 
 
 updateStateWithAction : ActionPerformer -> ActionOnGamestate -> FrontendPlayingState -> FrontendPlayingState
