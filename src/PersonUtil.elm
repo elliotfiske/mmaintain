@@ -1,4 +1,4 @@
-module PersonUtil exposing (createPerson, doIncrementCleanCount, doIncrementClearCount, movePersonWithId)
+module PersonUtil exposing (createPerson, doIncrementCleanCount, doIncrementClearCount, movePersonWithId, teleportPersonToPosition)
 
 import GameObjectIds exposing (PersonId)
 import GameObjectTypes exposing (..)
@@ -52,6 +52,11 @@ createPerson id name =
 movePersonWithId : PersonId -> Direction -> SeqDict PersonId PersonData -> SeqDict PersonId PersonData
 movePersonWithId id direction dict =
     SeqDict.update id (Maybe.map (movePerson direction)) dict
+
+
+teleportPersonToPosition : PersonId -> GameObjectTypes.Point -> SeqDict PersonId PersonData -> SeqDict PersonId PersonData
+teleportPersonToPosition id targetPosition dict =
+    SeqDict.update id (Maybe.map (\person -> { person | position = targetPosition })) dict
 
 
 doIncrementCleanCount : PersonData -> PersonData

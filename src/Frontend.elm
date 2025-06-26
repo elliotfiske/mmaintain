@@ -210,8 +210,23 @@ update msg model =
             let
                 refocus =
                     Effect.Task.attempt (\_ -> NoOpFrontendMsg) (Effect.Browser.Dom.focus (Effect.Browser.Dom.id "main-map"))
+
+                teleportAction =
+                    TeleportPerson (getMyId model) point
             in
-            ( modelUpdateTarget (Just point) model, refocus )
+            case model.state of
+                Playing state ->
+                    let
+                        ( actionWithMetadata, newState ) =
+                            addOptimisticActionAndReturnMetadata teleportAction state
+
+                        updatedModel =
+                            { model | state = Playing newState }
+                    in
+                    ( updatedModel, Command.batch [ Effect.Lamdera.sendToBackend (ClientPerformsAction actionWithMetadata), refocus ] )
+
+                _ ->
+                    ( model, refocus )
 
         ToggleDebugStuff ->
             ( modelUpdateIfPlaying toggleDebugStuff model, Command.none )

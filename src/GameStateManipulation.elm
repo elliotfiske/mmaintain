@@ -475,6 +475,9 @@ internalExecuteActionOnGameState action state =
         MovePerson personId direction ->
             BackendTriggerUtil.withNoOp { state | personDict = PersonUtil.movePersonWithId personId direction state.personDict }
 
+        TeleportPerson personId targetPosition ->
+            BackendTriggerUtil.withNoOp { state | personDict = PersonUtil.teleportPersonToPosition personId targetPosition state.personDict }
+
         AddPerson personData ->
             BackendTriggerUtil.withNoOp { state | personDict = SeqDict.insert personData.id personData state.personDict }
 

@@ -130,6 +130,7 @@ type alias ActionWithMetadata =
 
 type ActionOnGamestate
     = MovePerson PersonId Direction
+    | TeleportPerson PersonId Point
     | Clean PersonId Point
     | AddDirt DirtData
     | AddRelic RelicData Point
