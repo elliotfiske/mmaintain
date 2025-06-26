@@ -32,6 +32,14 @@ type alias HighFiveBoost =
     }
 
 
+type alias SkillTree =
+    { root : Bool
+    , learned : Bool
+    , swiftCleaning : Bool
+    , cleaningFundamentals : Bool
+    }
+
+
 type alias PersonData =
     { id : PersonId
     , name : String
@@ -39,6 +47,7 @@ type alias PersonData =
     , position : Point
     , stats : PersonStats
     , bestHighFiveBoost : Maybe HighFiveBoost
+    , skillTree : SkillTree
     }
 
 
@@ -105,5 +114,6 @@ type ActionOnGamestate
     | PickUpRelic RelicId PersonId
     | DropRelic RelicId PersonId
     | ActivateGenerosityTrap PersonId RelicId
+    | UnlockSkillAction PersonId String
     | BatchAction (List ActionOnGamestate)
     | GameStateNoOp

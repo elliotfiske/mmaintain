@@ -23,6 +23,7 @@ module GameStateManipulation exposing
     , playerEarnsExperience
     , relicBody
     , relicsAtLocation
+    , unlockSkill
     , updatePersonDictWithExperience
     , xpMultiplierForPlayer
     )
@@ -519,6 +520,9 @@ internalExecuteActionOnGameState action state =
         ActivateGenerosityTrap personId relicId ->
             handleActivateGenerosityTrap personId relicId state
 
+        UnlockSkillAction personId skillId ->
+            unlockSkill personId skillId state
+
         BatchAction actions ->
             handleBatchAction actions state
 
@@ -1002,3 +1006,25 @@ handleGuestBookPickup relicId relic personId peopleWhoHaveHeldIt state =
 
     else
         BackendTriggerUtil.withNoOp (Debug.log "GuestBook relic is not the one we're looking for" state)
+
+
+unlockSkill : PersonId -> String -> GameState -> ( GameState, Types.BackendTrigger )
+unlockSkill personId skillId state =
+    let
+        updatePersonSkillTree person =
+            let
+                skillTree = person.skillTree
+                newSkillTree = 
+                    case skillId of
+                        "root" -> { skillTree | root = True }
+                        "learned" -> { skillTree | learned = True }
+                        "swiftCleaning" -> { skillTree | swiftCleaning = True }
+                        "cleaningFundamentals" -> { skillTree | cleaningFundamentals = True }
+                        _ -> skillTree
+            in
+            { person | skillTree = newSkillTree }
+            
+        newPersonDict = 
+            SeqDict.update personId (Maybe.map updatePersonSkillTree) state.personDict
+    in
+    BackendTriggerUtil.withNoOp { state | personDict = newPersonDict }

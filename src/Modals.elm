@@ -1,7 +1,6 @@
 module Modals exposing (render)
 
 import BaseUI as UI
-import Effect.Lamdera
 import GameObjectIds exposing (..)
 import GameObjectTypes exposing (..)
 import Html exposing (..)
@@ -10,6 +9,7 @@ import Html.Events
 import Markdown
 import SeqDict
 import Types exposing (..)
+import Util
 
 
 render : FrontendPlayingState -> PersonData -> Html FrontendMsg
@@ -21,7 +21,12 @@ render state me =
         renderVictoryModal me
 
     else
-        text ""
+        case state.selectedSkill of
+            Just skillId ->
+                renderSkillModal me skillId
+
+            Nothing ->
+                text ""
 
 
 renderDebugModal : FrontendPlayingState -> Html FrontendMsg
@@ -191,3 +196,135 @@ debugDictsView { backendConfirmedGameState, myId } =
             ++ "<br>MyId: "
             ++ personIdToString myId
         )
+
+
+renderSkillModal : PersonData -> String -> Html FrontendMsg
+renderSkillModal me skillId =
+    Html.div []
+        [ UI.dialog
+            { title = UI.simpleTitle (getSkillName skillId)
+            , body = renderSkillModalBody me skillId
+            , actions = renderSkillModalActions me skillId
+            }
+        ]
+
+
+renderSkillModalBody : PersonData -> String -> Html FrontendMsg
+renderSkillModalBody me skillId =
+    let
+        skillPoints = calculateSkillPoints me
+        isUnlocked = isSkillUnlocked me.skillTree skillId
+        canUnlock = canUnlockSkill me skillId
+        description = getSkillDescription skillId
+    in
+    Html.div [ class "space-y-4" ]
+        [ Html.div [ class "prose" ]
+            [ Html.p [] [ text description ] ]
+        , Html.div [ class "text-sm text-gray-600" ]
+            [ Html.p [] [ text ("Skill Points Available: " ++ String.fromInt skillPoints) ]
+            , if isUnlocked then
+                Html.p [ class "text-green-600 font-semibold" ] [ text "✓ Skill Unlocked" ]
+              else if not canUnlock then
+                Html.p [ class "text-red-600" ] [ text "Cannot unlock: insufficient skill points or missing prerequisites" ]
+              else
+                Html.p [ class "text-blue-600" ] [ text "Ready to unlock!" ]
+            ]
+        ]
+
+
+renderSkillModalActions : PersonData -> String -> Html FrontendMsg
+renderSkillModalActions me skillId =
+    let
+        isUnlocked = isSkillUnlocked me.skillTree skillId
+        canUnlock = canUnlockSkill me skillId
+    in
+    Html.div [ class "flex justify-end space-x-2" ]
+        [ button [ class "btn btn-ghost", Html.Events.onClick CloseSkillModal ] [ text "Close" ]
+        , if isUnlocked then
+            text ""
+          else if canUnlock then
+            button [ class "btn btn-primary", Html.Events.onClick (UnlockSkill skillId) ] [ text "Unlock Skill" ]
+          else
+            button [ class "btn btn-disabled" ] [ text "Cannot Unlock" ]
+        ]
+
+
+-- Helper functions
+getSkillName : String -> String
+getSkillName skillId =
+    case skillId of
+        "root" -> "Root"
+        "learned" -> "Learned"
+        "swiftCleaning" -> "Swift Cleaning"
+        "cleaningFundamentals" -> "Cleaning Fundamentals"
+        _ -> "Unknown Skill"
+
+
+getSkillDescription : String -> String
+getSkillDescription skillId =
+    case skillId of
+        "root" ->
+            "Introduces you to the skill tree. Grants +5 cleaning power."
+        
+        "learned" ->
+            "Increases the base EXP from a basic clean by 5xp."
+        
+        "swiftCleaning" ->
+            "Increases cleaning by 1.1x."
+        
+        "cleaningFundamentals" ->
+            "Grants +10 cleaning power."
+        
+        _ ->
+            "Unknown skill."
+
+
+calculateSkillPoints : PersonData -> Int
+calculateSkillPoints person =
+    let
+        playerLevel = Util.levelForExp person.experience
+        unlockedSkillsCount = 
+            [ person.skillTree.root
+            , person.skillTree.learned
+            , person.skillTree.swiftCleaning
+            , person.skillTree.cleaningFundamentals
+            ]
+            |> List.filter identity
+            |> List.length
+    in
+    playerLevel - unlockedSkillsCount
+
+
+isSkillUnlocked : SkillTree -> String -> Bool
+isSkillUnlocked skillTree skillName =
+    case skillName of
+        "root" ->
+            skillTree.root
+
+        "learned" ->
+            skillTree.learned
+
+        "swiftCleaning" ->
+            skillTree.swiftCleaning
+
+        "cleaningFundamentals" ->
+            skillTree.cleaningFundamentals
+
+        _ ->
+            False
+
+
+canUnlockSkill : PersonData -> String -> Bool
+canUnlockSkill person skillId =
+    let
+        hasSkillPoints = calculateSkillPoints person > 0
+        skillUnlocked = isSkillUnlocked person.skillTree skillId
+        hasPrerequisites = 
+            case skillId of
+                "root" -> True  -- Always can unlock root
+                "learned" -> person.skillTree.root
+                "swiftCleaning" -> person.skillTree.root
+                "cleaningFundamentals" -> person.skillTree.root
+                _ -> False
+    in
+    hasSkillPoints && not skillUnlocked && hasPrerequisites

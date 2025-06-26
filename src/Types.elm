@@ -50,6 +50,7 @@ type alias FrontendPlayingState =
     , cameraPosition : Point
     , mobileRelicMenuOpen : Bool
     , skillTreeMenuOpen : Bool
+    , selectedSkill : Maybe String
     , debugDirtParams :
         { minX : Int
         , maxX : Int
@@ -117,6 +118,9 @@ type FrontendMsg
     | ReceivedMapSize { width : Float, height : Float }
     | ToggleMobileRelicMenu
     | ToggleSkillTreeMenu
+    | ClickedSkillNode String
+    | CloseSkillModal
+    | UnlockSkill String
     | NoOpFrontendMsg
     | NukeBackend
     | UpdateDebugDirtParamsMsg { minX : Int, maxX : Int, minY : Int, maxY : Int }

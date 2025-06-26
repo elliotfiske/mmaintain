@@ -11,7 +11,7 @@ import Effect.Subscription as Subscription exposing (Subscription)
 import Effect.Task
 import Effect.Time
 import GameObjectIds exposing (..)
-import GameObjectTypes exposing (ActionOnGamestate(..), ActionWithMetadata, Direction(..), DirtData, PersonData)
+import GameObjectTypes exposing (ActionOnGamestate(..), ActionWithMetadata, Direction(..), DirtData, PersonData, SkillTree)
 import GameStateManipulation
 import Html exposing (..)
 import Html.Attributes exposing (..)
@@ -241,6 +241,21 @@ update msg model =
                         )
             in
             ( updatedModel, scrollCommand )
+
+        ClickedSkillNode skillId ->
+            ( modelUpdateIfPlaying (\state -> { state | selectedSkill = Just skillId }) model, Command.none )
+
+        CloseSkillModal ->
+            ( modelUpdateIfPlaying (\state -> { state | selectedSkill = Nothing }) model, Command.none )
+
+        UnlockSkill skillId ->
+            let
+                myId = getMyId model
+                unlockSkillAction = UnlockSkillAction myId skillId
+            in
+            ( modelUpdateIfPlaying (\state -> { state | selectedSkill = Nothing }) model
+            , Effect.Lamdera.sendToBackend (ClientPerformsAction { action = unlockSkillAction, performer = myId, id = GameObjectTypes.ActionId 0 })
+            )
 
         ReceivedMapSize size ->
             ( modelUpdateIfPlaying (\state -> { state | mapSize = Just size } |> updateCameraPosition) model, Command.none )
@@ -644,6 +659,7 @@ initFrontendPlayingState { gameState, myId, debugDirtParams } =
             , cameraPosition = { x = 0, y = 0 }
             , mobileRelicMenuOpen = False
             , skillTreeMenuOpen = False
+            , selectedSkill = Nothing
             , debugDirtParams = debugDirtParams
             , currentTime = Effect.Time.millisToPosix 0
             , cleaningRandom = 42
@@ -677,6 +693,16 @@ renderModel model =
 
         Playing playingState ->
             renderPlayingState playingState
+
+
+getMyId : Model -> PersonId
+getMyId model =
+    case model.state of
+        Playing state ->
+            state.myId
+        
+        _ ->
+            PersonId 0  -- fallback, shouldn't happen
 
 
 extractMyself : FrontendPlayingState -> Maybe PersonData
@@ -854,17 +880,87 @@ renderSkillTreeContent state me =
             , Svg.Attributes.id "skill-tree-svg"
             ]
             [ -- Connection lines
-              skillConnectionLine "400" "300" "400" "200" -- center to top
-            , skillConnectionLine "400" "300" "250" "450" -- center to bottom-left
-            , skillConnectionLine "400" "300" "550" "450" -- center to bottom-right
+              skillConnectionLine "400" "300" "300" "200" -- root to learned
+            , skillConnectionLine "400" "300" "200" "400" -- root to swift cleaning  
+            , skillConnectionLine "400" "300" "600" "400" -- root to cleaning fundamentals
 
             -- Skill nodes
-            , skillNodeSvg "400" "300" "Core" "🔥" True
-            , skillNodeSvg "400" "200" "Power Strike" "⚡" False
-            , skillNodeSvg "250" "450" "Shield Mastery" "🛡️" False
-            , skillNodeSvg "550" "450" "Swift Cleaning" "💨" False
+            , skillNodeSvg "400" "300" "Root" "root" (isSkillUnlocked me.skillTree "root")
+            , skillNodeSvg "300" "200" "Learned" "learned" (isSkillUnlocked me.skillTree "learned")
+            , skillNodeSvg "200" "400" "Swift Cleaning" "swiftCleaning" (isSkillUnlocked me.skillTree "swiftCleaning")
+            , skillNodeSvg "600" "400" "Cleaning Fundamentals" "cleaningFundamentals" (isSkillUnlocked me.skillTree "cleaningFundamentals")
             ]
         ]
+
+
+isSkillUnlocked : SkillTree -> String -> Bool
+isSkillUnlocked skillTree skillName =
+    case skillName of
+        "root" ->
+            skillTree.root
+
+        "learned" ->
+            skillTree.learned
+
+        "swiftCleaning" ->
+            skillTree.swiftCleaning
+
+        "cleaningFundamentals" ->
+            skillTree.cleaningFundamentals
+
+        _ ->
+            False
+
+
+calculateSkillPoints : PersonData -> Int
+calculateSkillPoints person =
+    let
+        playerLevel = Util.levelForExp person.experience
+        unlockedSkillsCount = 
+            [ person.skillTree.root
+            , person.skillTree.learned
+            , person.skillTree.swiftCleaning
+            , person.skillTree.cleaningFundamentals
+            ]
+            |> List.filter identity
+            |> List.length
+    in
+    playerLevel - unlockedSkillsCount
+
+
+getSkillDescription : String -> String
+getSkillDescription skillId =
+    case skillId of
+        "root" ->
+            "Introduces you to the skill tree. Grants +5 cleaning power."
+        
+        "learned" ->
+            "Increases the base EXP from a basic clean by 5xp."
+        
+        "swiftCleaning" ->
+            "Increases cleaning by 1.1x."
+        
+        "cleaningFundamentals" ->
+            "Grants +10 cleaning power."
+        
+        _ ->
+            "Unknown skill."
+
+
+canUnlockSkill : PersonData -> String -> Bool
+canUnlockSkill person skillId =
+    let
+        hasSkillPoints = calculateSkillPoints person > 0
+        skillUnlocked = isSkillUnlocked person.skillTree skillId
+        hasPrerequisites = 
+            case skillId of
+                "root" -> True  -- Always can unlock root
+                "learned" -> person.skillTree.root
+                "swiftCleaning" -> person.skillTree.root
+                "cleaningFundamentals" -> person.skillTree.root
+                _ -> False
+    in
+    hasSkillPoints && not skillUnlocked && hasPrerequisites
 
 
 skillConnectionLine : String -> String -> String -> String -> Svg.Svg FrontendMsg
@@ -882,10 +978,20 @@ skillConnectionLine x1 y1 x2 y2 =
 
 
 skillNodeSvg : String -> String -> String -> String -> Bool -> Svg.Svg FrontendMsg
-skillNodeSvg x y name icon isUnlocked =
+skillNodeSvg x y name skillId isUnlocked =
     let
-        nodeRadius =
-            "32"
+        -- Calculate text dimensions (rough estimate)
+        textWidth =
+            String.length name * 8 + 16  -- rough char width + padding
+
+        textHeight =
+            20
+
+        rectX =
+            String.toInt x |> Maybe.withDefault 0 |> (\centerX -> centerX - textWidth // 2) |> String.fromInt
+
+        rectY =
+            String.toInt y |> Maybe.withDefault 0 |> (\centerY -> centerY - textHeight // 2) |> String.fromInt
 
         fillColor =
             if isUnlocked then
@@ -903,6 +1009,15 @@ skillNodeSvg x y name icon isUnlocked =
             else
                 "#6b7280"
 
+        textColor =
+            if isUnlocked then
+                "#ffffff"
+                -- White text on blue background
+
+            else
+                "#374151"
+                -- Dark gray text
+
         -- Gray
         opacity =
             if isUnlocked then
@@ -911,12 +1026,15 @@ skillNodeSvg x y name icon isUnlocked =
             else
                 "0.6"
     in
-    Svg.g []
-        [ -- Node circle
-          Svg.circle
-            [ Svg.Attributes.cx x
-            , Svg.Attributes.cy y
-            , Svg.Attributes.r nodeRadius
+    Svg.g [ Html.Events.onClick (ClickedSkillNode skillId) ]
+        [ -- Rounded rectangle background
+          Svg.rect
+            [ Svg.Attributes.x rectX
+            , Svg.Attributes.y rectY
+            , Svg.Attributes.width (String.fromInt textWidth)
+            , Svg.Attributes.height (String.fromInt textHeight)
+            , Svg.Attributes.rx "8"
+            , Svg.Attributes.ry "8"
             , Svg.Attributes.fill fillColor
             , Svg.Attributes.stroke strokeColor
             , Svg.Attributes.strokeWidth "2"
@@ -925,23 +1043,13 @@ skillNodeSvg x y name icon isUnlocked =
             ]
             []
 
-        -- Icon text
+        -- Name label (centered in rectangle)
         , Svg.text_
             [ Svg.Attributes.x x
-            , Svg.Attributes.y (String.fromInt (String.toInt y |> Maybe.withDefault 0 |> (+) 6))
-            , Svg.Attributes.textAnchor "middle"
-            , Svg.Attributes.fontSize "24"
-            , Svg.Attributes.opacity opacity
-            ]
-            [ Svg.text icon ]
-
-        -- Name label
-        , Svg.text_
-            [ Svg.Attributes.x x
-            , Svg.Attributes.y (String.fromInt (String.toInt y |> Maybe.withDefault 0 |> (+) 50))
+            , Svg.Attributes.y (String.fromInt (String.toInt y |> Maybe.withDefault 0 |> (+) 4))
             , Svg.Attributes.textAnchor "middle"
             , Svg.Attributes.fontSize "12"
-            , Svg.Attributes.fill "#374151"
+            , Svg.Attributes.fill textColor
             , Svg.Attributes.opacity opacity
             ]
             [ Svg.text name ]

@@ -38,6 +38,12 @@ createPerson id name =
         , clearCount = 0
         }
     , bestHighFiveBoost = Nothing
+    , skillTree =
+        { root = True  -- Root skill is unlocked by default
+        , learned = False
+        , swiftCleaning = False
+        , cleaningFundamentals = False
+        }
     }
 
 
