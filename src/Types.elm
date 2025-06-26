@@ -14,10 +14,6 @@ type alias RelicsById =
     SeqDict RelicId RelicData
 
 
-type alias PersonWithRelics =
-    { person : PersonData, heldRelics : List RelicData }
-
-
 type alias RelicsByLocation =
     SeqDict GameObjectTypes.RelicPosition RelicsById
 

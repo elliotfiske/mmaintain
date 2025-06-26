@@ -1,29 +1,12 @@
 module GameStateManipulation exposing
-    ( applyClean
-    , cleanDirt
-    , cleanStrengthForPlayer
-    , destroyDirt
-    , doClean
-    , dropAndDoubleRelicBody
+    ( cleanStrengthForPlayer
     , executeActionOnGameState
     , findSmallestAndLargestNearbyDirts
     , getRarestRelicAtLocation
-    , getRelicsAtFloorPoint
     , getRelicsHeldByPlayer
-    , handleDroppingDoubler
-    , handleSplashBucket
-    , incrementCleanCount
-    , incrementClearCount
-    , internalExecuteActionOnGameState
     , isRelicHeldByPerson
-    , makeDirtSmaller
-    , maybeActivateRelic
-    , pickUpRelic
-    , playerEarnsExperience
     , relicBody
     , relicsAtLocation
-    , unlockSkill
-    , updatePersonDictWithExperience
     , xpMultiplierForPlayer
     )
 
@@ -200,7 +183,7 @@ updateWithRelics actorId action state =
             -- Don't apply relic middleware for server actions
             BackendTriggerUtil.withNoOp state
 
-        Types.Client personId ->
+        Types.Client _ ->
             SeqDict.values state.relicsByLocation
                 |> List.concatMap SeqDict.values
                 |> List.foldl
@@ -519,8 +502,8 @@ internalExecuteActionOnGameState action state =
         ActivateGenerosityTrap personId relicId ->
             handleActivateGenerosityTrap personId relicId state
 
-        UnlockSkillAction personId skillId ->
-            unlockSkill personId skillId state
+        UnlockSkillAction personId skill ->
+            unlockSkill personId skill state
 
         BatchAction actions ->
             handleBatchAction actions state
@@ -547,7 +530,7 @@ combineBatchActionResult batchAction ( currentState, currentTrigger ) =
         ( _, NoOpBackendTrigger ) ->
             ( newState, currentTrigger )
 
-        ( _, _ ) ->
+        _ ->
             ( newState, Types.BatchTrigger [ currentTrigger, newTrigger ] )
 
 
@@ -872,37 +855,6 @@ dropAndDoubleRelicBody state relic me people heldByMe =
            )
 
 
-maybeActivateRelic : PersonId -> RelicId -> GameState -> ( GameState, Types.BackendTrigger )
-maybeActivateRelic activatorId relicId state =
-    let
-        maybeRelic =
-            RelicUtil.getRelicAtLocation (GameObjectTypes.HeldBy activatorId) relicId state
-
-        maybePerson =
-            SeqDict.get activatorId state.personDict
-    in
-    case ( maybeRelic, maybePerson ) of
-        ( Just relic, Just person ) ->
-            activateRelicWithPersonData state person relic
-
-        _ ->
-            ( state, NoOpBackendTrigger )
-
-
-activateRelicWithPersonData : GameState -> PersonData -> RelicData -> ( GameState, Types.BackendTrigger )
-activateRelicWithPersonData state person relic =
-    case relic.relicType of
-        DropAndDouble people ->
-            let
-                newPersonState =
-                    { person | experience = person.experience + RelicUtil.dropDoubleCurrentExperience relic.rarity relic.exp (List.length people) }
-            in
-            ( { state | personDict = SeqDict.insert person.id newPersonState state.personDict }, NoOpBackendTrigger )
-
-        _ ->
-            ( state, NoOpBackendTrigger )
-
-
 addCleanStats : PersonId -> GameState -> GameState
 addCleanStats personId state =
     { state | personDict = incrementCleanCount personId state.personDict }
@@ -939,8 +891,7 @@ cleanStrengthForPlayer state person =
                     Just boost ->
                         toFloat boost.boost
                   )
-    in
-    let
+
         -- First apply additive bonuses (Broom + Skills)
         strengthAfterAdditive =
             heldRelics
@@ -1051,8 +1002,8 @@ handleGuestBookPickup relicId relic personId peopleWhoHaveHeldIt state =
         BackendTriggerUtil.withNoOp (Debug.log "GuestBook relic is not the one we're looking for" state)
 
 
-unlockSkill : PersonId -> String -> GameState -> ( GameState, Types.BackendTrigger )
-unlockSkill personId skillId state =
+unlockSkill : PersonId -> GameObjectTypes.Skill -> GameState -> ( GameState, Types.BackendTrigger )
+unlockSkill personId skill state =
     let
         updatePersonSkillTree person =
             let
@@ -1060,21 +1011,18 @@ unlockSkill personId skillId state =
                     person.skillTree
 
                 newSkillTree =
-                    case skillId of
-                        "root" ->
-                            { skillTree | root = False }
+                    case skill of
+                        GameObjectTypes.Root ->
+                            { skillTree | root = True }
 
-                        "learned" ->
+                        GameObjectTypes.Learned ->
                             { skillTree | learned = True }
 
-                        "swiftCleaning" ->
+                        GameObjectTypes.SwiftCleaning ->
                             { skillTree | swiftCleaning = True }
 
-                        "cleaningFundamentals" ->
+                        GameObjectTypes.CleaningFundamentals ->
                             { skillTree | cleaningFundamentals = True }
-
-                        _ ->
-                            skillTree
             in
             { person | skillTree = newSkillTree }
 

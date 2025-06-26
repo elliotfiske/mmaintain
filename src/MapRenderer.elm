@@ -1,7 +1,6 @@
 module MapRenderer exposing (render)
 
 import BaseUI as UI
-import Dict
 import GameObjectTypes exposing (..)
 import GameStateManipulation
 import Html exposing (..)
@@ -9,7 +8,7 @@ import Html.Attributes exposing (..)
 import Html.Events
 import KeyboardInput
 import RelicUtil
-import SeqDict exposing (SeqDict)
+import SeqDict
 import Types exposing (..)
 import Util
 
@@ -202,13 +201,6 @@ renderRelicTooltipBody state me relicData =
             [ class "flex flex-col justify-between" ]
             (GameStateManipulation.relicBody state relicData me)
         ]
-
-
-relicRarityBadge : GameObjectTypes.RelicRarity -> Html msg
-relicRarityBadge rarity =
-    Html.div
-        [ class ("badge dark:text-black " ++ RelicUtil.relicBgColor rarity) ]
-        [ Html.text (RelicUtil.relicRarityName rarity) ]
 
 
 personView : GameObjectTypes.Point -> PersonData -> Html.Html FrontendMsg

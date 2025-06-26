@@ -40,25 +40,6 @@ relicName relicType =
             "High Five"
 
 
-relicTextColor : RelicRarity -> String
-relicTextColor rarity =
-    case rarity of
-        Common ->
-            ""
-
-        Uncommon ->
-            "text-green-500"
-
-        Rare ->
-            "text-blue-500"
-
-        Epic ->
-            "text-purple-500"
-
-        Legendary ->
-            "text-red-500"
-
-
 relicRarityToCssClass : RelicRarity -> String
 relicRarityToCssClass rarity =
     case rarity of
@@ -95,25 +76,6 @@ relicBgColor rarity =
 
         Legendary ->
             "bg-red-300"
-
-
-relicRarityName : RelicRarity -> String
-relicRarityName rarity =
-    case rarity of
-        Common ->
-            "Common"
-
-        Uncommon ->
-            "Uncommon"
-
-        Rare ->
-            "Rare"
-
-        Epic ->
-            "Epic"
-
-        Legendary ->
-            "Legendary"
 
 
 simpleRelicBody : String -> List (Html.Html FrontendMsg)
@@ -279,12 +241,6 @@ dropDoubleCurrentExperience rarity xp droppedPeople =
     dropDoubleBaseExperience rarity xp * 2 ^ droppedPeople
 
 
-getRelicAtLocation : GameObjectTypes.RelicPosition -> RelicId -> GameState -> Maybe RelicData
-getRelicAtLocation location relicId state =
-    SeqDict.get location state.relicsByLocation
-        |> Maybe.andThen (SeqDict.get relicId)
-
-
 updateRelicAtLocation : GameObjectTypes.RelicPosition -> RelicData -> GameState -> GameState
 updateRelicAtLocation location relic state =
     let
@@ -316,20 +272,6 @@ getRelicHolderId relicId state =
 
                     _ ->
                         Nothing
-            )
-
-
-getRelicPositionOnFloor : RelicId -> GameState -> Maybe Point
-getRelicPositionOnFloor relicId state =
-    SeqDict.get relicId state.relicIdToLocationIndex
-        |> Maybe.andThen
-            (\location ->
-                case location of
-                    GameObjectTypes.HeldBy _ ->
-                        Nothing
-
-                    GameObjectTypes.OnFloor position ->
-                        Just position
             )
 
 

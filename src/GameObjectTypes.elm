@@ -32,11 +32,19 @@ type alias HighFiveBoost =
     }
 
 
+type Skill
+    = Root
+    | Learned
+    | SwiftCleaning
+    | CleaningFundamentals
+
+
 type alias SkillTree =
     { root : Bool
     , learned : Bool
     , swiftCleaning : Bool
     , cleaningFundamentals : Bool
+    , relicHunter : Bool
     }
 
 
@@ -114,6 +122,6 @@ type ActionOnGamestate
     | PickUpRelic RelicId PersonId
     | DropRelic RelicId PersonId
     | ActivateGenerosityTrap PersonId RelicId
-    | UnlockSkillAction PersonId String
+    | UnlockSkillAction PersonId Skill
     | BatchAction (List ActionOnGamestate)
     | GameStateNoOp

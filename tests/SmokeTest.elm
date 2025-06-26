@@ -2,15 +2,10 @@ module SmokeTest exposing (appTests, main)
 
 import Backend
 import Effect.Browser.Dom as Dom
-import Effect.Command as Command exposing (BackendOnly, Command, FrontendOnly)
-import Effect.Http exposing (Response(..))
 import Effect.Lamdera
-import Effect.Subscription as Subscription
-import Effect.Test exposing (FileUpload(..), HttpResponse(..), MultipleFilesUpload(..))
+import Effect.Test exposing (HttpResponse(..))
 import Effect.Time
-import Expect
 import Frontend
-import Html
 import Test exposing (describe)
 import Test.Html.Query
 import Test.Html.Selector

@@ -1,4 +1,4 @@
-module PersonUtil exposing (createPerson, doIncrementCleanCount, doIncrementClearCount, movePerson, movePersonWithId)
+module PersonUtil exposing (createPerson, doIncrementCleanCount, doIncrementClearCount, movePersonWithId)
 
 import GameObjectIds exposing (PersonId)
 import GameObjectTypes exposing (..)
@@ -41,6 +41,7 @@ createPerson id name =
     , skillTree =
         { root = False
         , learned = False
+        , relicHunter = False
         , swiftCleaning = False
         , cleaningFundamentals = False
         }

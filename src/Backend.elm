@@ -290,8 +290,8 @@ processSingleTrigger performer batchedTrigger ( accModel, accActions ) =
     )
 
 
-getRandomRelicRarityAndType : Model -> ( Maybe GameObjectTypes.RelicRarity, GameObjectTypes.RelicType, Model )
-getRandomRelicRarityAndType model =
+getRandomRelicRarityAndType : PersonId -> Model -> ( Maybe GameObjectTypes.RelicRarity, GameObjectTypes.RelicType, Model )
+getRandomRelicRarityAndType who model =
     let
         ( randomRarity, newModel ) =
             getRandomValue model
@@ -301,6 +301,9 @@ getRandomRelicRarityAndType model =
 
         randomType =
             RelicUtil.relicTypeRoll randomTypeValue
+
+        maybeFinder =
+            SeqDict.get who model.gameState.personDict
 
         maybeRarity =
             RelicUtil.rarityRoll randomRarity
@@ -312,7 +315,7 @@ doRelicRoll : PersonId -> GameObjectTypes.DirtData -> Model -> ( Model, ActionOn
 doRelicRoll who killedDirt model =
     let
         ( randomRarity, randomType, newModel ) =
-            getRandomRelicRarityAndType model
+            getRandomRelicRarityAndType who model
     in
     case randomRarity of
         Nothing ->

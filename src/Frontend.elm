@@ -3,7 +3,6 @@ port module Frontend exposing (..)
 import BaseUI as UI
 import Duration
 import Effect.Browser.Dom
-import Effect.Browser.Events exposing (onKeyDown)
 import Effect.Browser.Navigation
 import Effect.Command as Command exposing (Command, FrontendOnly)
 import Effect.Lamdera
@@ -11,7 +10,7 @@ import Effect.Subscription as Subscription exposing (Subscription)
 import Effect.Task
 import Effect.Time
 import GameObjectIds exposing (..)
-import GameObjectTypes exposing (ActionOnGamestate(..), ActionWithMetadata, Direction(..), DirtData, PersonData, SkillTree)
+import GameObjectTypes exposing (ActionOnGamestate(..), ActionWithMetadata, DirtData, PersonData, SkillTree)
 import GameStateManipulation
 import Html exposing (..)
 import Html.Attributes exposing (..)
@@ -248,7 +247,12 @@ update msg model =
                     getMyId model
 
                 unlockSkillAction =
-                    UnlockSkillAction myId skillId
+                    case stringToSkill skillId of
+                        Just skill ->
+                            UnlockSkillAction myId skill
+
+                        Nothing ->
+                            GameStateNoOp
             in
             ( modelUpdateIfPlaying (\state -> { state | skillTreeModalState = SkillTreeOpen }) model
             , Command.batch
@@ -416,16 +420,6 @@ moveMeTowardsTargetPoint state =
             ( state, Command.none )
 
 
-updateModelWithActionFromMyself : ActionOnGamestate -> Model -> Model
-updateModelWithActionFromMyself actionOnGamestate model =
-    case model.state of
-        Playing playingState ->
-            { model | state = Playing (addOptimisticAction actionOnGamestate playingState) }
-
-        _ ->
-            model
-
-
 updateModelWithAction : ActionPerformer -> ActionOnGamestate -> Model -> Model
 updateModelWithAction who actionOnGamestate model =
     case model.state of
@@ -457,16 +451,6 @@ createActionWithId action state =
             { state | nextActionId = state.nextActionId + 1 }
     in
     ( actionWithMetadata, updatedState )
-
-
-addOptimisticAction : ActionOnGamestate -> FrontendPlayingState -> FrontendPlayingState
-addOptimisticAction action state =
-    let
-        ( actionWithMetadata, updatedState ) =
-            createActionWithId action state
-    in
-    { updatedState | optimisticActions = updatedState.optimisticActions ++ [ actionWithMetadata ] }
-        |> updateCameraPosition
 
 
 addOptimisticActionAndReturnMetadata : ActionOnGamestate -> FrontendPlayingState -> ( ActionWithMetadata, FrontendPlayingState )
@@ -534,22 +518,9 @@ getDisplayStateRelicsAtLocation position state =
     GameStateManipulation.relicsAtLocation position (computeDisplayState state)
 
 
-getDisplayStateRarestRelicAtLocation : GameObjectTypes.Point -> FrontendPlayingState -> Maybe GameObjectTypes.RelicData
-getDisplayStateRarestRelicAtLocation position state =
-    GameStateManipulation.getRarestRelicAtLocation position (computeDisplayState state)
-
-
 getDisplayStateIsRelicHeldByPerson : RelicId -> PersonId -> FrontendPlayingState -> Bool
 getDisplayStateIsRelicHeldByPerson relicId personId state =
     GameStateManipulation.isRelicHeldByPerson (computeDisplayState state) relicId personId
-
-
-{-| Helper function for MapRenderer to get the computed display state.
-This is the main entry point for MapRenderer to access the optimistic state.
--}
-getDisplayStateForMapRenderer : FrontendPlayingState -> GameState
-getDisplayStateForMapRenderer state =
-    computeDisplayState state
 
 
 removeConfirmedActionFromOptimisticList : ActionWithMetadata -> FrontendPlayingState -> FrontendPlayingState
@@ -905,30 +876,72 @@ renderSkillTreeContent state me =
             , skillConnectionLine "400" "300" "600" "400" -- root to cleaning fundamentals
 
             -- Skill nodes
-            , skillNodeSvg "400" "300" "Root" "root" (isSkillUnlocked me.skillTree "root")
-            , skillNodeSvg "300" "200" "Learned" "learned" (isSkillUnlocked me.skillTree "learned")
-            , skillNodeSvg "200" "400" "Swift Cleaning" "swiftCleaning" (isSkillUnlocked me.skillTree "swiftCleaning")
-            , skillNodeSvg "600" "400" "Cleaning Fundamentals" "cleaningFundamentals" (isSkillUnlocked me.skillTree "cleaningFundamentals")
+            , skillNodeSvg "400" "300" "Root" "root" (isSkillUnlockedFromString me.skillTree "root")
+            , skillNodeSvg "300" "200" "Learned" "learned" (isSkillUnlockedFromString me.skillTree "learned")
+            , skillNodeSvg "200" "400" "Swift Cleaning" "swiftCleaning" (isSkillUnlockedFromString me.skillTree "swiftCleaning")
+            , skillNodeSvg "600" "400" "Cleaning Fundamentals" "cleaningFundamentals" (isSkillUnlockedFromString me.skillTree "cleaningFundamentals")
             ]
         ]
 
 
-isSkillUnlocked : SkillTree -> String -> Bool
-isSkillUnlocked skillTree skillName =
-    case skillName of
+stringToSkill : String -> Maybe GameObjectTypes.Skill
+stringToSkill skillString =
+    case skillString of
         "root" ->
-            skillTree.root
+            Just GameObjectTypes.Root
 
         "learned" ->
-            skillTree.learned
+            Just GameObjectTypes.Learned
 
         "swiftCleaning" ->
-            skillTree.swiftCleaning
+            Just GameObjectTypes.SwiftCleaning
 
         "cleaningFundamentals" ->
-            skillTree.cleaningFundamentals
+            Just GameObjectTypes.CleaningFundamentals
 
         _ ->
+            Nothing
+
+
+skillToString : GameObjectTypes.Skill -> String
+skillToString skill =
+    case skill of
+        GameObjectTypes.Root ->
+            "root"
+
+        GameObjectTypes.Learned ->
+            "learned"
+
+        GameObjectTypes.SwiftCleaning ->
+            "swiftCleaning"
+
+        GameObjectTypes.CleaningFundamentals ->
+            "cleaningFundamentals"
+
+
+isSkillUnlocked : SkillTree -> GameObjectTypes.Skill -> Bool
+isSkillUnlocked skillTree skill =
+    case skill of
+        GameObjectTypes.Root ->
+            skillTree.root
+
+        GameObjectTypes.Learned ->
+            skillTree.learned
+
+        GameObjectTypes.SwiftCleaning ->
+            skillTree.swiftCleaning
+
+        GameObjectTypes.CleaningFundamentals ->
+            skillTree.cleaningFundamentals
+
+
+isSkillUnlockedFromString : SkillTree -> String -> Bool
+isSkillUnlockedFromString skillTree skillString =
+    case stringToSkill skillString of
+        Just skill ->
+            isSkillUnlocked skillTree skill
+
+        Nothing ->
             False
 
 
@@ -957,55 +970,6 @@ calculateSkillPoints person =
             playerLevel - unlockedSkillsCount
     in
     Basics.min uncappedSkillPoints unlockableSkillsRemaining
-
-
-getSkillDescription : String -> String
-getSkillDescription skillId =
-    case skillId of
-        "root" ->
-            "Introduces you to the skill tree. Grants +5 cleaning power."
-
-        "learned" ->
-            "Increases the base EXP from a clean by 5xp."
-
-        "swiftCleaning" ->
-            "Increases cleaning by 1.1x."
-
-        "cleaningFundamentals" ->
-            "Grants +10 cleaning power."
-
-        _ ->
-            "Unknown skill."
-
-
-canUnlockSkill : PersonData -> String -> Bool
-canUnlockSkill person skillId =
-    let
-        hasSkillPoints =
-            calculateSkillPoints person > 0
-
-        skillUnlocked =
-            isSkillUnlocked person.skillTree skillId
-
-        hasPrerequisites =
-            case skillId of
-                "root" ->
-                    True
-
-                -- Always can unlock root
-                "learned" ->
-                    person.skillTree.root
-
-                "swiftCleaning" ->
-                    person.skillTree.root
-
-                "cleaningFundamentals" ->
-                    person.skillTree.root
-
-                _ ->
-                    False
-    in
-    hasSkillPoints && not skillUnlocked && hasPrerequisites
 
 
 skillConnectionLine : String -> String -> String -> String -> Svg.Svg FrontendMsg
@@ -1442,13 +1406,6 @@ lockedSlotView lockedUntil =
             [ class "" ]
             [ Html.text ("Until level " ++ String.fromInt lockedUntil) ]
         ]
-
-
-relicRarityBadge : GameObjectTypes.RelicRarity -> Html msg
-relicRarityBadge rarity =
-    Html.div
-        [ class ("badge dark:text-black " ++ RelicUtil.relicBgColor rarity) ]
-        [ Html.text (RelicUtil.relicRarityName rarity) ]
 
 
 relicLevelProgressBar : GameObjectTypes.RelicData -> Html.Html msg

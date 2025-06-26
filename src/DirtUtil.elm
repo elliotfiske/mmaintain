@@ -1,6 +1,6 @@
 module DirtUtil exposing (reduceDirtAmount, setDirtAmount)
 
-import GameObjectTypes exposing (DirtData, Point)
+import GameObjectTypes exposing (DirtData)
 
 
 setDirtAmount : Int -> DirtData -> DirtData
