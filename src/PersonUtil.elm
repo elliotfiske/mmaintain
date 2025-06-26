@@ -44,6 +44,7 @@ createPerson id name =
         , relicHunter = False
         , swiftCleaning = False
         , cleaningFundamentals = False
+        , powerCleaning = False
         }
     }
 

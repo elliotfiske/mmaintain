@@ -207,7 +207,11 @@ update msg model =
             ( modelUpdateIfPlaying (\state -> { state | currentTime = currTime }) model, Command.none )
 
         ClickTarget point ->
-            ( modelUpdateTarget (Just point) model, Command.none )
+            let
+                refocus =
+                    Effect.Task.attempt (\_ -> NoOpFrontendMsg) (Effect.Browser.Dom.focus (Effect.Browser.Dom.id "main-map"))
+            in
+            ( modelUpdateTarget (Just point) model, refocus )
 
         ToggleDebugStuff ->
             ( modelUpdateIfPlaying toggleDebugStuff model, Command.none )
@@ -603,16 +607,28 @@ updateFromBackend msg model =
         ActionConfirmed actionWithMetadata ->
             case model.state of
                 Playing playingState ->
-                    let
-                        -- First, update the backend confirmed state with the confirmed action
-                        stateWithConfirmedAction =
-                            updateStateWithAction (Client actionWithMetadata.performer) actionWithMetadata.action playingState
+                    -- Check if this action was performed by the current client
+                    if actionWithMetadata.performer == playingState.myId then
+                        -- This is our own action being confirmed - just remove it from optimistic list
+                        -- Don't apply it again since we already applied it optimistically
+                        let
+                            finalState =
+                                removeConfirmedActionFromOptimisticList actionWithMetadata playingState
+                        in
+                        ( { model | state = Playing finalState }, Command.none )
 
-                        -- Then, remove the action from optimistic list if it's there
-                        finalState =
-                            removeConfirmedActionFromOptimisticList actionWithMetadata stateWithConfirmedAction
-                    in
-                    ( { model | state = Playing finalState }, Command.none )
+                    else
+                        -- This is another player's action - apply it and remove from optimistic list if present
+                        let
+                            -- First, update the backend confirmed state with the confirmed action
+                            stateWithConfirmedAction =
+                                updateStateWithAction (Client actionWithMetadata.performer) actionWithMetadata.action playingState
+
+                            -- Then, remove the action from optimistic list if it's there
+                            finalState =
+                                removeConfirmedActionFromOptimisticList actionWithMetadata stateWithConfirmedAction
+                        in
+                        ( { model | state = Playing finalState }, Command.none )
 
                 _ ->
                     ( model, Command.none )
@@ -870,6 +886,7 @@ renderSkillTreeContent state me =
             , skillConnectionLine "400" "300" "200" "400" -- root to swift cleaning
             , skillConnectionLine "400" "300" "600" "400" -- root to cleaning fundamentals
             , skillConnectionLine "300" "200" "300" "100" -- learned to relic hunter
+            , skillConnectionLine "200" "400" "100" "500" -- swift cleaning to power cleaning
 
             -- Skill nodes
             , skillNodeSvg "400" "300" "Root" GameObjectTypes.Root (isSkillUnlocked me.skillTree GameObjectTypes.Root)
@@ -877,6 +894,7 @@ renderSkillTreeContent state me =
             , skillNodeSvg "200" "400" "Swift Cleaning" GameObjectTypes.SwiftCleaning (isSkillUnlocked me.skillTree GameObjectTypes.SwiftCleaning)
             , skillNodeSvg "600" "400" "Cleaning Fundamentals" GameObjectTypes.CleaningFundamentals (isSkillUnlocked me.skillTree GameObjectTypes.CleaningFundamentals)
             , skillNodeSvg "300" "100" "Relic Hunter" GameObjectTypes.RelicHunter (isSkillUnlocked me.skillTree GameObjectTypes.RelicHunter)
+            , skillNodeSvg "100" "500" "Power Cleaning" GameObjectTypes.PowerCleaning (isSkillUnlocked me.skillTree GameObjectTypes.PowerCleaning)
             ]
         ]
 
@@ -898,6 +916,9 @@ isSkillUnlocked skillTree skill =
 
         GameObjectTypes.RelicHunter ->
             skillTree.relicHunter
+
+        GameObjectTypes.PowerCleaning ->
+            skillTree.powerCleaning
 
 
 calculateSkillPoints : PersonData -> Int

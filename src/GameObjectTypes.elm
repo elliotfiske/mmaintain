@@ -38,6 +38,7 @@ type Skill
     | SwiftCleaning
     | CleaningFundamentals
     | RelicHunter
+    | PowerCleaning
 
 
 allSkills : List Skill
@@ -47,6 +48,7 @@ allSkills =
     , SwiftCleaning
     , CleaningFundamentals
     , RelicHunter
+    , PowerCleaning
     ]
 
 
@@ -56,6 +58,7 @@ type alias SkillTree =
     , swiftCleaning : Bool
     , cleaningFundamentals : Bool
     , relicHunter : Bool
+    , powerCleaning : Bool
     }
 
 

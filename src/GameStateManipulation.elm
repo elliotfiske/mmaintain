@@ -994,6 +994,14 @@ cleanStrengthForPlayer state person =
                         else
                             acc
                    )
+                |> (\acc ->
+                        -- Add PowerCleaning multiplicative bonus
+                        if person.skillTree.powerCleaning then
+                            acc * 1.2
+
+                        else
+                            acc
+                   )
     in
     round strengthAfterMultiplicative
 
@@ -1071,6 +1079,9 @@ unlockSkill personId skill state =
 
                         GameObjectTypes.RelicHunter ->
                             { skillTree | relicHunter = True }
+
+                        GameObjectTypes.PowerCleaning ->
+                            { skillTree | powerCleaning = True }
             in
             { person | skillTree = newSkillTree }
 

@@ -285,6 +285,9 @@ getSkillName skill =
         GameObjectTypes.RelicHunter ->
             "Relic Hunter"
 
+        GameObjectTypes.PowerCleaning ->
+            "Power Cleaning"
+
 
 getSkillDescription : Skill -> String
 getSkillDescription skill =
@@ -303,6 +306,9 @@ getSkillDescription skill =
 
         GameObjectTypes.RelicHunter ->
             "Improves your chances of finding better relics when clearing dirt. Provides +10 boost to relic rarity rolls."
+
+        GameObjectTypes.PowerCleaning ->
+            "Increases cleaning by 1.2x. Stacks multiplicatively with Swift Cleaning."
 
 
 calculateSkillPoints : PersonData -> Int
@@ -347,6 +353,9 @@ isSkillUnlocked skillTree skill =
         GameObjectTypes.RelicHunter ->
             skillTree.relicHunter
 
+        GameObjectTypes.PowerCleaning ->
+            skillTree.powerCleaning
+
 
 canUnlockSkill : PersonData -> Skill -> Bool
 canUnlockSkill person skill =
@@ -374,5 +383,8 @@ canUnlockSkill person skill =
 
                 GameObjectTypes.RelicHunter ->
                     person.skillTree.learned
+
+                GameObjectTypes.PowerCleaning ->
+                    person.skillTree.swiftCleaning
     in
     hasSkillPoints && not skillUnlocked && hasPrerequisites
