@@ -21,11 +21,11 @@ render state me =
         renderVictoryModal me
 
     else
-        case state.selectedSkill of
-            Just skillId ->
+        case state.skillTreeModalState of
+            SkillDetailOpen skillId ->
                 renderSkillModal me skillId
 
-            Nothing ->
+            _ ->
                 text ""
 
 
@@ -239,7 +239,7 @@ renderSkillModalActions me skillId =
         canUnlock = canUnlockSkill me skillId
     in
     Html.div [ class "flex justify-end space-x-2" ]
-        [ button [ class "btn btn-ghost", Html.Events.onClick CloseSkillModal ] [ text "Close" ]
+        [ button [ class "btn btn-ghost", Html.Events.onClick CloseSkillTreeModal ] [ text "Back" ]
         , if isUnlocked then
             text ""
           else if canUnlock then
@@ -267,7 +267,7 @@ getSkillDescription skillId =
             "Introduces you to the skill tree. Grants +5 cleaning power."
         
         "learned" ->
-            "Increases the base EXP from a basic clean by 5xp."
+            "Increases the base EXP from a clean by 5xp."
         
         "swiftCleaning" ->
             "Increases cleaning by 1.1x."
@@ -291,8 +291,12 @@ calculateSkillPoints person =
             ]
             |> List.filter identity
             |> List.length
+        
+        totalSkills = 4
+        unlockableSkillsRemaining = totalSkills - unlockedSkillsCount
+        uncappedSkillPoints = playerLevel - unlockedSkillsCount
     in
-    playerLevel - unlockedSkillsCount
+    Basics.min uncappedSkillPoints unlockableSkillsRemaining
 
 
 isSkillUnlocked : SkillTree -> String -> Bool

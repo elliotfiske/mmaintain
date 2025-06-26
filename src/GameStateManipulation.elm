@@ -616,10 +616,13 @@ makeDirtSmaller personId newDirt state =
         newDirtDict =
             SeqDict.insert newDirt.position newDirt state.dirtByLocation
 
+        baseXP =
+            calculateBaseXPForCleaning personId 1 state
+
         newState =
             state
                 |> GameState.updateGameStateDirtDict newDirtDict
-                |> playerEarnsExperience personId 1
+                |> playerEarnsExperience personId baseXP
     in
     ( newState, NoOpBackendTrigger )
 
@@ -634,11 +637,14 @@ destroyDirt personId dirtData state =
             state.personDict
                 |> incrementClearCount personId
 
+        baseXP =
+            calculateBaseXPForCleaning personId 10 state
+
         newState =
             state
                 |> GameState.updateGameStateDirtDict newDirtDict
                 |> GameState.updateGameStatePersonDict newPersonDict
-                |> playerEarnsExperience personId 10
+                |> playerEarnsExperience personId baseXP
     in
     ( newState, ClearedPollution personId dirtData )
 
@@ -903,6 +909,19 @@ addCleanStats personId state =
     { state | personDict = incrementCleanCount personId state.personDict }
 
 
+calculateBaseXPForCleaning : PersonId -> Int -> GameState -> Int
+calculateBaseXPForCleaning personId baseAmount state =
+    case SeqDict.get personId state.personDict of
+        Nothing ->
+            baseAmount
+
+        Just person ->
+            if person.skillTree.learned then
+                baseAmount + 5
+            else
+                baseAmount
+
+
 cleanStrengthForPlayer : GameState -> PersonData -> Int
 cleanStrengthForPlayer state person =
     let
@@ -922,7 +941,7 @@ cleanStrengthForPlayer state person =
                   )
     in
     let
-        -- First apply additive bonuses (Broom only)
+        -- First apply additive bonuses (Broom + Skills)
         strengthAfterAdditive =
             heldRelics
                 |> List.foldl
@@ -935,8 +954,14 @@ cleanStrengthForPlayer state person =
                                 acc
                     )
                     baseCleanStrength
+                |> (\acc ->
+                        -- Add skill-based additive bonuses
+                        acc
+                            + (if person.skillTree.root then 5.0 else 0.0)
+                            + (if person.skillTree.cleaningFundamentals then 10.0 else 0.0)
+                   )
 
-        -- Then apply multiplicative bonuses (Mop, GuestBook, DiminishingPower)
+        -- Then apply multiplicative bonuses (Mop, GuestBook, DiminishingPower, Skills)
         strengthAfterMultiplicative =
             heldRelics
                 |> List.foldl
@@ -955,6 +980,13 @@ cleanStrengthForPlayer state person =
                                 acc
                     )
                     strengthAfterAdditive
+                |> (\acc ->
+                        -- Add skill-based multiplicative bonuses
+                        if person.skillTree.swiftCleaning then
+                            acc * 1.1
+                        else
+                            acc
+                   )
     in
     round strengthAfterMultiplicative
 
@@ -1013,18 +1045,29 @@ unlockSkill personId skillId state =
     let
         updatePersonSkillTree person =
             let
-                skillTree = person.skillTree
-                newSkillTree = 
+                skillTree =
+                    person.skillTree
+
+                newSkillTree =
                     case skillId of
-                        "root" -> { skillTree | root = True }
-                        "learned" -> { skillTree | learned = True }
-                        "swiftCleaning" -> { skillTree | swiftCleaning = True }
-                        "cleaningFundamentals" -> { skillTree | cleaningFundamentals = True }
-                        _ -> skillTree
+                        "root" ->
+                            { skillTree | root = False }
+
+                        "learned" ->
+                            { skillTree | learned = True }
+
+                        "swiftCleaning" ->
+                            { skillTree | swiftCleaning = True }
+
+                        "cleaningFundamentals" ->
+                            { skillTree | cleaningFundamentals = True }
+
+                        _ ->
+                            skillTree
             in
             { person | skillTree = newSkillTree }
-            
-        newPersonDict = 
+
+        newPersonDict =
             SeqDict.update personId (Maybe.map updatePersonSkillTree) state.personDict
     in
     BackendTriggerUtil.withNoOp { state | personDict = newPersonDict }

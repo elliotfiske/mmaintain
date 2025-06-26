@@ -40,6 +40,12 @@ type alias FrontendModel =
     }
 
 
+type SkillTreeModalState
+    = Closed
+    | SkillTreeOpen
+    | SkillDetailOpen String
+
+
 type alias FrontendPlayingState =
     { backendConfirmedGameState : GameState
     , optimisticActions : List ActionWithMetadata
@@ -49,8 +55,7 @@ type alias FrontendPlayingState =
     , mapSize : Maybe { width : Float, height : Float }
     , cameraPosition : Point
     , mobileRelicMenuOpen : Bool
-    , skillTreeMenuOpen : Bool
-    , selectedSkill : Maybe String
+    , skillTreeModalState : SkillTreeModalState
     , debugDirtParams :
         { minX : Int
         , maxX : Int
@@ -119,7 +124,7 @@ type FrontendMsg
     | ToggleMobileRelicMenu
     | ToggleSkillTreeMenu
     | ClickedSkillNode String
-    | CloseSkillModal
+    | CloseSkillTreeModal
     | UnlockSkill String
     | NoOpFrontendMsg
     | NukeBackend

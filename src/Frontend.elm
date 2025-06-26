@@ -223,38 +223,38 @@ update msg model =
             let
                 updatedModel =
                     modelUpdateIfPlaying toggleSkillTreeMenu model
-
-                -- Scroll to center of the skill tree
-                scrollCommand =
-                    Effect.Task.attempt (\_ -> NoOpFrontendMsg)
-                        (scrollElementToCenter
-                            "skill-tree-svg-container"
-                            "skill-tree-svg"
-                            0.5
-                            -- outerXPos (center)
-                            0.5
-                            -- innerXPos (center)
-                            0.5
-                            -- outerYPos (center)
-                            0.5
-                         -- innerYPos (center)
-                        )
             in
-            ( updatedModel, scrollCommand )
+            ( updatedModel, scrollToSkillTreeCenter )
 
         ClickedSkillNode skillId ->
-            ( modelUpdateIfPlaying (\state -> { state | selectedSkill = Just skillId }) model, Command.none )
+            ( modelUpdateIfPlaying (\state -> { state | skillTreeModalState = SkillDetailOpen skillId }) model, Command.none )
 
-        CloseSkillModal ->
-            ( modelUpdateIfPlaying (\state -> { state | selectedSkill = Nothing }) model, Command.none )
+        CloseSkillTreeModal ->
+            case model.state of
+                Playing playingState ->
+                    case playingState.skillTreeModalState of
+                        SkillDetailOpen _ ->
+                            ( { model | state = Playing { playingState | skillTreeModalState = SkillTreeOpen } }, scrollToSkillTreeCenter )
+
+                        _ ->
+                            ( { model | state = Playing { playingState | skillTreeModalState = Closed } }, Command.none )
+
+                _ ->
+                    ( model, Command.none )
 
         UnlockSkill skillId ->
             let
-                myId = getMyId model
-                unlockSkillAction = UnlockSkillAction myId skillId
+                myId =
+                    getMyId model
+
+                unlockSkillAction =
+                    UnlockSkillAction myId skillId
             in
-            ( modelUpdateIfPlaying (\state -> { state | selectedSkill = Nothing }) model
-            , Effect.Lamdera.sendToBackend (ClientPerformsAction { action = unlockSkillAction, performer = myId, id = GameObjectTypes.ActionId 0 })
+            ( modelUpdateIfPlaying (\state -> { state | skillTreeModalState = SkillTreeOpen }) model
+            , Command.batch
+                [ Effect.Lamdera.sendToBackend (ClientPerformsAction { action = unlockSkillAction, performer = myId, id = GameObjectTypes.ActionId 0 })
+                , scrollToSkillTreeCenter
+                ]
             )
 
         ReceivedMapSize size ->
@@ -273,12 +273,29 @@ toggleDebugStuff state =
 
 closeModals : FrontendPlayingState -> FrontendPlayingState
 closeModals state =
-    { state | showingDebugStuff = False, mobileRelicMenuOpen = False, skillTreeMenuOpen = False }
+    { state | showingDebugStuff = False, mobileRelicMenuOpen = False, skillTreeModalState = Closed }
 
 
 toggleMobileRelicMenu : FrontendPlayingState -> FrontendPlayingState
 toggleMobileRelicMenu state =
     { state | mobileRelicMenuOpen = not state.mobileRelicMenuOpen }
+
+
+scrollToSkillTreeCenter : Command FrontendOnly ToBackend FrontendMsg
+scrollToSkillTreeCenter =
+    Effect.Task.attempt (\_ -> NoOpFrontendMsg)
+        (scrollElementToCenter
+            "skill-tree-svg-container"
+            "skill-tree-svg"
+            0.5
+            -- outerXPos (center)
+            0.5
+            -- innerXPos (center)
+            0.5
+            -- outerYPos (center)
+            0.5
+         -- innerYPos (center)
+        )
 
 
 scrollElementToCenter : String -> String -> Float -> Float -> Float -> Float -> Effect.Task.Task FrontendOnly Effect.Browser.Dom.Error ()
@@ -315,7 +332,19 @@ scrollElementToCenter outerId innerId outerXPos innerXPos outerYPos innerYPos =
 
 toggleSkillTreeMenu : FrontendPlayingState -> FrontendPlayingState
 toggleSkillTreeMenu state =
-    { state | skillTreeMenuOpen = not state.skillTreeMenuOpen }
+    let
+        newModalState =
+            case state.skillTreeModalState of
+                Closed ->
+                    SkillTreeOpen
+
+                SkillTreeOpen ->
+                    Closed
+
+                SkillDetailOpen _ ->
+                    Closed
+    in
+    { state | skillTreeModalState = newModalState }
 
 
 modelUpdateIfPlaying : (FrontendPlayingState -> FrontendPlayingState) -> Model -> Model
@@ -658,8 +687,7 @@ initFrontendPlayingState { gameState, myId, debugDirtParams } =
             , mapSize = Nothing
             , cameraPosition = { x = 0, y = 0 }
             , mobileRelicMenuOpen = False
-            , skillTreeMenuOpen = False
-            , selectedSkill = Nothing
+            , skillTreeModalState = Closed
             , debugDirtParams = debugDirtParams
             , currentTime = Effect.Time.millisToPosix 0
             , cleaningRandom = 42
@@ -700,9 +728,13 @@ getMyId model =
     case model.state of
         Playing state ->
             state.myId
-        
+
         _ ->
-            PersonId 0  -- fallback, shouldn't happen
+            PersonId 0
+
+
+
+-- fallback, shouldn't happen
 
 
 extractMyself : FrontendPlayingState -> Maybe PersonData
@@ -881,7 +913,7 @@ renderSkillTreeContent state me =
             ]
             [ -- Connection lines
               skillConnectionLine "400" "300" "300" "200" -- root to learned
-            , skillConnectionLine "400" "300" "200" "400" -- root to swift cleaning  
+            , skillConnectionLine "400" "300" "200" "400" -- root to swift cleaning
             , skillConnectionLine "400" "300" "600" "400" -- root to cleaning fundamentals
 
             -- Skill nodes
@@ -915,17 +947,28 @@ isSkillUnlocked skillTree skillName =
 calculateSkillPoints : PersonData -> Int
 calculateSkillPoints person =
     let
-        playerLevel = Util.levelForExp person.experience
-        unlockedSkillsCount = 
+        playerLevel =
+            Util.levelForExp person.experience
+
+        unlockedSkillsCount =
             [ person.skillTree.root
             , person.skillTree.learned
             , person.skillTree.swiftCleaning
             , person.skillTree.cleaningFundamentals
             ]
-            |> List.filter identity
-            |> List.length
+                |> List.filter identity
+                |> List.length
+
+        totalSkills =
+            4
+
+        unlockableSkillsRemaining =
+            totalSkills - unlockedSkillsCount
+
+        uncappedSkillPoints =
+            playerLevel - unlockedSkillsCount
     in
-    playerLevel - unlockedSkillsCount
+    Basics.min uncappedSkillPoints unlockableSkillsRemaining
 
 
 getSkillDescription : String -> String
@@ -933,16 +976,16 @@ getSkillDescription skillId =
     case skillId of
         "root" ->
             "Introduces you to the skill tree. Grants +5 cleaning power."
-        
+
         "learned" ->
-            "Increases the base EXP from a basic clean by 5xp."
-        
+            "Increases the base EXP from a clean by 5xp."
+
         "swiftCleaning" ->
             "Increases cleaning by 1.1x."
-        
+
         "cleaningFundamentals" ->
             "Grants +10 cleaning power."
-        
+
         _ ->
             "Unknown skill."
 
@@ -950,15 +993,29 @@ getSkillDescription skillId =
 canUnlockSkill : PersonData -> String -> Bool
 canUnlockSkill person skillId =
     let
-        hasSkillPoints = calculateSkillPoints person > 0
-        skillUnlocked = isSkillUnlocked person.skillTree skillId
-        hasPrerequisites = 
+        hasSkillPoints =
+            calculateSkillPoints person > 0
+
+        skillUnlocked =
+            isSkillUnlocked person.skillTree skillId
+
+        hasPrerequisites =
             case skillId of
-                "root" -> True  -- Always can unlock root
-                "learned" -> person.skillTree.root
-                "swiftCleaning" -> person.skillTree.root
-                "cleaningFundamentals" -> person.skillTree.root
-                _ -> False
+                "root" ->
+                    True
+
+                -- Always can unlock root
+                "learned" ->
+                    person.skillTree.root
+
+                "swiftCleaning" ->
+                    person.skillTree.root
+
+                "cleaningFundamentals" ->
+                    person.skillTree.root
+
+                _ ->
+                    False
     in
     hasSkillPoints && not skillUnlocked && hasPrerequisites
 
@@ -982,8 +1039,9 @@ skillNodeSvg x y name skillId isUnlocked =
     let
         -- Calculate text dimensions (rough estimate)
         textWidth =
-            String.length name * 8 + 16  -- rough char width + padding
+            String.length name * 8 + 16
 
+        -- rough char width + padding
         textHeight =
             20
 
@@ -1016,8 +1074,8 @@ skillNodeSvg x y name skillId isUnlocked =
 
             else
                 "#374151"
-                -- Dark gray text
 
+        -- Dark gray text
         -- Gray
         opacity =
             if isUnlocked then
@@ -1082,12 +1140,24 @@ renderOpenSkillTreeButton state me =
     let
         myLevel =
             Util.levelForExp me.experience
+
+        skillPoints =
+            calculateSkillPoints me
     in
-    Html.button
-        [ class "btn btn-outline btn-ghost md:hidden fixed top-16 right-4 z-50"
-        , Html.Events.onClick ToggleSkillTreeMenu
+    Html.div [ class "md:hidden fixed top-16 right-4 z-50 flex flex-col items-end" ]
+        [ Html.button
+            [ class "btn btn-outline btn-ghost"
+            , Html.Events.onClick ToggleSkillTreeMenu
+            ]
+            [ "Skills: Lvl " ++ String.fromInt myLevel |> Html.text ]
+        , if skillPoints > 0 then
+            Html.div
+                [ class "mt-1 px-2 py-1 bg-yellow-400 text-black text-xs font-bold rounded-full" ]
+                [ Html.text (String.fromInt skillPoints ++ " skill points available") ]
+
+          else
+            Html.text ""
         ]
-        [ "Skills: Lvl " ++ String.fromInt myLevel |> Html.text ]
 
 
 renderMobileRelicDialog : FrontendPlayingState -> PersonData -> Html.Html FrontendMsg
@@ -1112,22 +1182,23 @@ renderMobileRelicDialog state me =
 
 renderMobileSkillTreeDialog : FrontendPlayingState -> PersonData -> Html.Html FrontendMsg
 renderMobileSkillTreeDialog state me =
-    if state.skillTreeMenuOpen then
-        UI.basicDialog
-            (Html.div
-                [ class "flex flex-col h-full" ]
-                [ Html.div [ class "flex-grow overflow-y-auto" ]
-                    (renderSkillTreeContainer state me)
-                , button
-                    [ class "btn btn-primary w-full"
-                    , Html.Events.onClick ToggleSkillTreeMenu
+    case state.skillTreeModalState of
+        SkillTreeOpen ->
+            UI.basicDialog
+                (Html.div
+                    [ class "flex flex-col h-full" ]
+                    [ Html.div [ class "flex-grow overflow-y-auto" ]
+                        (renderSkillTreeContainer state me)
+                    , button
+                        [ class "btn btn-primary w-full"
+                        , Html.Events.onClick ToggleSkillTreeMenu
+                        ]
+                        [ text "Close" ]
                     ]
-                    [ text "Close" ]
-                ]
-            )
+                )
 
-    else
-        text ""
+        _ ->
+            text ""
 
 
 renderDesktopRelicSidebar : FrontendPlayingState -> PersonData -> Html.Html FrontendMsg
@@ -1325,12 +1396,23 @@ renderCleaningMinigame state me dirt =
 
 renderSkillTree : FrontendPlayingState -> PersonData -> Html.Html FrontendMsg
 renderSkillTree state me =
-    Html.div [ class "order-4 md:order-none md:overflow-y-auto hidden md:flex items-center justify-center w-full h-full" ]
+    let
+        skillPoints =
+            calculateSkillPoints me
+    in
+    Html.div [ class "order-4 md:order-none md:overflow-y-auto hidden md:flex flex-col items-center justify-center w-full h-full" ]
         [ Html.button
             [ class "btn btn-outline btn-ghost"
             , Html.Events.onClick ToggleSkillTreeMenu
             ]
             [ Html.text "Skills" ]
+        , if skillPoints > 0 then
+            Html.div
+                [ class "mt-2 px-3 py-1 bg-yellow-400 text-black text-sm font-bold rounded-full" ]
+                [ Html.text (String.fromInt skillPoints ++ " skill points available") ]
+
+          else
+            Html.text ""
         ]
 
 
